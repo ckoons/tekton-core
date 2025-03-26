@@ -1,0 +1,84 @@
+#!/bin/bash
+# commit-all - Script to commit changes across all Tekton subprojects
+
+# Save original directory
+ORIGINAL_DIR=$(pwd)
+
+# Determine if we're in the Tekton directory or need to navigate to it
+if [[ $(basename "$ORIGINAL_DIR") == "Tekton" ]]; then
+  TEKTON_DIR="$ORIGINAL_DIR"
+else
+  TEKTON_DIR="/Users/cskoons/projects/github/Tekton"
+  if [ ! -d "$TEKTON_DIR" ]; then
+    echo "❌ Error: Tekton directory not found at $TEKTON_DIR"
+    exit 1
+  fi
+  cd "$TEKTON_DIR"
+fi
+
+COMMIT_MSG="$1"
+if [ -z "$COMMIT_MSG" ]; then
+  echo "Usage: commit-all 'Your commit message'"
+  cd "$ORIGINAL_DIR"
+  exit 1
+fi
+
+# Format the complete commit message with attribution
+FULL_COMMIT_MSG=$(cat <<EOF
+$COMMIT_MSG
+
+Design & Engineering Guidance:
+- Changes to project structure and configuration
+- Maintain consistent naming across the ecosystem
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+Designed & Engineering Guidance by Casey Koons <cskoons@gmail.com>
+Co-Authored-By: Casey Koons <cskoons@gmail.com> & Claude <noreply@anthropic.com>
+EOF
+)
+
+# List of project directories
+PROJECTS=("Codex" "Engram" "Ergon" "Rhetor" "Sophia" "Telos")
+
+# Track which projects were changed
+CHANGED=false
+
+# Commit changes in each project
+for PROJECT in "${PROJECTS[@]}"; do
+  if [ -d "$TEKTON_DIR/$PROJECT" ]; then
+    cd "$TEKTON_DIR/$PROJECT"
+    
+    # Check if there are changes
+    if [[ -n $(git status -s) ]]; then
+      echo "Committing changes in $PROJECT..."
+      git add .
+      git commit -m "$FULL_COMMIT_MSG"
+      git push
+      CHANGED=true
+    else
+      echo "No changes in $PROJECT"
+    fi
+  else
+    echo "Warning: $PROJECT directory not found"
+  fi
+done
+
+# Check if Tekton itself has changes
+cd "$TEKTON_DIR"
+if [[ -n $(git status -s) ]]; then
+  echo "Committing changes in Tekton..."
+  git add .
+  git commit -m "$FULL_COMMIT_MSG"
+  git push
+  CHANGED=true
+fi
+
+echo ""
+if [ "$CHANGED" = true ]; then
+  echo "✅ Changes committed and pushed to repositories"
+else
+  echo "ℹ️ No changes found in any project"
+fi
+
+# Return to original directory
+cd "$ORIGINAL_DIR"
