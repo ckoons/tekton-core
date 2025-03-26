@@ -45,9 +45,12 @@ Tekton uses a layered architecture:
 
 Tekton integrates with:
 
+- **Codex*: For AI-assisted software engineering
 - **Engram**: For persistent memory across sessions
-- **Agenteer**: For specialized agent creation and workflow management
-- **Forge**: For AI-assisted software engineering
+- **Ergon**: For specialized agent creation and workflow management
+- **Rhetor**: For AI communication, prompt engineering and context management
+- **Sophia**: For Machine Learning, self improvement of Tekton and all component operations
+- **Telos**: For User communication, requierments development & analysis, evaluation and goals
 - **Local Models**: Deepseek Coder, CodeLlama, etc.
 - **Remote APIs**: Claude, GPT, etc.
 
