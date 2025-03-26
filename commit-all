@@ -53,7 +53,18 @@ for PROJECT in "${PROJECTS[@]}"; do
       echo "Committing changes in $PROJECT..."
       git add .
       git commit -m "$FULL_COMMIT_MSG"
-      git push
+      
+      # Check if branch has upstream
+      if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
+        # Branch has upstream, do normal push
+        git push
+      else
+        # No upstream, set it up
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        echo "Setting up upstream branch for $BRANCH..."
+        git push --set-upstream origin $BRANCH
+      fi
+      
       CHANGED=true
     else
       echo "No changes in $PROJECT"
@@ -69,7 +80,18 @@ if [[ -n $(git status -s) ]]; then
   echo "Committing changes in Tekton..."
   git add .
   git commit -m "$FULL_COMMIT_MSG"
-  git push
+  
+  # Check if branch has upstream
+  if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
+    # Branch has upstream, do normal push
+    git push
+  else
+    # No upstream, set it up
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    echo "Setting up upstream branch for $BRANCH..."
+    git push --set-upstream origin $BRANCH
+  fi
+  
   CHANGED=true
 fi
 
