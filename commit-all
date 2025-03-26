@@ -74,25 +74,36 @@ for PROJECT in "${PROJECTS[@]}"; do
   fi
 done
 
-# Check if Tekton itself has changes
+# Check if Tekton itself has changes (excluding changes to this script only)
 cd "$TEKTON_DIR"
-if [[ -n $(git status -s) ]]; then
-  echo "Committing changes in Tekton..."
-  git add .
-  git commit -m "$FULL_COMMIT_MSG"
+GIT_STATUS=$(git status -s)
+
+# If there are changes but they are ONLY to this script, ignore them
+if [[ -n "$GIT_STATUS" ]]; then
+  # Calculate number of changed files (excluding this script)
+  NON_SCRIPT_CHANGES=$(echo "$GIT_STATUS" | grep -v "commit-all" | wc -l | tr -d '[:space:]')
   
-  # Check if branch has upstream
-  if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
-    # Branch has upstream, do normal push
-    git push
+  # Check if the commit-all script is the only changed file
+  if [[ "$NON_SCRIPT_CHANGES" -eq 0 ]] && [[ "$GIT_STATUS" == *"commit-all"* ]]; then
+    echo "Only the commit-all script has changed. Ignoring this change to avoid recursive commits."
   else
-    # No upstream, set it up
-    BRANCH=$(git rev-parse --abbrev-ref HEAD)
-    echo "Setting up upstream branch for $BRANCH..."
-    git push --set-upstream origin $BRANCH
+    echo "Committing changes in Tekton..."
+    git add .
+    git commit -m "$FULL_COMMIT_MSG"
+    
+    # Check if branch has upstream
+    if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
+      # Branch has upstream, do normal push
+      git push
+    else
+      # No upstream, set it up
+      BRANCH=$(git rev-parse --abbrev-ref HEAD)
+      echo "Setting up upstream branch for $BRANCH..."
+      git push --set-upstream origin $BRANCH
+    fi
+    
+    CHANGED=true
   fi
-  
-  CHANGED=true
 fi
 
 echo ""
