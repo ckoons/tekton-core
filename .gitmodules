@@ -1,0 +1,18 @@
+[submodule "Codex"]
+	path = Codex
+	url = https://github.com/ckoons/Codex.git
+[submodule "Engram"]
+	path = Engram
+	url = https://github.com/ckoons/Engram.git
+[submodule "Ergon"]
+	path = Ergon
+	url = https://github.com/ckoons/Ergon.git
+[submodule "Rhetor"]
+	path = Rhetor
+	url = https://github.com/ckoons/Rhetor.git
+[submodule "Sophia"]
+	path = Sophia
+	url = https://github.com/ckoons/Sophia.git
+[submodule "Telos"]
+	path = Telos
+	url = https://github.com/ckoons/Telos.git
