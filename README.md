@@ -45,7 +45,7 @@ Tekton uses a layered architecture:
 
 Tekton integrates with:
 
-- **Codex*: For AI-assisted software engineering
+- **Codex**: For AI-assisted software engineering
 - **Engram**: For persistent memory across sessions
 - **Ergon**: For specialized agent creation and workflow management
 - **Rhetor**: For AI communication, prompt engineering and context management
