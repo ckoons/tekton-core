@@ -16,3 +16,9 @@
 [submodule "Telos"]
 	path = Telos
 	url = https://github.com/ckoons/Telos.git
+[submodule "Prometheus"]
+	path = Prometheus
+	url = https://github.com/ckoons/Prometheus.git
+[submodule "Synthesis"]
+	path = Synthesis
+	url = https://github.com/ckoons/Synthesis.git
