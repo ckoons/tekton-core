@@ -83,6 +83,11 @@ if [[ -n "$GIT_STATUS" ]]; then
   # Calculate number of changed files (excluding this script)
   NON_SCRIPT_CHANGES=$(echo "$GIT_STATUS" | grep -v "commit-all" | wc -l | tr -d '[:space:]')
   
+  # If there's a branch rename in progress, don't ignore it
+  if [[ "$GIT_STATUS" == *"renamed:"*"master"*"main"* ]]; then
+    NON_SCRIPT_CHANGES=1  # Force considering this a change
+  fi
+  
   # Check if the commit-all script is the only changed file
   if [[ "$NON_SCRIPT_CHANGES" -eq 0 ]] && [[ "$GIT_STATUS" == *"commit-all"* ]]; then
     echo "Only the commit-all script has changed. Ignoring this change to avoid recursive commits."
