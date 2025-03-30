@@ -1,0 +1,533 @@
+#!/bin/bash
+# tekton_launch
+# Unified launcher script for Tekton ecosystem with memory and model selection
+# Created: March 30, 2025
+
+# Default values
+MODEL_TYPE="claude" # Options: claude, ollama, openai, gemini
+MODEL="claude-3-sonnet-20240229" # Default model
+CLIENT_ID="tekton"
+MEMORY_ONLY=false
+USE_SMART_DETECTION=true
+MEMORY_FUNCTIONS=true
+TEMPERATURE="0.7"
+MAX_TOKENS="2048"
+SKIP_HERMES_CHECK=false
+FORCE_FALLBACK=false
+
+# ANSI color codes for terminal output
+BLUE="\033[94m"
+GREEN="\033[92m"
+YELLOW="\033[93m"
+RED="\033[91m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --model-type)
+      MODEL_TYPE="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --client-id)
+      CLIENT_ID="$2"
+      shift 2
+      ;;
+    --memory-only)
+      MEMORY_ONLY=true
+      shift
+      ;;
+    --temperature)
+      TEMPERATURE="$2"
+      shift 2
+      ;;
+    --max-tokens)
+      MAX_TOKENS="$2"
+      shift 2
+      ;;
+    --no-memory)
+      MEMORY_FUNCTIONS=false
+      shift
+      ;;
+    --fallback)
+      USE_SMART_DETECTION=false
+      FORCE_FALLBACK=true
+      export ENGRAM_USE_FALLBACK=1
+      shift
+      ;;
+    --skip-hermes)
+      SKIP_HERMES_CHECK=true
+      shift
+      ;;
+    --help)
+      echo "Tekton - Unified launcher script for AI models with Hermes integration"
+      echo ""
+      echo "Usage: tekton_launch [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --model-type TYPE        Type of model to launch: claude, ollama, openai, gemini (default: claude)"
+      echo "  --model MODEL            Specific model to use (defaults depend on model type)"
+      echo "  --client-id ID           Client ID for Engram (default: tekton)"
+      echo "  --memory-only            Only start the memory service, don't launch the model"
+      echo "  --fallback               Use file-based memory (no vector database)"
+      echo "  --temperature TEMP       Temperature for generation (default: 0.7)"
+      echo "  --max-tokens TOKENS      Maximum tokens to generate (default: 2048)"
+      echo "  --no-memory              Disable memory functions"
+      echo "  --skip-hermes            Skip Hermes service check and integration"
+      echo "  --help                   Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Try 'tekton_launch --help' for more information."
+      exit 1
+      ;;
+  esac
+done
+
+# Get the directory where the script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
+# Find the Tekton root directory
+TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+echo -e "${GREEN}Using Tekton installation at: $TEKTON_DIR${RESET}"
+
+# Find the Engram directory
+ENGRAM_DIR="$TEKTON_DIR/Engram"
+if [ -d "$ENGRAM_DIR" ]; then
+  echo -e "${GREEN}Found Engram at: $ENGRAM_DIR${RESET}"
+else
+  echo -e "${RED}Engram directory not found at $ENGRAM_DIR${RESET}"
+  echo -e "${RED}Cannot continue without Engram${RESET}"
+  exit 1
+fi
+
+# Add Engram to Python path
+export PYTHONPATH="$ENGRAM_DIR:$PYTHONPATH"
+
+# Find the Hermes directory
+HERMES_DIR="$TEKTON_DIR/Hermes"
+if [ -d "$HERMES_DIR" ] && [ "$SKIP_HERMES_CHECK" != true ]; then
+  echo -e "${GREEN}Found Hermes at: $HERMES_DIR${RESET}"
+  export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
+else
+  if [ "$SKIP_HERMES_CHECK" = true ]; then
+    echo -e "${YELLOW}Skipping Hermes integration (--skip-hermes)${RESET}"
+  else
+    echo -e "${YELLOW}Hermes directory not found at $HERMES_DIR${RESET}"
+    echo -e "${YELLOW}Proceeding without Hermes integration${RESET}"
+  fi
+  SKIP_HERMES_CHECK=true
+fi
+
+# Make helper scripts executable
+chmod +x "$ENGRAM_DIR/utils/detect_best_vector_db.py" 2>/dev/null
+
+# Detect best vector database if smart detection is enabled
+if [ "$USE_SMART_DETECTION" = true ]; then
+    echo -e "${BLUE}Detecting optimal vector database...${RESET}"
+    
+    if [ -f "$ENGRAM_DIR/utils/detect_best_vector_db.py" ]; then
+        # Run detection script to determine the best DB
+        DB_INFO=$(python "$ENGRAM_DIR/utils/detect_best_vector_db.py" --quiet)
+        DB_AVAILABLE=$?
+        
+        if [ $DB_AVAILABLE -eq 0 ] && [ -n "$DB_INFO" ]; then
+            # Extract the database name from the path
+            DB_NAME=$(basename "$DB_INFO" | sed 's/engram_with_//' | sed 's/_ollama//' | sed 's/_faiss//' | sed 's/_lancedb//')
+            
+            if [[ "$DB_INFO" == *"lancedb"* ]]; then
+                echo -e "${GREEN}Using LanceDB vector database (optimal for your hardware)${RESET}"
+                export ENGRAM_USE_VECTORDB=lancedb
+                export ENGRAM_USE_FALLBACK=0
+            elif [[ "$DB_INFO" == *"faiss"* ]]; then
+                echo -e "${GREEN}Using FAISS vector database (optimal for your hardware)${RESET}"
+                export ENGRAM_USE_VECTORDB=faiss
+                export ENGRAM_USE_FALLBACK=0
+            elif [ "$SKIP_HERMES_CHECK" = true ]; then
+                echo -e "${YELLOW}No optimal vector database detected, using file-based memory${RESET}"
+                export ENGRAM_USE_FALLBACK=1
+            else
+                echo -e "${YELLOW}No optimal vector database detected, using Hermes database services${RESET}"
+                export ENGRAM_USE_HERMES=1
+                export ENGRAM_USE_FALLBACK=0
+            fi
+        else
+            if [ "$SKIP_HERMES_CHECK" = true ]; then
+                echo -e "${YELLOW}Vector database detection failed, using file-based memory${RESET}"
+                export ENGRAM_USE_FALLBACK=1
+            else
+                echo -e "${YELLOW}Vector database detection failed, using Hermes database services${RESET}"
+                export ENGRAM_USE_HERMES=1
+                export ENGRAM_USE_FALLBACK=0
+            fi
+        fi
+    else
+        if [ "$SKIP_HERMES_CHECK" = true ]; then
+            echo -e "${YELLOW}Vector database detection script not found, using file-based memory${RESET}"
+            export ENGRAM_USE_FALLBACK=1
+        else
+            echo -e "${YELLOW}Vector database detection script not found, using Hermes database services${RESET}"
+            export ENGRAM_USE_HERMES=1
+            export ENGRAM_USE_FALLBACK=0
+        fi
+    fi
+elif [ "$FORCE_FALLBACK" = true ]; then
+    echo -e "${YELLOW}Using file-based memory system (fallback mode)${RESET}"
+    export ENGRAM_USE_FALLBACK=1
+fi
+    
+# For LanceDB, set up hardware-specific optimizations
+if [ "$ENGRAM_USE_VECTORDB" = "lancedb" ]; then
+    # Check for Apple Silicon for Metal optimizations
+    if [[ "$(uname -m)" == "arm64" ]] && [[ "$(uname -s)" == "Darwin" ]]; then
+        echo -e "${GREEN}Running on Apple Silicon, optimizing for Metal...${RESET}"
+        export LANCEDB_USE_METAL=1
+    fi
+
+    # Check for CUDA for optimizations
+    CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())" 2>/dev/null)
+    if [ "$CUDA_AVAILABLE" == "True" ]; then
+        echo -e "${GREEN}CUDA detected, enabling GPU acceleration...${RESET}"
+        export LANCEDB_USE_CUDA=1
+    fi
+fi
+
+# Start the memory service if needed
+if [ "$MEMORY_ONLY" = true ] || [ "$MODEL_TYPE" = "claude" ]; then
+    # Check if Engram memory service is already running
+    ps aux | grep "engram.api.consolidated_server" | grep -v "grep" > /dev/null 2>&1
+    PS_CHECK=$?
+    
+    if [ $PS_CHECK -eq 0 ]; then
+        echo -e "${GREEN}Engram memory service is already running${RESET}"
+    else
+        echo -e "${BLUE}Starting Engram memory service...${RESET}"
+        
+        # Find the consolidated server script
+        ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
+        
+        if [ -x "$ENGRAM_STARTUP" ]; then
+            # Start the service with client ID 'server'
+            if [ "$ENGRAM_USE_FALLBACK" = "1" ]; then
+                "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" --fallback > /tmp/engram_error.log 2>&1 &
+            elif [ "$ENGRAM_USE_HERMES" = "1" ]; then
+                ENGRAM_USE_HERMES=1 "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
+            else
+                "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
+            fi
+            
+            STARTUP_PID=$!
+            echo -e "${GREEN}Started Engram memory service with PID: $STARTUP_PID${RESET}"
+            
+            # Wait for service to be ready
+            echo -e "${BLUE}Waiting for service to be ready...${RESET}"
+            for i in {1..10}; do
+                sleep 1
+                ps aux | grep "$STARTUP_PID" | grep -v "grep" > /dev/null 2>&1
+                if [ $? -ne 0 ]; then
+                    echo -e "${RED}Memory service failed to start${RESET}"
+                    cat /tmp/engram_error.log
+                    exit 1
+                fi
+                
+                # Try connecting to health endpoint
+                if curl -s "http://127.0.0.1:8000/health" > /dev/null 2>&1; then
+                    echo -e "${GREEN}Memory service is online!${RESET}"
+                    break
+                fi
+                
+                echo -n "."
+            done
+            echo ""
+        else
+            echo -e "${RED}Engram consolidated server script not found${RESET}"
+            exit 1
+        fi
+    fi
+    
+    # If we only wanted to start the memory service, exit now
+    if [ "$MEMORY_ONLY" = true ]; then
+        echo -e "${GREEN}${BOLD}Memory services started successfully. Exiting per --memory-only flag.${RESET}"
+        exit 0
+    fi
+fi
+
+# Display memory system information
+if [ "$ENGRAM_USE_FALLBACK" = "1" ]; then
+    echo -e "${YELLOW}${BOLD}Memory system:${RESET} File-based (fallback mode)"
+elif [ "$ENGRAM_USE_HERMES" = "1" ]; then
+    echo -e "${GREEN}${BOLD}Memory system:${RESET} Hermes centralized database services"
+else
+    if [ "$ENGRAM_USE_VECTORDB" = "lancedb" ]; then
+        echo -e "${GREEN}${BOLD}Memory system:${RESET} LanceDB vector database"
+    else
+        echo -e "${GREEN}${BOLD}Memory system:${RESET} FAISS vector database"
+    fi
+fi
+
+# Store the current working directory
+CURRENT_DIR="$(pwd)"
+
+# Launch the appropriate model
+echo -e "${BLUE}${BOLD}Launching $MODEL_TYPE model: $MODEL${RESET}"
+
+case "$MODEL_TYPE" in
+    "claude")
+        # Check if model is available
+        if [ "$MODEL" = "claude-3-sonnet-20240229" ] || [ "$MODEL" = "claude-3-opus-20240229" ] || [ "$MODEL" = "claude-3-5-sonnet" ]; then
+            echo -e "${GREEN}Using Claude model: $MODEL${RESET}"
+        else
+            echo -e "${YELLOW}Requested model '$MODEL' may not be available, attempting to use anyway${RESET}"
+        fi
+        
+        # Set memory functions CLI flag
+        MEMORY_FLAG=""
+        if [ "$MEMORY_FUNCTIONS" = true ]; then
+            MEMORY_FLAG="--allowedTools='Bash(*),Edit,View,Replace,BatchTool,GlobTool,GrepTool,LS,ReadNotebook,NotebookEditCell,WebFetchTool'"
+        else
+            MEMORY_FLAG=""
+        fi
+        
+        # Create the memory import code
+        MEMORY_IMPORT="
+# Setup Python environment
+import sys, os
+
+# Set client ID for this Claude instance
+os.environ['ENGRAM_CLIENT_ID'] = '${CLIENT_ID}'
+
+# Add Engram and Hermes directories to Python path
+ENGRAM_DIR = '${ENGRAM_DIR}'
+HERMES_DIR = '${HERMES_DIR}'
+
+if ENGRAM_DIR not in sys.path:
+    sys.path.insert(0, ENGRAM_DIR)
+    print(f\"${YELLOW}Added {ENGRAM_DIR} to Python path${RESET}\")
+
+if HERMES_DIR not in sys.path and not ${SKIP_HERMES_CHECK}:
+    sys.path.insert(0, HERMES_DIR)
+    print(f\"${YELLOW}Added {HERMES_DIR} to Python path${RESET}\")
+
+# Import memory functions from engram with Hermes integration
+try:
+    # Check if Hermes is available
+    hermes_available = False
+    if not ${SKIP_HERMES_CHECK}:
+        try:
+            from hermes.core.service_discovery import ServiceRegistry
+            from hermes.utils.database_helper import DatabaseClient
+            hermes_available = True
+            print(\"${GREEN}Hermes services available!${RESET}\")
+        except ImportError as e:
+            print(f\"${YELLOW}Hermes services not available: {e}${RESET}\")
+    
+    # Check if Hermes integration is enabled
+    use_hermes = os.environ.get('ENGRAM_USE_HERMES') == '1'
+    
+    # If Hermes is available and integration is enabled, use the Hermes adapter
+    if hermes_available and use_hermes:
+        print(\"${GREEN}Using Hermes integration for Engram memory...${RESET}\")
+        try:
+            from engram.integrations.hermes.memory_adapter import HermesMemoryService
+            # Register with Hermes service registry
+            try:
+                import asyncio
+                
+                async def register_with_hermes(client_id):
+                    try:
+                        # Initialize service registry
+                        registry = ServiceRegistry()
+                        await registry.start()
+                        
+                        # Register Claude with Hermes
+                        success = await registry.register(
+                            service_id=f\"claude-{client_id}\",
+                            name=f\"Claude ({client_id})\",
+                            version=\"3.5\",
+                            endpoint=\"http://localhost:11434\",
+                            capabilities=[\"llm\", \"reasoning\", \"tool_use\", \"image_understanding\"],
+                            metadata={
+                                \"client_id\": client_id,
+                                \"model\": \"${MODEL}\",
+                                \"provider\": \"anthropic\"
+                            }
+                        )
+                        
+                        if success:
+                            print(f\"${GREEN}Registered Claude ({client_id}) with Hermes service registry${RESET}\")
+                        else:
+                            print(f\"${YELLOW}Failed to register Claude with Hermes${RESET}\")
+                    except Exception as e:
+                        print(f\"${YELLOW}Error registering with Hermes: {e}${RESET}\")
+                
+                # Run the registration
+                asyncio.run(register_with_hermes(\"${CLIENT_ID}\"))
+            except Exception as e:
+                print(f\"${YELLOW}Error registering with Hermes service registry: {e}${RESET}\")
+            
+            # Import memory functions from Engram
+            from engram.cli.quickmem import m, t, r, w, l, c, k, s, a, p, v, d, n, q, y, z
+            print(\"${GREEN}💭 Memory functions loaded with Hermes integration (Client: ${CLIENT_ID})!${RESET}\")
+        except ImportError as e:
+            print(f\"${YELLOW}Hermes adapter not available: {e}${RESET}\")
+            # Fall back to standard memory functions
+            from engram.cli.quickmem import m, t, r, w, l, c, k, s, a, p, v, d, n, q, y, z
+            print(\"${GREEN}💭 Memory functions loaded (Client: ${CLIENT_ID})!${RESET}\")
+    else:
+        # Load standard memory functions from engram
+        from engram.cli.quickmem import m, t, r, w, l, c, k, s, a, p, v, d, n, q, y, z
+        print(\"${GREEN}💭 Memory functions loaded from engram package (Client: ${CLIENT_ID})!${RESET}\")
+    
+    # Try to load communication functions
+    try:
+        from engram.cli.comm_quickmem import sm, gm, ho, cc, lc, sc, gc, cs, wi, dl, do, di
+        print(\"${GREEN}💬 Claude communication functions loaded!${RESET}\")
+        # Show communication status
+        print(\"\\n${BLUE}Claude-to-Claude Communication Status:${RESET}\")
+        my_id = wi()
+        comm_status = cs()
+        
+        # Initialize dialog support
+        try:
+            from engram.cli.claude_dialog import init_dialog
+            # Initialize dialog with client ID
+            init_dialog(\"${CLIENT_ID}\")
+            print(\"${GREEN}🗣️ Dialog mode functionality initialized!${RESET}\")
+            print(\"${YELLOW}Use 'dl(\\\"target_id\\\")' to start dialog mode${RESET}\")
+        except ImportError as e:
+            print(f\"${YELLOW}⚠️ Dialog mode not available: {e}${RESET}\")
+    except ImportError as e:
+        print(f\"${YELLOW}⚠️ Claude communication functions not available: {e}${RESET}\")
+except ImportError as e:
+    print(f\"${RED}❌ Failed to import memory functions: {e}${RESET}\")
+    print(\"${RED}❌ Claude will run without memory capabilities${RESET}\")
+
+# Check memory service status
+try:
+    status = s()
+    previous = l(3)
+    print(f\"${GREEN}✓ Memory service status checked successfully${RESET}\")
+except Exception as e:
+    print(f\"${RED}❌ Error checking memory status: {e}${RESET}\")
+    print(\"${YELLOW}⚠️ Memory service may not be running correctly${RESET}\")
+
+print(\"\")"
+
+        # Launch Claude with the specified model and memory functions
+        echo "$MEMORY_IMPORT" | claude --model="$MODEL" $MEMORY_FLAG
+        ;;
+        
+    "ollama")
+        # Check if Ollama is running
+        if ! curl -s http://localhost:11434/api/tags > /dev/null; then
+            echo -e "${RED}Error: Ollama is not running. Please start Ollama first.${RESET}"
+            exit 1
+        fi
+        
+        # Find the Ollama bridge script
+        OLLAMA_BRIDGE="$ENGRAM_DIR/ollama/ollama_bridge.py"
+        echo -e "${BLUE}Using Ollama bridge: $OLLAMA_BRIDGE${RESET}"
+        
+        # Verify the bridge file exists
+        if [ ! -f "$OLLAMA_BRIDGE" ]; then
+            echo -e "${RED}Error: Ollama bridge script not found at $OLLAMA_BRIDGE${RESET}"
+            exit 1
+        fi
+        
+        # Add paths to PYTHONPATH
+        export PYTHONPATH="$ENGRAM_DIR/ollama:$ENGRAM_DIR:$PYTHONPATH"
+        
+        # Register Ollama with Hermes service registry if available
+        if [ "$SKIP_HERMES_CHECK" != true ] && [ -d "$HERMES_DIR" ]; then
+            echo -e "${BLUE}Registering Ollama with Hermes service registry...${RESET}"
+            
+            python -c "
+import sys, os
+import asyncio
+
+try:
+    sys.path.insert(0, '$HERMES_DIR')
+    from hermes.core.service_discovery import ServiceRegistry
+    
+    async def register_with_hermes():
+        try:
+            # Initialize service registry
+            registry = ServiceRegistry()
+            await registry.start()
+            
+            # Register Ollama with Hermes
+            success = await registry.register(
+                service_id=f'ollama-$CLIENT_ID',
+                name=f'Ollama ($CLIENT_ID)',
+                version='latest',
+                endpoint='http://localhost:11434',
+                capabilities=['llm', 'reasoning', 'embedding'],
+                metadata={
+                    'client_id': '$CLIENT_ID',
+                    'model': '$MODEL',
+                    'provider': 'ollama'
+                }
+            )
+            
+            if success:
+                print('\033[92mRegistered Ollama ($CLIENT_ID) with Hermes service registry\033[0m')
+            else:
+                print('\033[93mFailed to register Ollama with Hermes\033[0m')
+        except Exception as e:
+            print(f'\033[93mError registering with Hermes: {e}\033[0m')
+    
+    # Run the registration
+    asyncio.run(register_with_hermes())
+except Exception as e:
+    print(f'\033[93mError importing Hermes modules: {e}\033[0m')
+"
+        fi
+        
+        # Build command
+        CMD="python $OLLAMA_BRIDGE $MODEL --prompt-type combined --client-id $CLIENT_ID --temperature $TEMPERATURE --max-tokens $MAX_TOKENS"
+        
+        if [ "$MEMORY_FUNCTIONS" = true ]; then
+            CMD="$CMD --memory-functions"
+        fi
+        
+        # Add available models - default is Claude
+        CMD="$CMD --available-models Claude"
+        
+        # Add Hermes integration if available
+        if [ "$SKIP_HERMES_CHECK" != true ] && [ "$ENGRAM_USE_HERMES" = "1" ]; then
+            CMD="$CMD --hermes-integration"
+        fi
+        
+        # Execute the command
+        echo -e "${GREEN}${BOLD}Starting Ollama with model: $MODEL${RESET}"
+        cd "$CURRENT_DIR"
+        $CMD
+        ;;
+        
+    "openai")
+        echo -e "${YELLOW}OpenAI model support is not fully implemented yet.${RESET}"
+        echo -e "${YELLOW}Please use claude or ollama model types for now.${RESET}"
+        exit 1
+        ;;
+        
+    "gemini")
+        echo -e "${YELLOW}Gemini model support is not fully implemented yet.${RESET}"
+        echo -e "${YELLOW}Please use claude or ollama model types for now.${RESET}"
+        exit 1
+        ;;
+        
+    *)
+        echo -e "${RED}Unknown model type: $MODEL_TYPE${RESET}"
+        echo -e "${YELLOW}Supported model types: claude, ollama${RESET}"
+        exit 1
+        ;;
+esac
+
+echo -e "${BLUE}${BOLD}====== Tekton session ended ======${RESET}"

@@ -33,10 +33,17 @@ This document outlines the comprehensive development roadmap for the Tekton ecos
   - Multi-hop reasoning
   - Ontology management
 
-### Hermes (Vector & Messaging)
+### Hermes (Centralized Database & Messaging)
 - **Status:** 🟡 Initial Structure
-- **Purpose:** Vector operations and inter-component messaging
+- **Purpose:** Central data management and inter-component messaging
 - **Components:**
+  - Unified Registration Protocol
+  - Centralized Logging System
+  - All Database Services:
+    - Vector stores
+    - Knowledge graphs (Neo4j)
+    - Key-value stores
+    - Caches
   - Vector embedding and search
   - Hardware-optimized backends
   - Message bus
@@ -83,6 +90,9 @@ This document outlines the comprehensive development roadmap for the Tekton ecos
 
 ### Phase 1: Core Infrastructure (Current)
 - ✅ Engram memory system
+- 🔴 Unified Registration Protocol - PRIORITY
+- 🔄 Centralized Database Services in Hermes
+- 🔄 Centralized Logging System in Hermes
 - 🔄 Athena knowledge graph
 - 🔄 Hermes vector operations and messaging
 - 🔄 Harmonia workflow orchestration
@@ -116,20 +126,27 @@ This document outlines the comprehensive development roadmap for the Tekton ecos
 ## Technical Implementation Focus
 
 ### Current Focus
-- Vector database optimization
-- Client registration system
+- Unified Registration Protocol
+- Centralized Database Services in Hermes
+- Centralized Logging System
 - Component lifecycle management
 - Inter-component communication
 - Orchestrated startup/shutdown
 
 ### Next Steps
-1. Complete Athena core functionality
-2. Implement Hermes vector operations
-3. Develop Harmonia workflow engine
-4. Create basic Rhetor capabilities
-5. Design advanced vector operations in Hermes
+1. Implement Unified Registration Protocol through Hermes
+2. Migrate all database services to Hermes with namespace support
+3. Implement centralized logging infrastructure
+4. Complete Athena core functionality and Neo4j integration
+5. Develop Harmonia workflow engine
+6. Create basic Rhetor capabilities
+7. Design advanced vector operations in Hermes
 
 ## Architecture Principles
+- Centralized database services through Hermes
+- Centralized logging infrastructure
+- Single registration point for all components
+- Namespace isolation with cross-cutting capabilities
 - Shared resources for efficiency
 - Async-first for scalability
 - Hardware optimization
