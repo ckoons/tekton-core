@@ -1,454 +1,212 @@
-# Centralized Database Services
+# Hermes Database Services
 
-Hermes provides centralized database services for all Tekton components, offering a unified interface for various types of databases with namespace isolation, hardware optimization, and consistent APIs.
+Hermes provides a centralized set of database services that can be used by all Tekton components. These services abstract away the underlying database implementations, providing a consistent interface for various data storage and retrieval needs.
 
-## Overview
+## Available Database Types
 
-The centralized database services in Hermes provide the following benefits:
+### 1. Vector Database
 
-- **Single Source of Truth**: All data is managed through Hermes, preventing duplication and inconsistencies.
-- **Namespace Isolation**: Data is segregated by component and purpose while enabling cross-cutting analysis.
-- **Hardware Optimization**: Database backends are automatically selected based on available hardware.
-- **Connection Pooling**: Connections are managed efficiently to reduce resource usage.
-- **Consistent APIs**: All database types share similar interface patterns, making them easy to learn and use.
-- **Fallback Mechanisms**: Simple implementations are provided when specialized databases are unavailable.
-
-## Supported Database Types
-
-Hermes supports six types of databases for different use cases:
-
-1. **Vector Database**: For storing and searching vector embeddings (FAISS, Qdrant, ChromaDB, LanceDB)
-2. **Graph Database**: For knowledge representation and relationship analysis (Neo4j, NetworkX)
-3. **Key-Value Database**: For simple, fast data storage (Redis, LevelDB, RocksDB)
-4. **Document Database**: For structured document storage (MongoDB, JSONDB)
-5. **Cache Database**: For temporary data with expiration (Memory, Memcached)
-6. **Relational Database**: For structured data and SQL queries (SQLite, PostgreSQL)
-
-## Getting Started
-
-To use Hermes's database services, you will need to import the appropriate utilities:
+Optimized for storing and retrieving vector embeddings used in semantic search:
 
 ```python
-# For standalone functions
-from hermes.utils.database_helper import get_vector_db, get_graph_db, get_key_value_db
-
-# For the client class (recommended)
-from hermes.utils.database_helper import DatabaseClient
-```
-
-### Using the DatabaseClient
-
-The `DatabaseClient` class is the recommended way to access database services. It automatically manages connections and provides namespace prefixing:
-
-```python
-import asyncio
 from hermes.utils.database_helper import DatabaseClient
 
-async def example():
-    # Create a client for your component
-    client = DatabaseClient("my_component")
-    
-    # Get a vector database connection
-    vector_db = await client.get_vector_db(namespace="embeddings")
-    
-    # Store a vector
-    await vector_db.store(
-        id="doc1",
-        vector=[0.1, 0.2, 0.3, 0.4, 0.5],
-        metadata={"type": "example"},
-        text="Example document"
-    )
-    
-    # Close connections when done
-    await client.close_connections()
+# Initialize client
+db_client = DatabaseClient(component_id="engram.memory")
 
-# Run the async function
-asyncio.run(example())
-```
+# Get vector database for a specific namespace
+vector_db = await db_client.get_vector_db(namespace="conversations")
 
-You can also use the client as a context manager:
-
-```python
-async def example():
-    async with DatabaseClient("my_component") as client:
-        # Get connections
-        vector_db = await client.get_vector_db()
-        kv_db = await client.get_key_value_db()
-        
-        # Use databases...
-        
-        # Connections are automatically closed when exiting the context
-```
-
-### Using Standalone Functions
-
-For simpler use cases, you can use the standalone helper functions:
-
-```python
-import asyncio
-from hermes.utils.database_helper import get_vector_db, get_graph_db
-
-async def example():
-    # Get a vector database connection
-    vector_db = await get_vector_db(namespace="my_component.embeddings")
-    
-    # Get a graph database connection
-    graph_db = await get_graph_db(namespace="my_component.knowledge")
-    
-    # Use databases...
-
-# Run the async function
-asyncio.run(example())
-```
-
-## Namespace Isolation
-
-Namespaces are used to isolate data between components and purposes. The `DatabaseClient` automatically prefixes namespaces with the component ID:
-
-```python
-# Create a client for your component
-client = DatabaseClient("my_component")
-
-# These create different namespaces
-vector_db1 = await client.get_vector_db(namespace="embeddings")  # Actual: "my_component.embeddings"
-vector_db2 = await client.get_vector_db(namespace="models")     # Actual: "my_component.models"
-
-# Default namespace is the component ID
-vector_db3 = await client.get_vector_db()  # Actual: "my_component"
-```
-
-When using standalone functions, you should manually include the component prefix:
-
-```python
-vector_db = await get_vector_db(namespace="my_component.embeddings")
-```
-
-## Vector Database
-
-The vector database is used for storing and searching vector embeddings, such as those created by language models.
-
-### Vector Database Operations
-
-```python
-# Store a vector
+# Store a vector with metadata and text
 await vector_db.store(
-    id="doc1",
-    vector=[0.1, 0.2, 0.3, 0.4, 0.5],
-    metadata={"type": "example", "category": "tutorial"},
-    text="Example document text"
+    id="memory-123",
+    vector=[0.1, 0.2, 0.3, ...],  # Vector embedding
+    metadata={"timestamp": "2025-03-30T12:34:56Z", "user": "alice"},
+    text="This is the full text associated with the vector"
 )
 
 # Search for similar vectors
 results = await vector_db.search(
-    query_vector=[0.1, 0.2, 0.3, 0.4, 0.5],
-    limit=10,
-    filter={"category": "tutorial"}
+    query_vector=[0.15, 0.22, 0.31, ...],
+    limit=5,
+    filter={"user": "alice"}
 )
-
-# Get a specific vector
-vector = await vector_db.get(id="doc1")
-
-# List vectors
-vectors = await vector_db.list(
-    limit=100,
-    offset=0,
-    filter={"type": "example"}
-)
-
-# Delete vectors
-await vector_db.delete(id="doc1")  # Delete by ID
-await vector_db.delete(filter={"type": "example"})  # Delete by filter
 ```
 
-## Graph Database
+### 2. Key-Value Database
 
-The graph database is used for storing and querying relationships between entities.
-
-### Graph Database Operations
+For simple key-value storage with optional expiration:
 
 ```python
+# Get key-value database
+kv_db = await db_client.get_key_value_db(namespace="cache")
+
+# Store values
+await kv_db.set("user:alice", {"name": "Alice", "role": "admin"})
+await kv_db.set("session:123", {"user_id": "alice", "active": True}, expiration=3600)  # 1 hour
+
+# Retrieve values
+user = await kv_db.get("user:alice")
+
+# Check if key exists
+exists = await kv_db.exists("session:123")
+
+# Delete key
+await kv_db.delete("session:123")
+
+# Batch operations
+await kv_db.set_batch({
+    "counter:1": 42,
+    "counter:2": 73,
+    "counter:3": 19
+})
+```
+
+### 3. Graph Database
+
+For storing and querying interconnected data:
+
+```python
+# Get graph database
+graph_db = await db_client.get_graph_db(namespace="knowledge")
+
 # Add nodes
 await graph_db.add_node(
-    id="person1",
-    labels=["Person"],
-    properties={"name": "Alice", "age": 30}
+    id="person:alice",
+    labels=["Person", "Employee"],
+    properties={"name": "Alice", "role": "Developer"}
 )
 
 await graph_db.add_node(
-    id="company1",
-    labels=["Company"],
-    properties={"name": "Acme Inc", "founded": 2000}
+    id="project:tekton",
+    labels=["Project"],
+    properties={"name": "Tekton", "status": "Active"}
 )
 
 # Add relationships
 await graph_db.add_relationship(
-    source_id="person1",
-    target_id="company1",
-    type="WORKS_FOR",
-    properties={"since": 2018, "position": "Developer"}
+    source_id="person:alice",
+    target_id="project:tekton",
+    type="WORKS_ON",
+    properties={"since": "2025-01-01", "role": "Lead Developer"}
 )
 
-# Get a node
-node = await graph_db.get_node(id="person1")
-
-# Get relationships
-relationships = await graph_db.get_relationships(
-    node_id="person1",
-    types=["WORKS_FOR"],
-    direction="outgoing"  # or "incoming" or "both"
-)
-
-# Execute a custom query (Neo4j Cypher)
+# Query the graph
 results = await graph_db.query(
     query="""
-    MATCH (p:Person {namespace: $namespace})-[r:WORKS_FOR]->(c:Company {namespace: $namespace})
-    RETURN p.name AS name, r.position AS position, c.name AS company
+    MATCH (p:Person)-[r:WORKS_ON]->(proj:Project)
+    WHERE proj.name = $project_name
+    RETURN p, r, proj
     """,
-    params={}
-)
-
-# Delete nodes and relationships
-await graph_db.delete_node(id="person1")
-await graph_db.delete_relationship(
-    source_id="person1",
-    target_id="company1",
-    type="WORKS_FOR"
+    params={"project_name": "Tekton"}
 )
 ```
 
-## Key-Value Database
+## Database Backends
 
-The key-value database is used for simple data storage with fast access.
+Each database type supports multiple backend implementations:
 
-### Key-Value Database Operations
+### Vector Database Backends
+
+- **FAISS**: High-performance vector similarity search with GPU acceleration
+- **LanceDB**: Document-oriented vector database (via Engram integration)
+- **Fallback**: Simple in-memory implementation for systems without specialized databases
+
+### Key-Value Database Backends
+
+- **Redis**: Fast in-memory data structure store
+- **Local**: Simple file-based implementation for development/testing
+
+### Graph Database Backends
+
+- **Neo4j**: Industry-standard graph database with Cypher query language
+- **Memory**: Simple in-memory implementation for development/testing
+
+## Namespace Isolation
+
+All database operations occur within a specific namespace to isolate data from different components:
 
 ```python
-# Set values
-await kv_db.set("string_key", "Hello, world!")
-await kv_db.set("int_key", 42)
-await kv_db.set("dict_key", {"name": "Example", "values": [1, 2, 3]})
-
-# Set with expiration (in seconds)
-await kv_db.set("expiring_key", "I will expire", expiration=60)
-
-# Get values
-value = await kv_db.get("string_key")
-
-# Check if key exists
-exists = await kv_db.exists("string_key")
-
-# Batch operations
-await kv_db.set_batch({
-    "key1": "value1",
-    "key2": "value2",
-    "key3": "value3"
-})
-
-values = await kv_db.get_batch(["key1", "key2", "key3"])
-
-# Delete keys
-await kv_db.delete("string_key")
-await kv_db.delete_batch(["key1", "key2", "key3"])
+# Different namespaces for different data types
+conversations_db = await db_client.get_vector_db(namespace="conversations")
+thinking_db = await db_client.get_vector_db(namespace="thinking")
+projects_db = await db_client.get_vector_db(namespace="projects")
 ```
 
-## Document Database
+## Hardware-Aware Optimization
 
-The document database is used for storing structured documents with query capabilities.
+The database services automatically select the most appropriate backend based on available hardware:
 
-### Document Database Operations
+- CUDA-enabled GPUs for FAISS GPU acceleration
+- Apple Metal for optimized performance on Apple Silicon
+- Fallback to CPU implementations when specialized hardware is unavailable
+
+## Integration with Other Tekton Components
+
+### Engram Integration
 
 ```python
-# Insert documents
-user_id = await doc_db.insert(
-    collection="users",
-    document={
-        "name": "John Doe",
-        "email": "john@example.com",
-        "age": 35,
-        "interests": ["programming", "databases", "AI"]
-    }
+from engram.integrations.hermes.memory_adapter import HermesMemoryService
+
+# Initialize memory service with Hermes integration
+memory = HermesMemoryService(client_id="claude")
+
+# Add a memory (uses Hermes vector database)
+await memory.add(
+    content="Important information to remember",
+    namespace="conversations",
+    metadata={"timestamp": "2025-03-30T12:34:56Z"}
 )
 
-# Find documents
-users = await doc_db.find(
-    collection="users",
-    query={"age": {"$gt": 30}},
-    projection={"name": 1, "email": 1},
-    limit=10,
-    offset=0
-)
-
-# Find a single document
-user = await doc_db.find_one(
-    collection="users",
-    query={"email": "john@example.com"}
-)
-
-# Update documents
-updated = await doc_db.update(
-    collection="users",
-    query={"email": "john@example.com"},
-    update={"$set": {"age": 36}},
-    upsert=False
-)
-
-# Count documents
-count = await doc_db.count(
-    collection="users",
-    query={"age": {"$gt": 30}}
-)
-
-# Delete documents
-deleted = await doc_db.delete(
-    collection="users",
-    query={"email": "john@example.com"}
-)
+# Search memories (uses Hermes vector search)
+results = await memory.search("important information", namespace="conversations")
 ```
 
-## Cache Database
-
-The cache database is used for temporary data storage with automatic expiration.
-
-### Cache Database Operations
+### Athena Integration
 
 ```python
-# Set values with expiration (in seconds)
-await cache_db.set("cache_key", "Cache value", expiration=60)
+from athena.integrations.hermes.knowledge_adapter import HermesKnowledgeAdapter
 
-# Get values
-value = await cache_db.get("cache_key")
+# Initialize knowledge service with Hermes integration
+knowledge = HermesKnowledgeAdapter()
 
-# Update expiration
-await cache_db.touch("cache_key", expiration=120)
+# Store knowledge entities (uses Hermes graph database)
+await knowledge.add_entity("Person", "Alice", {"role": "Developer"})
+await knowledge.add_entity("Project", "Tekton", {"status": "Active"})
+await knowledge.add_relationship("Person", "Alice", "WORKS_ON", "Project", "Tekton")
 
-# Delete values
-await cache_db.delete("cache_key")
-
-# Clear all cache
-await cache_db.flush()
+# Query knowledge graph (uses Hermes graph queries)
+developers = await knowledge.query_entities("Person", {"role": "Developer"})
 ```
 
-## Relational Database
+## Configuration
 
-The relational database is used for structured data and SQL queries.
+Database services can be configured through:
 
-### Relational Database Operations
+1. Environment variables
+2. Configuration files
+3. Programmatic configuration
+
+Example configuration:
 
 ```python
-# Execute a SQL query
-results = await rel_db.execute(
-    query="SELECT * FROM users WHERE age > ?",
-    params=[30]
-)
+from hermes.utils.database_helper import configure_databases
 
-# Execute multiple queries
-results = await rel_db.execute_batch(
-    queries=[
-        "INSERT INTO users (name, email) VALUES (?, ?)",
-        "INSERT INTO users (name, email) VALUES (?, ?)"
-    ],
-    params_list=[
-        ["John Doe", "john@example.com"],
-        ["Jane Smith", "jane@example.com"]
-    ]
-)
-
-# Transactions
-await rel_db.begin_transaction()
-try:
-    await rel_db.execute("INSERT INTO users (name) VALUES (?)", ["User 1"])
-    await rel_db.execute("INSERT INTO users (name) VALUES (?)", ["User 2"])
-    await rel_db.commit_transaction()
-except:
-    await rel_db.rollback_transaction()
-
-# Schema operations
-await rel_db.create_table(
-    table_name="users",
-    columns={
-        "id": "INTEGER",
-        "name": "TEXT",
-        "email": "TEXT",
-        "age": "INTEGER"
+configure_databases(
+    vector_db={
+        "backend": "faiss",
+        "use_gpu": True,
+        "default_dimensions": 1536
     },
-    primary_key="id"
-)
-
-await rel_db.drop_table(table_name="users")
-```
-
-## Hardware Optimization
-
-Hermes automatically selects the optimal database backend based on available hardware:
-
-- For vector databases:
-  - FAISS if NVIDIA GPU is available
-  - Qdrant for Apple Silicon
-  - FAISS for CPU-only systems
-
-- For graph databases:
-  - Neo4j if available
-  - NetworkX as a fallback
-
-- For key-value databases:
-  - Redis if available
-  - LevelDB as a fallback
-
-- For document databases:
-  - MongoDB if available
-  - JSONDB as a fallback
-
-You can override the automatic selection by specifying a backend:
-
-```python
-from hermes.core.database_manager import DatabaseBackend
-
-# Use a specific backend
-vector_db = await client.get_vector_db(
-    namespace="embeddings",
-    backend=DatabaseBackend.FAISS
-)
-
-# Or by string
-vector_db = await client.get_vector_db(
-    namespace="embeddings",
-    backend="faiss"
-)
-```
-
-## Custom Configuration
-
-You can provide custom configuration for database connections:
-
-```python
-# Vector database configuration
-vector_db = await client.get_vector_db(
-    namespace="embeddings",
-    config={
-        "vector_dim": 1536,  # OpenAI embedding dimension
-        "use_gpu": True
-    }
-)
-
-# Neo4j configuration
-graph_db = await client.get_graph_db(
-    namespace="knowledge",
-    backend=DatabaseBackend.NEO4J,
-    config={
+    key_value_db={
+        "backend": "redis",
+        "host": "localhost",
+        "port": 6379
+    },
+    graph_db={
+        "backend": "neo4j",
         "uri": "bolt://localhost:7687",
         "username": "neo4j",
-        "password": "password"
-    }
-)
-
-# Redis configuration
-kv_db = await client.get_key_value_db(
-    namespace="config",
-    backend=DatabaseBackend.REDIS,
-    config={
-        "host": "localhost",
-        "port": 6379,
-        "db": 0,
         "password": "password"
     }
 )
@@ -456,46 +214,17 @@ kv_db = await client.get_key_value_db(
 
 ## Best Practices
 
-1. **Use DatabaseClient**: The `DatabaseClient` class provides the best developer experience with automatic connection management and namespace prefixing.
+1. **Use Namespaces Properly**:
+   - Separate data by logical category
+   - Use consistent naming conventions
+   - Document namespace purposes
 
-2. **Organize by Purpose**: Use different namespaces for different types of data, even within the same component.
+2. **Handle Connection Management**:
+   - Use the context manager pattern for database access
+   - Close connections explicitly when done
+   - Handle connection errors gracefully
 
-3. **Close Connections**: Always close connections when done, either manually or using a context manager.
-
-4. **Use Appropriate Database Type**: Choose the right database type for your use case:
-   - Vector database for embeddings and similarity search
-   - Graph database for relationships and knowledge representation
-   - Key-value database for simple data storage
-   - Document database for structured documents
-   - Cache database for temporary data
-   - Relational database for SQL and structured data
-
-5. **Handle Errors**: Database operations can fail for various reasons. Always handle errors appropriately:
-
-   ```python
-   try:
-       result = await vector_db.search(query_vector=[0.1, 0.2, 0.3])
-   except Exception as e:
-       logger.error(f"Vector search failed: {e}")
-       result = []
-   ```
-
-6. **Use Batch Operations**: When possible, use batch operations instead of individual operations for better performance.
-
-7. **Respect Namespaces**: Don't access data from other components' namespaces unless explicitly designed for cross-component analysis.
-
-## Extending the System
-
-You can extend the database services by implementing new adapters for additional backends:
-
-1. Create a new adapter class that inherits from the appropriate base class (e.g., `VectorDatabaseAdapter`)
-2. Implement all abstract methods required by the interface
-3. Add backend detection and adapter creation in the `DatabaseFactory` class
-
-See existing adapters in the `hermes/adapters/` directory for examples.
-
-## Next Steps
-
-- Check out the [Database Example Script](../scripts/database_example.py) for complete usage examples.
-- See the [API Reference](api_reference.md) for detailed documentation of all classes and methods.
-- Explore the [Migration Guide](migration_guide.md) for information on moving existing components to use Hermes's database services.
+3. **Optimize for Your Use Case**:
+   - Vector search: Use appropriate dimensions and indexing
+   - Key-value: Set appropriate expiration times
+   - Graph: Design schemas for efficient querying

@@ -1,290 +1,311 @@
 #!/usr/bin/env python3
 """
-Centralized Logging System Example - Demonstrates logging capabilities.
+Hermes Logging Example
 
-This script demonstrates how Tekton components can use the Centralized
-Logging System for structured, schema-versioned logging.
+This script demonstrates how to use the Hermes logging system with different
+log levels, component-based logging, and structured logging features.
 """
 
-import os
-import sys
-import logging
 import time
-import argparse
-import datetime
-import traceback
 import random
-from typing import Dict, Any, Optional, List
+import os
+from pathlib import Path
+import threading
+from datetime import datetime
 
-# Add project root to Python path if needed
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Ensure Hermes is in Python path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from hermes.core.logging import LogLevel, init_logging, get_logger
-from hermes.utils.logging_helper import (
-    setup_logging, intercept_python_logging, patch_stdout_stderr,
-    create_correlation_context
-)
+from hermes.core.logging import get_logger, configure_logging
 
+def basic_logging_example():
+    """Demonstrate basic logging functionality."""
+    print("\n=== Basic Logging Example ===")
+    
+    # Configure logging with default settings
+    configure_logging(level="INFO")
+    
+    # Get loggers for different components
+    main_logger = get_logger("hermes.examples.main")
+    database_logger = get_logger("hermes.examples.database")
+    api_logger = get_logger("hermes.examples.api")
+    
+    # Log messages at different levels
+    main_logger.debug("This is a debug message (should not be visible at INFO level)")
+    main_logger.info("This is an info message from the main component")
+    main_logger.warning("This is a warning message from the main component")
+    main_logger.error("This is an error message from the main component")
+    
+    database_logger.info("This is an info message from the database component")
+    database_logger.warning("This is a warning message from the database component")
+    
+    api_logger.info("This is an info message from the API component")
+    api_logger.error("This is an error message from the API component")
+    
+    # Try to log a critical message with exception
+    try:
+        result = 1 / 0
+    except Exception as e:
+        main_logger.critical(f"Critical error occurred: {e}", exc_info=True)
 
-def demonstrate_basic_logging(component_name: str) -> None:
-    """
-    Demonstrate basic logging capabilities.
+def component_based_logging_example():
+    """Demonstrate component-based logging with different log levels."""
+    print("\n=== Component-Based Logging Example ===")
     
-    Args:
-        component_name: Component name to use for logs
-    """
-    print("\n=== Basic Logging ===\n")
-    
-    # Set up logging
-    logger = setup_logging(component_name)
-    
-    # Log at different levels
-    logger.fatal("This is a fatal error message", code="FATAL001")
-    logger.error("This is an error message", code="ERROR001")
-    logger.warn("This is a warning message", code="WARN001")
-    logger.info("This is an info message", code="INFO001")
-    logger.normal("Component started successfully", code="NORMAL001")
-    logger.debug("This is a debug message", code="DEBUG001")
-    logger.trace("This is a trace message", code="TRACE001")
-    
-    # Log with context
-    logger.info(
-        "This is a message with context",
-        code="INFO002",
-        context={
-            "user_id": "user123",
-            "action": "login",
-            "ip_address": "192.168.1.1"
+    # Configure with component-specific levels
+    configure_logging(
+        level="INFO",  # Default level
+        component_levels={
+            "hermes.examples.database": "DEBUG",  # More verbose for database
+            "hermes.examples.api": "WARNING"      # Less verbose for API
         }
     )
     
-    # Log with effective timestamp
-    past_time = time.time() - 3600  # 1 hour ago
-    logger.info(
-        "This event actually happened an hour ago",
-        code="INFO003",
-        context={"retroactive": True},
-        effective_timestamp=past_time
-    )
+    # Get loggers for different components
+    main_logger = get_logger("hermes.examples.main")
+    database_logger = get_logger("hermes.examples.database")
+    api_logger = get_logger("hermes.examples.api")
     
-    # Log errors with stack traces
-    try:
-        # Generate an exception
-        result = 1 / 0
-    except Exception as e:
-        logger.error(
-            f"An error occurred: {e}",
-            code="ERROR002",
-            context={"operation": "division"},
-            stack_trace=traceback.format_exc()
-        )
+    # Log messages at different levels
+    main_logger.debug("Main debug (should not be visible at INFO level)")
+    main_logger.info("Main info (should be visible)")
+    
+    database_logger.debug("Database debug (should be visible due to DEBUG level)")
+    database_logger.info("Database info (should be visible)")
+    
+    api_logger.debug("API debug (should not be visible)")
+    api_logger.info("API info (should not be visible at WARNING level)")
+    api_logger.warning("API warning (should be visible)")
+    
+    # Reset logging configuration to default
+    configure_logging(level="INFO")
 
+def structured_logging_example():
+    """Demonstrate structured logging with additional context."""
+    print("\n=== Structured Logging Example ===")
+    
+    # Configure logging
+    configure_logging(level="INFO")
+    
+    # Get logger
+    logger = get_logger("hermes.examples.structured")
+    
+    # Log with additional structured data
+    logger.info("User logged in", 
+                extra={
+                    "user_id": "user123",
+                    "ip_address": "192.168.1.1",
+                    "login_time": datetime.now().isoformat()
+                })
+    
+    logger.warning("High CPU usage detected",
+                  extra={
+                      "cpu_percent": 95.2,
+                      "memory_percent": 87.3,
+                      "process_count": 120
+                  })
+    
+    logger.error("Database connection failed",
+                extra={
+                    "database": "postgres",
+                    "host": "db.example.com",
+                    "port": 5432,
+                    "retry_count": 3,
+                    "error_code": "ECONNREFUSED"
+                })
+    
+    # Log with deeply nested data
+    logger.info("Complex operation completed",
+               extra={
+                   "operation": "data_migration",
+                   "stats": {
+                       "records_processed": 1250,
+                       "success_rate": 0.997,
+                       "duration_ms": 3542,
+                       "by_type": {
+                           "users": 450,
+                           "orders": 800
+                       }
+                   },
+                   "context": {
+                       "environment": "production",
+                       "region": "us-west",
+                       "initiated_by": "scheduled_job"
+                   }
+               })
 
-def demonstrate_logger_extensions(component_name: str) -> None:
-    """
-    Demonstrate logger extension capabilities.
+def simulated_application_logging():
+    """Simulate logging from a running application."""
+    print("\n=== Simulated Application Logging ===")
     
-    Args:
-        component_name: Component name to use for logs
-    """
-    print("\n=== Logger Extensions ===\n")
+    # Configure logging
+    configure_logging(level="INFO")
     
-    # Set up logging
-    logger = setup_logging(component_name)
+    # Get loggers for different components
+    api_logger = get_logger("app.api")
+    db_logger = get_logger("app.database")
+    auth_logger = get_logger("app.auth")
     
-    # Create logger with context
-    user_logger = logger.with_context({
-        "user_id": "user456",
-        "session_id": "session789"
-    })
+    # Simulate a series of operations with logging
+    api_logger.info("Application started", 
+                   extra={"version": "1.0.0", "environment": "development"})
     
-    # Log with extended context
-    user_logger.info("User logged in", code="USER001")
-    user_logger.info(
-        "User performed action",
-        code="USER002",
-        context={"action": "update_profile"}  # This will be merged with default context
-    )
+    # Simulate user login
+    user_id = f"user_{random.randint(1000, 9999)}"
+    auth_logger.info(f"User login attempt", 
+                    extra={"user_id": user_id, "ip": "192.168.1.1"})
     
-    # Create logger with correlation ID
-    correlation_id = create_correlation_context()
-    correlation_logger = logger.with_correlation(correlation_id)
+    # Simulate successful login
+    auth_logger.info(f"User login successful", 
+                    extra={"user_id": user_id, "session_id": f"sess_{random.randint(1000, 9999)}"})
     
-    # Log correlated events
-    correlation_logger.info("Operation started", code="OP001")
-    correlation_logger.info("Step 1 completed", code="OP002")
-    correlation_logger.info("Step 2 completed", code="OP003")
-    correlation_logger.info("Operation completed", code="OP004")
+    # Simulate database queries
+    db_logger.info("Executing database query", 
+                  extra={"query_type": "SELECT", "table": "users"})
     
-    print(f"All those events share correlation ID: {correlation_id}")
-
-
-def demonstrate_query_capabilities(component_name: str) -> None:
-    """
-    Demonstrate log query capabilities.
-    
-    Args:
-        component_name: Component name to use for logs
-    """
-    print("\n=== Query Capabilities ===\n")
-    
-    # Set up logging
-    logger = setup_logging(component_name)
-    
-    # Generate some logs with different levels
-    for i in range(10):
-        level = random.choice([
-            LogLevel.ERROR,
-            LogLevel.WARN,
-            LogLevel.INFO,
-            LogLevel.DEBUG
-        ])
+    # Simulate random errors (20% chance)
+    if random.random() < 0.2:
+        db_logger.error("Database query failed", 
+                       extra={
+                           "query_type": "SELECT", 
+                           "table": "users",
+                           "error_code": "DB-3542",
+                           "retryable": True
+                       })
         
-        # Log the message
-        if level == LogLevel.ERROR:
-            logger.error(f"Error message {i}", code=f"ERROR{i}")
-        elif level == LogLevel.WARN:
-            logger.warn(f"Warning message {i}", code=f"WARN{i}")
-        elif level == LogLevel.INFO:
-            logger.info(f"Info message {i}", code=f"INFO{i}")
-        else:
-            logger.debug(f"Debug message {i}", code=f"DEBUG{i}")
+        # Simulate retry
+        db_logger.info("Retrying database query", 
+                      extra={"query_type": "SELECT", "table": "users", "attempt": 2})
     
-    # Query logs
-    from hermes.core.logging import _global_log_manager
+    # Simulate API response
+    response_time = random.randint(50, 500)
+    status_code = 200 if response_time < 300 else 500
     
-    # Get logs for the component
-    logs = _global_log_manager.query(
-        components=[component_name],
-        limit=5  # Get latest 5 logs
-    )
+    api_logger.info("API request completed", 
+                   extra={
+                       "path": "/api/users",
+                       "method": "GET",
+                       "status_code": status_code,
+                       "response_time_ms": response_time,
+                       "user_id": user_id
+                   })
     
-    print(f"Latest 5 logs for {component_name}:")
-    for log in logs:
-        print(f"[{log.level.name}] {log.message} (Code: {log.code})")
-    
-    # Get error logs only
-    error_logs = _global_log_manager.query(
-        components=[component_name],
-        levels=[LogLevel.ERROR],
-        limit=5
-    )
-    
-    print(f"\nLatest error logs for {component_name}:")
-    for log in error_logs:
-        print(f"[{log.level.name}] {log.message} (Code: {log.code})")
+    # Log warning for slow responses
+    if response_time > 200:
+        api_logger.warning("Slow API response detected", 
+                          extra={
+                              "path": "/api/users",
+                              "response_time_ms": response_time,
+                              "threshold_ms": 200
+                          })
 
-
-def demonstrate_python_logging_integration(component_name: str) -> None:
-    """
-    Demonstrate integration with Python's logging system.
+def concurrent_logging_example():
+    """Demonstrate logging from multiple threads concurrently."""
+    print("\n=== Concurrent Logging Example ===")
     
-    Args:
-        component_name: Component name to use for logs
-    """
-    print("\n=== Python Logging Integration ===\n")
+    # Configure logging
+    configure_logging(level="INFO")
     
-    # Set up logging
-    logger = setup_logging(component_name)
-    
-    # Intercept Python logging
-    intercept_python_logging(component_name)
-    
-    # Create Python logger
-    py_logger = logging.getLogger("example.python")
-    py_logger.setLevel(logging.DEBUG)
-    
-    # Log using Python's logging system
-    py_logger.critical("This is a critical message from Python logging")
-    py_logger.error("This is an error message from Python logging")
-    py_logger.warning("This is a warning message from Python logging")
-    py_logger.info("This is an info message from Python logging")
-    py_logger.debug("This is a debug message from Python logging")
-    
-    # Log an exception
-    try:
-        # Generate an exception
-        result = 1 / 0
-    except Exception as e:
-        py_logger.exception("An exception occurred")
-
-
-def demonstrate_stdout_stderr_redirection(component_name: str) -> None:
-    """
-    Demonstrate redirection of stdout and stderr to logging system.
-    
-    Args:
-        component_name: Component name to use for logs
-    """
-    print("\n=== Stdout/Stderr Redirection ===\n")
-    
-    # Set up logging
-    logger = setup_logging(component_name)
-    
-    # Save original stdout/stderr
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-    
-    try:
-        # Patch stdout and stderr
-        patch_stdout_stderr(component_name)
+    def worker_task(worker_id):
+        """Simulated worker task that logs messages."""
+        # Get a logger for this worker
+        logger = get_logger(f"hermes.examples.worker.{worker_id}")
         
-        # Print to stdout (will be redirected to logging system)
-        print("This message goes to stdout but is also logged")
+        # Log start
+        logger.info(f"Worker {worker_id} started")
         
-        # Print to stderr (will be redirected to logging system)
-        print("This message goes to stderr but is also logged", file=sys.stderr)
+        # Simulate work with logging
+        for i in range(3):
+            # Simulate work
+            work_time = random.uniform(0.1, 0.5)
+            time.sleep(work_time)
+            
+            # Log progress
+            logger.info(f"Worker {worker_id} completed step {i+1}",
+                       extra={
+                           "worker_id": worker_id,
+                           "step": i+1,
+                           "duration_ms": int(work_time * 1000)
+                       })
+            
+            # Simulate occasional warnings
+            if random.random() < 0.3:
+                logger.warning(f"Worker {worker_id} encountered a non-critical issue",
+                              extra={
+                                  "worker_id": worker_id,
+                                  "step": i+1,
+                                  "issue_type": "performance_degradation"
+                              })
         
-    finally:
-        # Restore original stdout/stderr
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
+        # Log completion
+        logger.info(f"Worker {worker_id} completed all tasks")
+    
+    # Create and start worker threads
+    threads = []
+    for i in range(5):
+        thread = threading.Thread(target=worker_task, args=(i+1,))
+        threads.append(thread)
+        thread.start()
+    
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
+    
+    # Log overall completion
+    main_logger = get_logger("hermes.examples.main")
+    main_logger.info("All workers completed their tasks")
 
+def log_level_demonstration():
+    """Demonstrate different log levels and when to use them."""
+    print("\n=== Log Level Demonstration ===")
+    
+    # Configure to show all logs
+    configure_logging(level="DEBUG")
+    
+    # Get logger
+    logger = get_logger("hermes.examples.levels")
+    
+    # DEBUG: Detailed information, typically of interest only when diagnosing problems
+    logger.debug("Connecting to database with timeout=30s and max_connections=10")
+    logger.debug("User preference loaded: display_mode=dark, notifications=enabled")
+    
+    # INFO: Confirmation that things are working as expected
+    logger.info("Application started successfully")
+    logger.info("User 'alice' logged in")
+    logger.info("Database migration completed: 42 tables updated")
+    
+    # WARNING: An indication that something unexpected happened, or may happen in the near future
+    logger.warning("API rate limit approaching: 980/1000 requests used")
+    logger.warning("Disk usage above 85% threshold")
+    logger.warning("Using deprecated function 'old_auth()' - will be removed in v2.0")
+    
+    # ERROR: Due to a more serious problem, the software has not been able to perform a function
+    logger.error("Failed to connect to database after 3 retries")
+    logger.error("User authentication failed: invalid credentials")
+    logger.error("Unable to process payment: gateway timeout")
+    
+    # CRITICAL: A serious error indicating that the program itself may be unable to continue running
+    logger.critical("Insufficient memory to continue operation")
+    logger.critical("Database connection pool exhausted")
+    logger.critical("Unhandled exception in main thread")
+    
+    # Reset to default
+    configure_logging(level="INFO")
 
-def main() -> None:
-    """Main function to parse arguments and run examples."""
-    parser = argparse.ArgumentParser(description="Centralized Logging System Example")
+def main():
+    """Run all logging examples."""
+    print("Starting Hermes logging examples...")
     
-    parser.add_argument(
-        "--component",
-        type=str,
-        default="example.logging",
-        help="Component name to use for logs"
-    )
+    # Run examples
+    basic_logging_example()
+    component_based_logging_example()
+    structured_logging_example()
+    log_level_demonstration()
+    simulated_application_logging()
+    concurrent_logging_example()
     
-    parser.add_argument(
-        "--storage-path",
-        type=str,
-        default=None,
-        help="Path to store log files (default: ~/.tekton/logs)"
-    )
-    
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        choices=["FATAL", "ERROR", "WARN", "INFO", "NORMAL", "DEBUG", "TRACE"],
-        default="TRACE",
-        help="Minimum log level for console output"
-    )
-    
-    args = parser.parse_args()
-    
-    # Initialize logging system
-    init_logging(
-        storage_path=args.storage_path,
-        console_level=args.log_level
-    )
-    
-    # Run demonstrations
-    demonstrate_basic_logging(args.component)
-    demonstrate_logger_extensions(args.component)
-    demonstrate_query_capabilities(args.component)
-    demonstrate_python_logging_integration(args.component)
-    demonstrate_stdout_stderr_redirection(args.component)
-    
-    print("\nAll demonstrations completed. Check log files in:")
-    print(f"  {os.path.expanduser('~/.tekton/logs')}" if args.storage_path is None else f"  {args.storage_path}")
-
+    print("\nAll logging examples completed")
 
 if __name__ == "__main__":
     main()

@@ -1,223 +1,347 @@
-# Updating Components to Centralized Services
+# Updating Tekton Components to Use Hermes Services
 
-This guide explains how to update existing Tekton components to use the centralized services in Hermes, including the Unified Registration Protocol and Centralized Logging System.
+This guide describes how to update existing Tekton components to use the centralized services provided by Hermes.
 
-## Centralized Logging System
+## Overview
 
-### Basic Integration
+Tekton components should leverage Hermes for:
 
-The simplest way to update a component to use the Centralized Logging System is to replace the standard Python logging with the Hermes logging system:
+1. **Database Services**: Vector, key-value, graph, and other database types
+2. **Logging**: Centralized logging infrastructure
+3. **Service Registration**: Registering and discovering services
+4. **Message Bus**: Inter-component communication
 
-1. Replace logging imports:
+## Updating Database Access
+
+### Step 1: Add Hermes as a Dependency
 
 ```python
-# Old imports
+# In your setup.py or requirements.txt
+# Add Hermes as a dependency
+"hermes-tekton>=1.0.0"
+```
+
+### Step 2: Import Hermes Database Client
+
+```python
+from hermes.utils.database_helper import DatabaseClient
+
+# Initialize database client with your component ID
+db_client = DatabaseClient(component_id="your_component.module")
+```
+
+### Step 3: Replace Direct Database Access
+
+#### Before
+
+```python
+# Direct FAISS access
+import faiss
+import numpy as np
+
+# Create FAISS index
+index = faiss.IndexFlatIP(1536)
+vectors = np.array([...], dtype=np.float32)
+faiss.normalize_L2(vectors)
+index.add(vectors)
+
+# Search
+query = np.array([...], dtype=np.float32)
+faiss.normalize_L2(query)
+distances, indices = index.search(query, 5)
+```
+
+#### After
+
+```python
+# Using Hermes database services
+async def search_vectors():
+    # Get vector database
+    vector_db = await db_client.get_vector_db(namespace="your_namespace")
+    
+    # Store vectors
+    for i, vec in enumerate(your_vectors):
+        await vector_db.store(
+            id=f"item-{i}",
+            vector=vec,
+            metadata={"source": "your_component"}
+        )
+    
+    # Search
+    results = await vector_db.search(
+        query_vector=your_query,
+        limit=5
+    )
+    
+    return results
+```
+
+### Step 4: Add Graceful Fallback
+
+```python
+async def get_database():
+    try:
+        # Try to use Hermes database services
+        vector_db = await db_client.get_vector_db(namespace="your_namespace")
+        return vector_db
+    except ImportError:
+        # Hermes not available, fall back to local implementation
+        print("Hermes database services not available, using fallback")
+        return YourFallbackDatabase()
+```
+
+## Updating Logging
+
+### Step 1: Import Hermes Logger
+
+```python
+from hermes.core.logging import get_logger
+
+# Get a logger for your component
+logger = get_logger("your_component.module")
+```
+
+### Step 2: Replace Existing Logging
+
+#### Before
+
+```python
 import logging
 
-# New imports
-try:
-    from hermes.utils.logging_helper import setup_logging
-    USE_CENTRALIZED_LOGGING = True
-except ImportError:
-    # Fall back to standard logging if Hermes is not available
-    import logging
-    USE_CENTRALIZED_LOGGING = False
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Log messages
+logger.info("Operation started")
+logger.warning("Potential issue detected")
+logger.error("Operation failed: %s", error_message)
 ```
 
-2. Replace logger initialization:
+#### After
 
 ```python
-# Old initialization
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("component.module")
+from hermes.core.logging import get_logger
 
-# New initialization
-if USE_CENTRALIZED_LOGGING:
-    # Use Centralized Logging System
-    logger = setup_logging("component.module")
-else:
-    # Fall back to standard logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    logger = logging.getLogger("component.module")
+# Get a logger for your component
+logger = get_logger("your_component.module")
+
+# Log messages
+logger.info("Operation started")
+logger.warning("Potential issue detected")
+logger.error(f"Operation failed: {error_message}")
 ```
 
-3. Update log calls to use additional features (optional):
+### Step 3: Add Structured Logging
 
 ```python
-# Basic logging (works with both systems)
-logger.info("User logged in")
-logger.error("Database connection failed")
+# Log with additional context
+logger.info("Vector search completed", 
+            extra={
+                "operation": "vector_search",
+                "duration_ms": 15.4,
+                "results_count": 5,
+                "namespace": "your_namespace"
+            })
+```
 
-# Enhanced logging (only with Centralized Logging)
-if USE_CENTRALIZED_LOGGING:
-    # Log with context
-    logger.info(
-        "User action",
-        code="USER001",
-        context={"user_id": "user123", "action": "login"}
-    )
+## Adding Service Registration
+
+### Step 1: Import Hermes Registration
+
+```python
+from hermes.core.registration import ServiceRegistry
+```
+
+### Step 2: Register Your Service
+
+```python
+async def register_service():
+    # Initialize service registry
+    registry = ServiceRegistry()
+    await registry.start()
     
-    # Log system events using NORMAL level
-    logger.normal("System started", code="SYS001")
-    
-    # Create correlated logger
-    correlation_id = "transaction-123"
-    correlated_logger = logger.with_correlation(correlation_id)
-    correlated_logger.info("Transaction started", code="TRANS001")
-    correlated_logger.info("Transaction completed", code="TRANS002")
-```
-
-### Converting Print Statements
-
-Many components use `print()` statements for output. These can be converted to proper logging:
-
-```python
-# Old code
-print(f"Processing task {task_id}")
-
-# New code
-logger.info(f"Processing task {task_id}")
-```
-
-For debugging print statements:
-
-```python
-# Old code
-print(f"DEBUG: Variable value: {value}")
-
-# New code
-logger.debug(f"Variable value: {value}")
-```
-
-### Stdout/Stderr Redirection
-
-For components that can't easily change all print statements, you can redirect stdout/stderr:
-
-```python
-from hermes.utils.logging_helper import patch_stdout_stderr
-
-# Redirect stdout/stderr to the logging system
-patch_stdout_stderr("component.module")
-
-# Now all print statements will go to the logging system
-print("This will be logged as INFO")
-print("This will be logged as ERROR", file=sys.stderr)
-```
-
-### Python Logging Interception
-
-For components using Python's logging extensively:
-
-```python
-from hermes.utils.logging_helper import intercept_python_logging
-
-# Intercept all Python logging
-intercept_python_logging("component.module")
-
-# Now all Python logging calls will go to the Centralized Logging System
-import logging
-logging.getLogger("some.module").info("This will be redirected")
-```
-
-## Unified Registration Protocol
-
-### Basic Integration
-
-To update a component to use the Unified Registration Protocol:
-
-1. Add imports:
-
-```python
-from hermes.utils.registration_helper import register_component
-```
-
-2. Add registration code at component startup:
-
-```python
-async def start_component():
-    # Register with Hermes
-    registration = await register_component(
-        component_id="my_component_id",
-        component_name="My Component",
-        component_type="custom",
-        component_version="1.0.0",
-        capabilities=["custom.capability1", "custom.capability2"]
+    # Register your service
+    success = await registry.register(
+        service_id="your_component-main",
+        name="Your Component Service",
+        version="1.0.0",
+        endpoint="http://localhost:8080",
+        capabilities=["your_capability"],
+        metadata={
+            "description": "Your component description",
+            "config": {"key": "value"}
+        }
     )
     
-    if not registration:
-        logger.fatal("Failed to register with Hermes, component cannot start")
-        return False
-    
-    # Store registration for later use
-    global _registration
-    _registration = registration
-    
-    # Component successfully started
-    return True
+    if success:
+        logger.info("Successfully registered with Hermes")
+    else:
+        logger.warning("Failed to register with Hermes")
 ```
 
-3. Add cleanup code at component shutdown:
+### Step 3: Add Health Updates
 
 ```python
-async def stop_component():
-    # Unregister from Hermes
-    if _registration:
-        await _registration.unregister()
-        await _registration.close()
+async def update_health():
+    # Initialize service registry
+    registry = ServiceRegistry()
     
-    # Component successfully stopped
-    return True
+    # Update health status
+    await registry.update_health(
+        service_id="your_component-main",
+        status="healthy",
+        metrics={
+            "response_time_ms": 250,
+            "requests_per_minute": 15,
+            "error_rate": 0.01
+        }
+    )
 ```
 
-### Using Messaging
+## Using the Message Bus
 
-Once registered, you can use the messaging system:
+### Step 1: Import Hermes Message Bus
 
 ```python
-# Publish a message
-_registration.publish_message(
-    topic="my.topic",
-    message={"data": "Hello World"}
-)
-
-# Subscribe to a topic
-def handle_message(message):
-    print(f"Received message: {message}")
-
-_registration.subscribe_to_topic(
-    topic="other.topic",
-    callback=handle_message
-)
+from hermes.core.message_bus import MessageBus
 ```
 
-## Converting Multiple Components
+### Step 2: Subscribe to Topics
 
-The `scripts/update_engram_logging.py` script is an example of how to automate the conversion process. You can use it as a template for updating other components:
+```python
+async def start_message_listener():
+    # Initialize message bus
+    bus = MessageBus()
+    await bus.start()
+    
+    # Subscribe to topics
+    await bus.subscribe("engram.memory.updated", handle_memory_update)
+    await bus.subscribe("ergon.tools.registered", handle_tool_registration)
+```
 
-```bash
-python scripts/update_engram_logging.py --engram-path /path/to/Engram
+### Step 3: Handle Messages
+
+```python
+async def handle_memory_update(message):
+    logger.info(f"Received memory update: {message}")
+    # Process the message
+    
+async def handle_tool_registration(message):
+    logger.info(f"Received tool registration: {message}")
+    # Process the message
+```
+
+### Step 4: Publish Messages
+
+```python
+async def notify_component_event(event_type, data):
+    # Initialize message bus
+    bus = MessageBus()
+    
+    # Publish message
+    await bus.publish(
+        topic=f"your_component.{event_type}",
+        message={
+            "type": event_type,
+            "timestamp": datetime.now().isoformat(),
+            "data": data
+        }
+    )
+```
+
+## Complete Integration Example
+
+Here's a complete example showing integration with all Hermes services:
+
+```python
+import asyncio
+from datetime import datetime
+from hermes.utils.database_helper import DatabaseClient
+from hermes.core.logging import get_logger
+from hermes.core.registration import ServiceRegistry
+from hermes.core.message_bus import MessageBus
+
+# Initialize logger
+logger = get_logger("your_component.main")
+
+class YourComponent:
+    def __init__(self):
+        self.db_client = DatabaseClient(component_id="your_component")
+        self.registry = ServiceRegistry()
+        self.message_bus = MessageBus()
+    
+    async def start(self):
+        # Start services
+        await self.registry.start()
+        await self.message_bus.start()
+        
+        # Register with Hermes
+        await self.registry.register(
+            service_id="your_component-main",
+            name="Your Component",
+            version="1.0.0",
+            endpoint="http://localhost:8080",
+            capabilities=["your_capability"],
+            metadata={"description": "Your component description"}
+        )
+        
+        # Subscribe to messages
+        await self.message_bus.subscribe("engram.memory.updated", self.handle_memory_update)
+        
+        logger.info("Your component started successfully")
+    
+    async def handle_memory_update(self, message):
+        logger.info(f"Received memory update: {message}")
+        
+        # Store in database
+        vector_db = await self.db_client.get_vector_db(namespace="your_namespace")
+        await vector_db.store(
+            id=f"memory-{message['id']}",
+            vector=message.get("vector"),
+            metadata={"source": "engram", "timestamp": datetime.now().isoformat()},
+            text=message.get("content")
+        )
+        
+        # Notify about processing
+        await self.message_bus.publish(
+            topic="your_component.memory_processed",
+            message={
+                "type": "memory_processed",
+                "timestamp": datetime.now().isoformat(),
+                "memory_id": message["id"]
+            }
+        )
+    
+    async def update_health(self):
+        await self.registry.update_health(
+            service_id="your_component-main",
+            status="healthy",
+            metrics={
+                "response_time_ms": 250,
+                "requests_per_minute": 15,
+                "error_rate": 0.01
+            }
+        )
+
+# Run the component
+async def main():
+    component = YourComponent()
+    await component.start()
+    
+    # Keep running
+    while True:
+        await component.update_health()
+        await asyncio.sleep(60)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Testing the Integration
 
-After updating a component, test it to ensure it works correctly:
-
-1. Run the component with Hermes available
-2. Check that logs are appearing in the Centralized Logging System
-3. Run the component without Hermes (should fall back to standard logging)
-4. Verify the component functions correctly in both scenarios
-
-## Best Practices
-
-- **Backward Compatibility**: Always maintain backward compatibility so components work even if Hermes is not available
-- **Correlation IDs**: Use correlation IDs for related operations to make debugging easier
-- **Context Information**: Add relevant context to log entries
-- **Log Levels**: Use appropriate log levels for different types of messages
-- **System Events**: Use the NORMAL log level for system lifecycle events
-- **Documentation**: Update component documentation to mention the integration with Hermes
+1. **Ensure Hermes is Running**: Verify that Hermes is running and accessible
+2. **Test with Fallbacks**: Test your component with and without Hermes being available
+3. **Check Service Registry**: Verify that your service appears in the registry
+4. **Validate Message Bus**: Test message publishing and subscription
+5. **Monitor Logs**: Check that logs are being properly captured by Hermes

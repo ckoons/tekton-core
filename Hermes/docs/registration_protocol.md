@@ -1,164 +1,185 @@
-# Unified Registration Protocol
+# Hermes Registration Protocol
 
-The Unified Registration Protocol (URP) is a standardized way for Tekton components to register with the ecosystem, discover other components, and communicate with each other.
+The Hermes Registration Protocol defines how components within the Tekton ecosystem register themselves, discover each other, and maintain service health information.
 
-## Overview
+## Core Concepts
 
-The URP provides the following benefits:
+### 1. Service Registry
 
-- **Single Registration Point**: Components register once with Hermes
-- **Propagation**: Registration information is propagated to all relevant systems
-- **Security**: Token-based authentication ensures only authorized components can register
-- **Health Monitoring**: Regular heartbeats ensure component health is tracked
-- **Capability Discovery**: Components can discover others by their capabilities
+The central registry maintains information about all available services:
 
-## Component Registration Flow
+- Service identifier
+- Service type
+- Capabilities
+- Endpoint information
+- Health status
+- Metadata
 
-1. Component initializes and connects to Hermes
-2. Component sends registration request with its metadata
-3. Hermes validates the request and registers the component
-4. Hermes provides a security token for future operations
-5. Component begins sending regular heartbeats to maintain registration
-6. When shutting down, component unregisters from Hermes
+### 2. Service Discovery
 
-## Integration Guide
+Components can discover other services based on:
 
-### Basic Integration
+- Service type (e.g., "llm", "memory", "vector-db")
+- Specific capabilities (e.g., "reasoning", "tool_use")
+- Health status
 
-The simplest way to integrate with the URP is to use the `HermesClient` class:
+### 3. Health Monitoring
 
-```python
-import asyncio
-from hermes.api.client import HermesClient
+The registry periodically checks service health through:
 
-async def main():
-    # Create a client
-    client = HermesClient(
-        component_id="my_component",
-        component_name="My Component",
-        component_type="custom",
-        component_version="1.0.0",
-        capabilities=["custom.capability1", "custom.capability2"]
-    )
-    
-    # Register with Hermes
-    await client.register()
-    
-    # Use Hermes services...
-    
-    # Unregister when done
-    await client.unregister()
-    await client.close()
+- Heartbeat monitoring
+- Endpoint validation
+- Performance metrics collection
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
+## Registration Process
 
-### Using the Registration Helper
+### Step 1: Service Registration
 
-For even simpler integration, use the `registration_helper` module:
+Services register themselves with the central registry:
 
 ```python
-import asyncio
-from hermes.utils.registration_helper import register_component
+from hermes.core.registration import ServiceRegistry
 
-async def main():
-    # Register your component
-    registration = await register_component(
-        component_id="my_component",
-        component_name="My Component",
-        component_type="custom",
-        component_version="1.0.0",
-        capabilities=["custom.capability1", "custom.capability2"]
-    )
-    
-    if registration:
-        # Use registration for messaging
-        registration.publish_message(
-            topic="my.topic",
-            message={"data": "Hello World"}
-        )
-        
-        # Unregister when done
-        await registration.unregister()
-        await registration.close()
+# Initialize service registry
+registry = ServiceRegistry()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# Register a service
+registry.register(
+    service_id="claude-main",
+    name="Claude 3 Opus",
+    version="20240229",
+    endpoint="http://localhost:11434",
+    capabilities=["llm", "reasoning", "tool_use", "image_understanding"],
+    metadata={
+        "client_id": "main",
+        "model": "claude-3-opus-20240229",
+        "provider": "anthropic"
+    }
+)
 ```
 
-### Integration in an Existing Application
+### Step 2: Service Discovery
 
-To integrate URP in an existing application:
+Other components can discover registered services:
 
 ```python
-import asyncio
-import signal
-import sys
-from hermes.utils.registration_helper import ComponentRegistration
+from hermes.core.registration import ServiceRegistry
 
-# Create component registration
-registration = None
+# Initialize service registry
+registry = ServiceRegistry()
 
-async def setup():
-    global registration
-    
-    # Initialize registration
-    registration = ComponentRegistration(
-        component_id="my_component",
-        component_name="My Component",
-        component_type="custom",
-        component_version="1.0.0",
-        capabilities=["custom.capability1", "custom.capability2"]
-    )
-    
-    # Register with Hermes
-    success = await registration.register()
-    
-    if not success:
-        print("Failed to register with Hermes")
-        return False
-    
-    return True
+# Find services with specific capabilities
+llm_services = registry.find_services(
+    capabilities=["llm", "reasoning"],
+    status="healthy"
+)
 
-async def shutdown():
-    if registration:
-        await registration.unregister()
-        await registration.close()
-
-async def main():
-    # Set up signal handlers
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
-    
-    # Set up component
-    if not await setup():
-        return
-    
-    # Run your application...
-    try:
-        while True:
-            await asyncio.sleep(1)
-    finally:
-        await shutdown()
-
-if __name__ == "__main__":
-    asyncio.run(main())
+# Get a specific service by ID
+claude_service = registry.get_service("claude-main")
 ```
 
-## Component Requirements
+### Step 3: Heartbeat and Health Updates
 
-To integrate with the URP, components must:
+Services periodically update their health status:
 
-1. Have a unique component ID
-2. Define their capabilities
-3. Send regular heartbeats
-4. Properly unregister when shutting down
+```python
+# Update health status
+registry.update_health(
+    service_id="claude-main",
+    status="healthy",
+    metrics={
+        "response_time_ms": 250,
+        "requests_per_minute": 15,
+        "error_rate": 0.01
+    }
+)
+```
+
+## Protocol Message Format
+
+The registration protocol uses a simple JSON message format:
+
+### Registration Message
+
+```json
+{
+  "action": "register",
+  "service_id": "claude-main",
+  "name": "Claude 3 Opus",
+  "version": "20240229",
+  "endpoint": "http://localhost:11434",
+  "capabilities": ["llm", "reasoning", "tool_use", "image_understanding"],
+  "metadata": {
+    "client_id": "main",
+    "model": "claude-3-opus-20240229",
+    "provider": "anthropic"
+  }
+}
+```
+
+### Health Update Message
+
+```json
+{
+  "action": "health_update",
+  "service_id": "claude-main",
+  "status": "healthy",
+  "timestamp": "2025-03-30T12:34:56Z",
+  "metrics": {
+    "response_time_ms": 250,
+    "requests_per_minute": 15,
+    "error_rate": 0.01
+  }
+}
+```
 
 ## Security Considerations
 
-- Protect the security token provided by Hermes
-- Store the token in memory, not on disk
-- Use secure connections when communicating with Hermes
-- Validate tokens before trusting component identities
+The registration protocol includes security measures:
+
+1. **Authentication**: Services must authenticate before registering
+2. **Authorization**: Only authorized components can modify service information
+3. **Encryption**: Communication is encrypted using TLS
+4. **Validation**: All messages are validated against the protocol schema
+
+## Integration with Other Tekton Components
+
+### Engram Integration
+
+```python
+# Register Engram memory service
+registry.register(
+    service_id="engram-memory",
+    name="Engram Memory Service",
+    version="1.0.0",
+    endpoint="http://localhost:8000",
+    capabilities=["memory", "vector_search"],
+    metadata={
+        "storage_type": "faiss",
+        "vector_dimensions": 1536
+    }
+)
+```
+
+### Ergon Integration
+
+```python
+# Register Ergon tool service
+registry.register(
+    service_id="ergon-tools",
+    name="Ergon Tool Service",
+    version="1.0.0",
+    endpoint="http://localhost:8080",
+    capabilities=["tool_registry", "tool_execution"],
+    metadata={
+        "available_tools": ["web_search", "calculator", "code_execution"]
+    }
+)
+```
+
+## Implementation Notes
+
+- The registry maintains an in-memory cache with periodic persistence
+- Service health is validated through regular heartbeat checks
+- Services that fail health checks are marked as unhealthy
+- Services that don't respond for an extended period are removed from the registry

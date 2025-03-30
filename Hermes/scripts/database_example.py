@@ -1,505 +1,336 @@
 #!/usr/bin/env python3
 """
-Database Services Example - Demonstrates usage of Hermes's database services.
+Hermes Database Services Example
 
-This script shows how to use the database services provided by Hermes,
-including different types of databases and operations.
+This script demonstrates how to use Hermes database services including vector,
+key-value, and graph databases with various backend implementations.
 """
 
-import os
 import asyncio
-import json
+import time
+import random
+import os
+from pathlib import Path
 import numpy as np
-from typing import Dict, List, Any, Optional
+
+# Ensure Hermes is in Python path
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from hermes.utils.database_helper import DatabaseClient
-from hermes.core.database_manager import DatabaseBackend
+from hermes.core.logging import get_logger, configure_logging
 
+# Configure logging
+configure_logging(level="INFO")
+logger = get_logger("hermes.examples.database")
 
-async def demonstrate_vector_db(namespace: str, logger) -> None:
-    """
-    Demonstrate vector database operations.
+# Sample data for demonstrations
+SAMPLE_TEXTS = [
+    "The quick brown fox jumps over the lazy dog",
+    "Machine learning models transform raw data into useful predictions",
+    "Vector databases enable semantic search capabilities",
+    "Graph databases excel at representing complex relationships",
+    "Key-value stores provide fast access to data using unique keys",
+    "Distributed systems require robust communication protocols",
+    "Neural networks learn by adjusting weights through backpropagation",
+    "Natural language processing enables machines to understand human language",
+    "Computer vision systems can identify objects in images and videos",
+    "Reinforcement learning teaches agents through reward signals"
+]
+
+# Mock function to generate vector embeddings (in real usage, you would use a proper embedding model)
+def generate_embedding(text, dim=1536):
+    """Generate a mock embedding vector for a text string."""
+    # Create a deterministic but unique vector based on the text
+    # In reality, you would use a proper embedding model
+    np.random.seed(hash(text) % (2**32))
+    vector = np.random.randn(dim).astype(np.float32)
+    # Normalize the vector to unit length
+    vector = vector / np.linalg.norm(vector)
+    return vector.tolist()
+
+async def vector_database_example():
+    """Demonstrate vector database operations."""
+    logger.info("=== Vector Database Example ===")
     
-    Args:
-        namespace: Database namespace
-        logger: Logger instance
-    """
-    logger.info("\n=== Vector Database ===\n")
+    # Initialize DatabaseClient
+    db_client = DatabaseClient(component_id="hermes.examples")
     
-    # Get vector database connection
-    client = DatabaseClient("example")
-    vector_db = await client.get_vector_db(namespace=namespace)
-    logger.info(f"Connected to vector database with backend: {vector_db.backend.value}")
+    # Get vector database for 'documents' namespace
+    vector_db = await db_client.get_vector_db(namespace="documents")
     
-    # Store vectors
-    vector1 = [0.1, 0.2, 0.3, 0.4, 0.5]
-    vector2 = [0.2, 0.3, 0.4, 0.5, 0.6]
-    vector3 = [0.3, 0.4, 0.5, 0.6, 0.7]
+    # Connect to the database
+    await vector_db.connect()
+    logger.info(f"Connected to vector database backend: {vector_db.backend}")
     
-    await vector_db.store(
-        id="doc1",
-        vector=vector1,
-        metadata={"type": "example", "topic": "databases"},
-        text="This is document 1 about databases"
-    )
+    # Store vectors with their text and metadata
+    for i, text in enumerate(SAMPLE_TEXTS):
+        # Generate embedding
+        vector = generate_embedding(text)
+        
+        # Create metadata
+        metadata = {
+            "id": f"doc-{i}",
+            "length": len(text),
+            "category": "example",
+            "timestamp": time.time()
+        }
+        
+        # Store in vector database
+        success = await vector_db.store(
+            id=metadata["id"],
+            vector=vector,
+            metadata=metadata,
+            text=text
+        )
+        
+        if success:
+            logger.info(f"Stored vector for: {text[:30]}...")
+        else:
+            logger.error(f"Failed to store vector for: {text[:30]}...")
     
-    await vector_db.store(
-        id="doc2",
-        vector=vector2,
-        metadata={"type": "example", "topic": "vectors"},
-        text="This is document 2 about vectors"
-    )
+    # Search for similar vectors
+    query_text = "How do neural networks learn from data?"
+    query_vector = generate_embedding(query_text)
     
-    await vector_db.store(
-        id="doc3",
-        vector=vector3,
-        metadata={"type": "example", "topic": "search"},
-        text="This is document 3 about search"
-    )
-    
-    logger.info("Stored 3 vectors")
-    
-    # Search vectors
+    logger.info(f"Searching for vectors similar to: '{query_text}'")
     results = await vector_db.search(
-        query_vector=vector2,
-        limit=2
+        query_vector=query_vector,
+        limit=3
     )
     
-    logger.info("Search results:")
-    for result in results:
-        logger.info(f"  - ID: {result['id']}, Text: {result['text']}, Score: {result['relevance']:.4f}")
+    logger.info(f"Found {len(results)} similar vectors:")
+    for i, result in enumerate(results):
+        logger.info(f"  {i+1}. [{result['relevance']:.4f}] {result['text'][:50]}...")
     
-    # Filter by metadata
-    filtered_results = await vector_db.search(
-        query_vector=vector2,
-        limit=2,
-        filter={"topic": "databases"}
-    )
+    # Clean up - delete the vectors
+    logger.info("Cleaning up - deleting vectors")
+    await vector_db.delete()
     
-    logger.info("\nFiltered search results:")
-    for result in filtered_results:
-        logger.info(f"  - ID: {result['id']}, Text: {result['text']}, Score: {result['relevance']:.4f}")
-    
-    # Get specific vector
-    doc = await vector_db.get("doc1")
-    logger.info(f"\nDocument 1: {doc['text']}")
-    
-    # List vectors
-    all_docs = await vector_db.list(limit=10)
-    logger.info(f"\nAll documents ({len(all_docs)}):")
-    for doc in all_docs:
-        logger.info(f"  - ID: {doc['id']}, Text: {doc['text']}")
-    
-    # Delete a vector
-    await vector_db.delete("doc3")
-    logger.info("\nDeleted document 3")
-    
-    # List again
-    remaining_docs = await vector_db.list(limit=10)
-    logger.info(f"\nRemaining documents ({len(remaining_docs)}):")
-    for doc in remaining_docs:
-        logger.info(f"  - ID: {doc['id']}, Text: {doc['text']}")
-    
-    # Close connection
-    await client.close_connections()
+    # Disconnect from the database
+    await vector_db.disconnect()
+    logger.info("Disconnected from vector database")
 
-
-async def demonstrate_graph_db(namespace: str, logger) -> None:
-    """
-    Demonstrate graph database operations.
+async def key_value_database_example():
+    """Demonstrate key-value database operations."""
+    logger.info("\n=== Key-Value Database Example ===")
     
-    Args:
-        namespace: Database namespace
-        logger: Logger instance
-    """
-    logger.info("\n=== Graph Database ===\n")
+    # Initialize DatabaseClient
+    db_client = DatabaseClient(component_id="hermes.examples")
     
-    try:
-        # Get graph database connection
-        client = DatabaseClient("example")
-        graph_db = await client.get_graph_db(namespace=namespace)
-        logger.info(f"Connected to graph database with backend: {graph_db.backend.value}")
-        
-        # Add nodes
-        await graph_db.add_node(
-            id="person1",
-            labels=["Person"],
-            properties={"name": "Alice", "age": 30}
-        )
-        
-        await graph_db.add_node(
-            id="person2",
-            labels=["Person"],
-            properties={"name": "Bob", "age": 28}
-        )
-        
-        await graph_db.add_node(
-            id="company1",
-            labels=["Company"],
-            properties={"name": "Acme Inc", "founded": 2000}
-        )
-        
-        logger.info("Added 3 nodes")
-        
-        # Add relationships
-        await graph_db.add_relationship(
-            source_id="person1",
-            target_id="company1",
-            type="WORKS_FOR",
-            properties={"since": 2018, "position": "Developer"}
-        )
-        
-        await graph_db.add_relationship(
-            source_id="person2",
-            target_id="company1",
-            type="WORKS_FOR",
-            properties={"since": 2020, "position": "Manager"}
-        )
-        
-        await graph_db.add_relationship(
-            source_id="person1",
-            target_id="person2",
-            type="KNOWS",
-            properties={"since": 2019}
-        )
-        
-        logger.info("Added 3 relationships")
-        
-        # Get node
-        person = await graph_db.get_node("person1")
-        logger.info(f"\nPerson 1: {person['properties'].get('name')} (age {person['properties'].get('age')})")
-        
-        # Get relationships
-        relationships = await graph_db.get_relationships(
-            node_id="person1",
-            direction="outgoing"
-        )
-        
-        logger.info(f"\nRelationships for Person 1 ({len(relationships)}):")
-        for rel in relationships:
-            logger.info(f"  - Type: {rel['type']}, Target: {rel['target_id']}")
-        
-        # Execute a custom query
-        query_results = await graph_db.query(
-            query="""
-            MATCH (p:Person {namespace: $namespace})-[r:WORKS_FOR]->(c:Company {namespace: $namespace})
-            RETURN p.name AS name, r.position AS position, c.name AS company
-            """,
-            params={}
-        )
-        
-        logger.info(f"\nQuery results ({len(query_results)}):")
-        for result in query_results:
-            logger.info(f"  - {result['name']} works as {result['position']} at {result['company']}")
-        
-        # Close connection
-        await client.close_connections()
+    # Get key-value database for 'cache' namespace
+    kv_db = await db_client.get_key_value_db(namespace="cache")
     
-    except Exception as e:
-        logger.error(f"Error demonstrating graph database: {e}")
-
-
-async def demonstrate_key_value_db(namespace: str, logger) -> None:
-    """
-    Demonstrate key-value database operations.
+    # Connect to the database
+    await kv_db.connect()
+    logger.info(f"Connected to key-value database backend: {kv_db.backend}")
     
-    Args:
-        namespace: Database namespace
-        logger: Logger instance
-    """
-    logger.info("\n=== Key-Value Database ===\n")
+    # Store simple values
+    await kv_db.set("greeting", "Hello, Hermes!")
+    await kv_db.set("count", 42)
+    await kv_db.set("enabled", True)
     
-    # Get key-value database connection
-    client = DatabaseClient("example")
-    kv_db = await client.get_key_value_db(namespace=namespace)
-    logger.info(f"Connected to key-value database with backend: {kv_db.backend.value}")
-    
-    # Set values
-    await kv_db.set("string_key", "Hello, world!")
-    await kv_db.set("int_key", 42)
-    await kv_db.set("dict_key", {"name": "Example", "values": [1, 2, 3]})
-    
-    # Set value with expiration
-    await kv_db.set("expiring_key", "I will expire soon", expiration=5)
-    
-    logger.info("Set 4 key-value pairs")
-    
-    # Get values
-    string_val = await kv_db.get("string_key")
-    int_val = await kv_db.get("int_key")
-    dict_val = await kv_db.get("dict_key")
-    
-    logger.info(f"\nString value: {string_val}")
-    logger.info(f"Integer value: {int_val}")
-    logger.info(f"Dictionary value: {dict_val}")
-    
-    # Check existence
-    exists = await kv_db.exists("string_key")
-    logger.info(f"\nstring_key exists: {exists}")
-    
-    # Batch operations
-    batch_items = {
-        "batch1": "First batch item",
-        "batch2": "Second batch item",
-        "batch3": "Third batch item"
+    # Store a complex value
+    user_data = {
+        "id": "user-123",
+        "name": "Alice",
+        "roles": ["admin", "developer"],
+        "settings": {
+            "theme": "dark",
+            "notifications": True
+        }
     }
+    await kv_db.set("user:123", user_data)
     
-    await kv_db.set_batch(batch_items)
-    logger.info("\nSet batch of 3 items")
+    # Store with expiration (5 seconds)
+    await kv_db.set("temporary", "This will expire soon", expiration=5)
     
-    # Get batch
-    batch_values = await kv_db.get_batch(["batch1", "batch2", "batch3"])
-    logger.info("\nBatch values:")
-    for key, value in batch_values.items():
-        logger.info(f"  - {key}: {value}")
+    # Retrieve values
+    greeting = await kv_db.get("greeting")
+    count = await kv_db.get("count")
+    user = await kv_db.get("user:123")
     
-    # Delete key
-    await kv_db.delete("int_key")
-    logger.info("\nDeleted int_key")
+    logger.info(f"Retrieved greeting: {greeting}")
+    logger.info(f"Retrieved count: {count}")
+    logger.info(f"Retrieved user: {user['name']} with roles {user['roles']}")
     
-    # Verify deletion
-    exists = await kv_db.exists("int_key")
-    logger.info(f"int_key exists: {exists}")
+    # Check if key exists
+    exists = await kv_db.exists("temporary")
+    logger.info(f"Temporary key exists: {exists}")
     
     # Wait for expiration
-    logger.info("\nWaiting for expiring_key to expire...")
+    logger.info("Waiting for temporary key to expire...")
     await asyncio.sleep(6)
     
-    # Check if expired
-    expired_val = await kv_db.get("expiring_key")
-    logger.info(f"expiring_key value: {expired_val}")
+    # Check if expired key still exists
+    exists = await kv_db.exists("temporary")
+    logger.info(f"Temporary key exists after expiration: {exists}")
     
-    # Close connection
-    await client.close_connections()
+    # Batch operations
+    batch_data = {
+        "batch:1": "First batch item",
+        "batch:2": "Second batch item",
+        "batch:3": "Third batch item"
+    }
+    
+    # Store batch
+    await kv_db.set_batch(batch_data)
+    logger.info(f"Stored {len(batch_data)} items in batch")
+    
+    # Retrieve batch
+    batch_keys = list(batch_data.keys())
+    retrieved_batch = await kv_db.get_batch(batch_keys)
+    logger.info(f"Retrieved {len(retrieved_batch)} items from batch")
+    
+    # Delete batch
+    await kv_db.delete_batch(batch_keys)
+    logger.info(f"Deleted {len(batch_keys)} items from batch")
+    
+    # Clean up
+    await kv_db.clear_namespace()
+    logger.info("Cleared all keys in namespace")
+    
+    # Disconnect
+    await kv_db.disconnect()
+    logger.info("Disconnected from key-value database")
 
-
-async def demonstrate_document_db(namespace: str, logger) -> None:
-    """
-    Demonstrate document database operations.
+async def graph_database_example():
+    """Demonstrate graph database operations."""
+    logger.info("\n=== Graph Database Example ===")
     
-    Args:
-        namespace: Database namespace
-        logger: Logger instance
-    """
-    logger.info("\n=== Document Database ===\n")
+    # Initialize DatabaseClient
+    db_client = DatabaseClient(component_id="hermes.examples")
     
-    # Get document database connection
-    client = DatabaseClient("example")
-    doc_db = await client.get_document_db(namespace=namespace)
-    logger.info(f"Connected to document database with backend: {doc_db.backend.value}")
+    # Get graph database for 'knowledge' namespace
+    graph_db = await db_client.get_graph_db(namespace="knowledge")
     
-    # Insert documents
-    user1_id = await doc_db.insert(
-        collection="users",
-        document={
-            "name": "John Doe",
-            "email": "john@example.com",
-            "age": 35,
-            "interests": ["programming", "databases", "AI"]
-        }
+    # Connect to the database
+    await graph_db.connect()
+    logger.info(f"Connected to graph database backend: {graph_db.backend}")
+    
+    # Add nodes representing people
+    people = ["Alice", "Bob", "Charlie", "David", "Eve"]
+    for person in people:
+        await graph_db.add_node(
+            id=f"person:{person.lower()}",
+            labels=["Person"],
+            properties={"name": person, "active": True}
+        )
+        logger.info(f"Added Person node: {person}")
+    
+    # Add nodes representing projects
+    projects = ["Hermes", "Engram", "Athena", "Ergon"]
+    for project in projects:
+        await graph_db.add_node(
+            id=f"project:{project.lower()}",
+            labels=["Project"],
+            properties={"name": project, "status": "Active"}
+        )
+        logger.info(f"Added Project node: {project}")
+    
+    # Create relationships between people and projects
+    relationships = [
+        ("alice", "hermes", "CREATED"),
+        ("alice", "athena", "CONTRIBUTES_TO"),
+        ("bob", "engram", "CREATED"),
+        ("bob", "hermes", "CONTRIBUTES_TO"),
+        ("charlie", "ergon", "CREATED"),
+        ("charlie", "athena", "CONTRIBUTES_TO"),
+        ("david", "hermes", "CONTRIBUTES_TO"),
+        ("eve", "engram", "CONTRIBUTES_TO")
+    ]
+    
+    for person_id, project_id, rel_type in relationships:
+        await graph_db.add_relationship(
+            source_id=f"person:{person_id}",
+            target_id=f"project:{project_id}",
+            type=rel_type,
+            properties={"since": "2025-01-01"}
+        )
+        logger.info(f"Added relationship: {person_id} -{rel_type}-> {project_id}")
+    
+    # Get a specific node
+    alice_node = await graph_db.get_node("person:alice")
+    logger.info(f"Retrieved node: {alice_node}")
+    
+    # Get relationships for a node
+    alice_relationships = await graph_db.get_relationships("person:alice")
+    logger.info(f"Retrieved {len(alice_relationships)} relationships for Alice")
+    for rel in alice_relationships:
+        logger.info(f"  {rel['source_id']} -{rel['type']}-> {rel['target_id']}")
+    
+    # Execute a Cypher query (Neo4j)
+    try:
+        query_results = await graph_db.query(
+            query="""
+            MATCH (p:Person)-[r]->(proj:Project)
+            WHERE proj.name = $project_name
+            RETURN p.name AS person, TYPE(r) AS relationship
+            """,
+            params={"project_name": "Hermes"}
+        )
+        
+        logger.info(f"Query found {len(query_results)} contributors to Hermes:")
+        for result in query_results:
+            logger.info(f"  {result['person']} - {result['relationship']}")
+            
+    except Exception as e:
+        logger.warning(f"Cypher query not supported on this backend: {e}")
+    
+    # Delete a relationship
+    await graph_db.delete_relationship(
+        source_id="person:alice",
+        target_id="project:athena",
+        type="CONTRIBUTES_TO"
     )
+    logger.info("Deleted relationship between Alice and Athena")
     
-    user2_id = await doc_db.insert(
-        collection="users",
-        document={
-            "name": "Jane Smith",
-            "email": "jane@example.com",
-            "age": 28,
-            "interests": ["design", "databases", "photography"]
-        }
-    )
+    # Delete a node
+    await graph_db.delete_node("person:eve")
+    logger.info("Deleted node for Eve")
     
-    user3_id = await doc_db.insert(
-        collection="users",
-        document={
-            "name": "Bob Johnson",
-            "email": "bob@example.com",
-            "age": 42,
-            "interests": ["AI", "machine learning", "data science"]
-        }
-    )
+    # Clean up - delete everything in this namespace
+    # In Neo4j this is done with a query
+    try:
+        await graph_db.query("MATCH (n) DETACH DELETE n")
+        logger.info("Cleared all nodes and relationships")
+    except Exception:
+        logger.info("Falling back to individual deletions for cleanup")
+        # Delete remaining nodes (relationships will be deleted automatically)
+        for person in people:
+            if person != "Eve":  # Already deleted
+                await graph_db.delete_node(f"person:{person.lower()}")
+        
+        for project in projects:
+            await graph_db.delete_node(f"project:{project.lower()}")
     
-    logger.info(f"Inserted 3 documents with IDs: {user1_id}, {user2_id}, {user3_id}")
-    
-    # Find specific document
-    user = await doc_db.find_one(
-        collection="users",
-        query={"name": "Jane Smith"}
-    )
-    
-    logger.info(f"\nFound user: {user.get('name')} ({user.get('email')})")
-    
-    # Find with query
-    database_users = await doc_db.find(
-        collection="users",
-        query={"interests": "databases"}
-    )
-    
-    logger.info(f"\nUsers interested in databases ({len(database_users)}):")
-    for user in database_users:
-        logger.info(f"  - {user.get('name')} ({user.get('email')})")
-    
-    # Update document
-    updated_count = await doc_db.update(
-        collection="users",
-        query={"name": "John Doe"},
-        update={"$set": {"age": 36, "interests": ["programming", "databases", "AI", "cloud"]}}
-    )
-    
-    logger.info(f"\nUpdated {updated_count} documents")
-    
-    # Verify update
-    updated_user = await doc_db.find_one(
-        collection="users",
-        query={"name": "John Doe"}
-    )
-    
-    logger.info(f"Updated user: {updated_user.get('name')} (age {updated_user.get('age')})")
-    logger.info(f"Interests: {', '.join(updated_user.get('interests', []))}")
-    
-    # Count documents
-    count = await doc_db.count(
-        collection="users",
-        query={"age": {"$gt": 30}}
-    )
-    
-    logger.info(f"\nUsers over 30: {count}")
-    
-    # Delete document
-    deleted_count = await doc_db.delete(
-        collection="users",
-        query={"name": "Bob Johnson"}
-    )
-    
-    logger.info(f"\nDeleted {deleted_count} documents")
-    
-    # Verify deletion
-    remaining_count = await doc_db.count(
-        collection="users",
-        query={}
-    )
-    
-    logger.info(f"Remaining users: {remaining_count}")
-    
-    # Close connection
-    await client.close_connections()
-
-
-async def demonstrate_cache_db(namespace: str, logger) -> None:
-    """
-    Demonstrate cache database operations.
-    
-    Args:
-        namespace: Database namespace
-        logger: Logger instance
-    """
-    logger.info("\n=== Cache Database ===\n")
-    
-    # Get cache database connection
-    client = DatabaseClient("example")
-    cache_db = await client.get_cache_db(namespace=namespace)
-    logger.info(f"Connected to cache database with backend: {cache_db.backend.value}")
-    
-    # Set values with expiration
-    await cache_db.set("cache_key1", "Cache value 1", expiration=10)
-    await cache_db.set("cache_key2", {"complex": "object", "with": ["nested", "values"]}, expiration=20)
-    
-    logger.info("Set 2 cache values")
-    
-    # Get values
-    value1 = await cache_db.get("cache_key1")
-    value2 = await cache_db.get("cache_key2")
-    
-    logger.info(f"\nCache value 1: {value1}")
-    logger.info(f"Cache value 2: {value2}")
-    
-    # Update expiration
-    await cache_db.touch("cache_key1", expiration=30)
-    logger.info("\nUpdated expiration for cache_key1 to 30 seconds")
-    
-    # Delete value
-    await cache_db.delete("cache_key2")
-    logger.info("\nDeleted cache_key2")
-    
-    # Verify deletion
-    value2 = await cache_db.get("cache_key2")
-    logger.info(f"Cache value 2 after deletion: {value2}")
-    
-    # Flush cache
-    await cache_db.flush()
-    logger.info("\nFlushed cache")
-    
-    # Verify flush
-    value1 = await cache_db.get("cache_key1")
-    logger.info(f"Cache value 1 after flush: {value1}")
-    
-    # Close connection
-    await client.close_connections()
-
-
-async def demonstrate_database_client(logger) -> None:
-    """
-    Demonstrate the DatabaseClient for managing connections.
-    
-    Args:
-        logger: Logger instance
-    """
-    logger.info("\n=== DatabaseClient ===\n")
-    
-    # Create a client for a component
-    client = DatabaseClient("my_component")
-    logger.info("Created DatabaseClient for 'my_component'")
-    
-    # Get databases for different purposes
-    vector_db = await client.get_vector_db(namespace="embeddings")
-    kv_db = await client.get_key_value_db(namespace="config")
-    cache_db = await client.get_cache_db(namespace="user_cache")
-    
-    logger.info(f"Connected to vector database with backend: {vector_db.backend.value}")
-    logger.info(f"Connected to key-value database with backend: {kv_db.backend.value}")
-    logger.info(f"Connected to cache database with backend: {cache_db.backend.value}")
-    
-    # Use client as context manager
-    logger.info("\nUsing client as context manager:")
-    async with DatabaseClient("another_component") as ctx_client:
-        doc_db = await ctx_client.get_document_db(namespace="records")
-        logger.info(f"Connected to document database with backend: {doc_db.backend.value}")
-        logger.info("Context manager will automatically close connections")
-    
-    # Close connections manually
-    await client.close_connections()
-    logger.info("\nClosed all connections")
-
+    # Disconnect
+    await graph_db.disconnect()
+    logger.info("Disconnected from graph database")
 
 async def main():
-    """Main function to demonstrate database services."""
-    # Simple logger
-    class Logger:
-        def info(self, message):
-            print(message)
-        
-        def error(self, message):
-            print(f"ERROR: {message}")
-    
-    logger = Logger()
-    
-    # Create base namespace for examples
-    namespace = f"example.{os.getpid()}"
-    
-    # Run demonstrations
-    await demonstrate_vector_db(namespace, logger)
-    await demonstrate_key_value_db(namespace, logger)
-    
+    """Run all database examples."""
     try:
-        await demonstrate_graph_db(namespace, logger)
-    except ImportError:
-        logger.error("Neo4j not available, skipping graph database example")
-    
-    await demonstrate_document_db(namespace, logger)
-    await demonstrate_cache_db(namespace, logger)
-    await demonstrate_database_client(logger)
-
+        logger.info("Starting Hermes database examples")
+        
+        # Vector database example
+        await vector_database_example()
+        
+        # Key-value database example
+        await key_value_database_example()
+        
+        # Graph database example
+        await graph_database_example()
+        
+        logger.info("All database examples completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error in database examples: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Ensure all connections are closed
+        logger.info("Database examples complete")
 
 if __name__ == "__main__":
-    # Run the async main function
     asyncio.run(main())
