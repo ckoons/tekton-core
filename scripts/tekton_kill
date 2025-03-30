@@ -1,0 +1,71 @@
+#!/bin/bash
+# tekton_kill - script to kill all Tekton-related processes
+# Created: March 30, 2025
+
+# ANSI color codes for terminal output
+BLUE="\033[94m"
+GREEN="\033[92m"
+YELLOW="\033[93m"
+RED="\033[91m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# Function to kill processes by pattern
+kill_processes() {
+    local pattern=$1
+    local name=$2
+    local pids=$(pgrep -f "$pattern" 2>/dev/null)
+    
+    if [ -n "$pids" ]; then
+        echo -e "${BLUE}Found $name processes:${RESET} $pids"
+        echo -e "${YELLOW}Killing $name processes...${RESET}"
+        
+        for pid in $pids; do
+            # Get process name for display
+            proc_name=$(ps -p $pid -o comm= 2>/dev/null)
+            if [ -n "$proc_name" ]; then
+                echo -e "${RED}Killing${RESET} $pid ($proc_name)"
+                kill -9 $pid 2>/dev/null
+            fi
+        done
+    else
+        echo -e "${GREEN}No $name processes found.${RESET}"
+    fi
+}
+
+# Display header
+echo -e "${BLUE}${BOLD}Tekton Process Killer${RESET}"
+echo -e "${YELLOW}This will terminate all Tekton-related processes${RESET}"
+echo ""
+
+# Kill Engram consolidated server
+kill_processes "engram.api.consolidated_server" "Engram consolidated server"
+
+# Kill Engram with Claude processes
+kill_processes "engram_with_claude" "Engram with Claude" 
+
+# Kill Engram with Ollama processes
+kill_processes "engram_with_ollama" "Engram with Ollama"
+
+# Kill Python processes related to Hermes
+kill_processes "hermes.*database_manager" "Hermes database"
+kill_processes "hermes.*service_discovery" "Hermes service discovery"
+kill_processes "hermes.*vector_engine" "Hermes vector engine"
+
+# Kill Ollama bridge processes
+kill_processes "ollama_bridge.py" "Ollama bridge"
+
+# Check if any processes survived
+echo -e "${BLUE}${BOLD}Checking for surviving processes...${RESET}"
+echo -e "${YELLOW}Running: ps aux | grep -E '(engram|hermes|tekton|ollama_bridge)' | grep -v grep${RESET}"
+remaining=$(ps aux | grep -E '(engram|hermes|tekton|ollama_bridge)' | grep -v grep)
+
+if [ -n "$remaining" ]; then
+    echo -e "${RED}${BOLD}Warning: Some processes may still be running:${RESET}"
+    echo "$remaining"
+    echo -e "${YELLOW}You may need to kill these manually.${RESET}"
+else
+    echo -e "${GREEN}${BOLD}All Tekton processes terminated successfully.${RESET}"
+fi
+
+echo -e "${BLUE}${BOLD}Done.${RESET}"

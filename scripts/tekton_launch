@@ -231,13 +231,13 @@ if [ "$MEMORY_ONLY" = true ] || [ "$MODEL_TYPE" = "claude" ]; then
         ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
         
         if [ -x "$ENGRAM_STARTUP" ]; then
-            # Start the service with client ID 'server'
+            # Start the service (note: engram_consolidated doesn't accept --client-id)
             if [ "$ENGRAM_USE_FALLBACK" = "1" ]; then
-                "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" --fallback > /tmp/engram_error.log 2>&1 &
+                "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" --fallback > /tmp/engram_error.log 2>&1 &
             elif [ "$ENGRAM_USE_HERMES" = "1" ]; then
-                ENGRAM_USE_HERMES=1 "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
+                ENGRAM_USE_HERMES=1 "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
             else
-                "$ENGRAM_STARTUP" --client-id "server" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
+                "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
             fi
             
             STARTUP_PID=$!
@@ -328,7 +328,7 @@ if ENGRAM_DIR not in sys.path:
     sys.path.insert(0, ENGRAM_DIR)
     print(f\"${YELLOW}Added {ENGRAM_DIR} to Python path${RESET}\")
 
-if HERMES_DIR not in sys.path and not ${SKIP_HERMES_CHECK}:
+if HERMES_DIR not in sys.path and ${SKIP_HERMES_CHECK} != True:
     sys.path.insert(0, HERMES_DIR)
     print(f\"${YELLOW}Added {HERMES_DIR} to Python path${RESET}\")
 
@@ -336,7 +336,7 @@ if HERMES_DIR not in sys.path and not ${SKIP_HERMES_CHECK}:
 try:
     # Check if Hermes is available
     hermes_available = False
-    if not ${SKIP_HERMES_CHECK}:
+    if ${SKIP_HERMES_CHECK} != True:
         try:
             from hermes.core.service_discovery import ServiceRegistry
             from hermes.utils.database_helper import DatabaseClient
@@ -438,7 +438,10 @@ except Exception as e:
 print(\"\")"
 
         # Launch Claude with the specified model and memory functions
-        echo "$MEMORY_IMPORT" | claude --model="$MODEL" $MEMORY_FLAG
+        # Claude CLI currently doesn't accept --model flag, but we should select model via env var
+        echo -e "${BLUE}Setting model to $MODEL via ANTHROPIC_API_MODEL env var${RESET}"
+        export ANTHROPIC_API_MODEL="$MODEL"
+        echo "$MEMORY_IMPORT" | claude $MEMORY_FLAG
         ;;
         
     "ollama")
