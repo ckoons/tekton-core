@@ -98,6 +98,13 @@ cd "$SCRIPT_DIR"
 TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 echo -e "${GREEN}Using Tekton installation at: $TEKTON_DIR${RESET}"
 
+# Create necessary directories if they don't exist
+mkdir -p "$HOME/.tekton/data/vector"
+mkdir -p "$HOME/.tekton/data/keyvalue"
+mkdir -p "$HOME/.tekton/data/graph"
+mkdir -p "$HOME/.tekton/logs"
+echo -e "${GREEN}Ensured data directories exist in $HOME/.tekton${RESET}"
+
 # Find the Engram directory
 ENGRAM_DIR="$TEKTON_DIR/Engram"
 if [ -d "$ENGRAM_DIR" ]; then
@@ -114,8 +121,17 @@ export PYTHONPATH="$ENGRAM_DIR:$PYTHONPATH"
 # Find the Hermes directory
 HERMES_DIR="$TEKTON_DIR/Hermes"
 if [ -d "$HERMES_DIR" ] && [ "$SKIP_HERMES_CHECK" != true ]; then
-  echo -e "${GREEN}Found Hermes at: $HERMES_DIR${RESET}"
-  export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
+  # Check for key files to verify Hermes is properly installed
+  if [ -f "$HERMES_DIR/hermes/core/database_manager.py" ] && [ -f "$HERMES_DIR/hermes/core/logging.py" ]; then
+    echo -e "${GREEN}Found Hermes at: $HERMES_DIR${RESET}"
+    export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
+    export HERMES_AVAILABLE=1
+  else
+    echo -e "${YELLOW}Hermes found at $HERMES_DIR but appears incomplete${RESET}"
+    echo -e "${YELLOW}Proceeding without Hermes integration${RESET}"
+    SKIP_HERMES_CHECK=true
+    export HERMES_AVAILABLE=0
+  fi
 else
   if [ "$SKIP_HERMES_CHECK" = true ]; then
     echo -e "${YELLOW}Skipping Hermes integration (--skip-hermes)${RESET}"
@@ -124,6 +140,7 @@ else
     echo -e "${YELLOW}Proceeding without Hermes integration${RESET}"
   fi
   SKIP_HERMES_CHECK=true
+  export HERMES_AVAILABLE=0
 fi
 
 # Make helper scripts executable
@@ -135,7 +152,7 @@ if [ "$USE_SMART_DETECTION" = true ]; then
     
     if [ -f "$ENGRAM_DIR/utils/detect_best_vector_db.py" ]; then
         # Run detection script to determine the best DB
-        DB_INFO=$(python "$ENGRAM_DIR/utils/detect_best_vector_db.py" --quiet)
+        DB_INFO=$(python "$ENGRAM_DIR/utils/detect_best_vector_db.py" --quiet 2>/dev/null)
         DB_AVAILABLE=$?
         
         if [ $DB_AVAILABLE -eq 0 ] && [ -n "$DB_INFO" ]; then
@@ -150,32 +167,32 @@ if [ "$USE_SMART_DETECTION" = true ]; then
                 echo -e "${GREEN}Using FAISS vector database (optimal for your hardware)${RESET}"
                 export ENGRAM_USE_VECTORDB=faiss
                 export ENGRAM_USE_FALLBACK=0
-            elif [ "$SKIP_HERMES_CHECK" = true ]; then
-                echo -e "${YELLOW}No optimal vector database detected, using file-based memory${RESET}"
-                export ENGRAM_USE_FALLBACK=1
-            else
+            elif [ "$HERMES_AVAILABLE" = "1" ]; then
                 echo -e "${YELLOW}No optimal vector database detected, using Hermes database services${RESET}"
                 export ENGRAM_USE_HERMES=1
                 export ENGRAM_USE_FALLBACK=0
+            else
+                echo -e "${YELLOW}No optimal vector database detected, using file-based memory${RESET}"
+                export ENGRAM_USE_FALLBACK=1
             fi
         else
-            if [ "$SKIP_HERMES_CHECK" = true ]; then
-                echo -e "${YELLOW}Vector database detection failed, using file-based memory${RESET}"
-                export ENGRAM_USE_FALLBACK=1
-            else
+            if [ "$HERMES_AVAILABLE" = "1" ]; then
                 echo -e "${YELLOW}Vector database detection failed, using Hermes database services${RESET}"
                 export ENGRAM_USE_HERMES=1
                 export ENGRAM_USE_FALLBACK=0
+            else
+                echo -e "${YELLOW}Vector database detection failed, using file-based memory${RESET}"
+                export ENGRAM_USE_FALLBACK=1
             fi
         fi
     else
-        if [ "$SKIP_HERMES_CHECK" = true ]; then
-            echo -e "${YELLOW}Vector database detection script not found, using file-based memory${RESET}"
-            export ENGRAM_USE_FALLBACK=1
-        else
+        if [ "$HERMES_AVAILABLE" = "1" ]; then
             echo -e "${YELLOW}Vector database detection script not found, using Hermes database services${RESET}"
             export ENGRAM_USE_HERMES=1
             export ENGRAM_USE_FALLBACK=0
+        else
+            echo -e "${YELLOW}Vector database detection script not found, using file-based memory${RESET}"
+            export ENGRAM_USE_FALLBACK=1
         fi
     fi
 elif [ "$FORCE_FALLBACK" = true ]; then
