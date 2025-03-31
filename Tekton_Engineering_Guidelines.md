@@ -243,6 +243,9 @@ Tekton will prioritize broad interoperability:
 - Component changes should be tested in isolation before integration
 - Cross-component changes should be planned and executed as coordinated operations
 - Significant architectural changes require documentation updates
+- Code file should be kept under 500 lines (smaller prefered)
+  - Very large files should be organized into files in a subdirectory
+  - Non-code files should be kept as small as possible
 
 ### Testing Strategy
 - Unit tests for individual components

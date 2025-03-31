@@ -40,5 +40,5 @@ __all__ = [
     'get_logger'
 ]
 
-# Global log manager instance
-_global_log_manager = None
+# Standard Python logger for internal use
+_internal_logger = logging.getLogger(__name__)
