@@ -10,8 +10,8 @@ import json
 import time
 import uuid
 import asyncio
-from pathlib import Path
-from typing import Dict, List, Any, Optional, Union, Tuple, Set
+from typing import Dict, List, Any, Optional, Union, Tuple
+
 from neo4j import GraphDatabase, AsyncGraphDatabase, basic_auth
 
 from hermes.core.logging import get_logger
@@ -32,13 +32,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
     def __init__(self, 
                 namespace: str,
                 config: Optional[Dict[str, Any]] = None):
-        """
-        Initialize the Neo4j graph adapter.
-        
-        Args:
-            namespace: Namespace for data isolation
-            config: Optional configuration parameters
-        """
+        """Initialize the Neo4j graph adapter."""
         super().__init__(namespace, config)
         
         # Neo4j connection settings
@@ -48,9 +42,6 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
         
         # Initialize client
         self.client = None
-        self.session = None
-        
-        # Internal state
         self._connected = False
         
         # Namespace will be used as a prefix for all node labels
@@ -62,12 +53,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
         return DatabaseBackend.NEO4J
     
     async def connect(self) -> bool:
-        """
-        Connect to the database.
-        
-        Returns:
-            True if connection successful
-        """
+        """Connect to the database."""
         try:
             # Create client with auth
             self.client = AsyncGraphDatabase.driver(
@@ -92,12 +78,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
             return False
     
     async def disconnect(self) -> bool:
-        """
-        Disconnect from the database.
-        
-        Returns:
-            True if disconnection successful
-        """
+        """Disconnect from the database."""
         try:
             if self.client:
                 await self.client.close()
@@ -113,12 +94,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
             return False
     
     async def is_connected(self) -> bool:
-        """
-        Check if connected to the database.
-        
-        Returns:
-            True if connected
-        """
+        """Check if connected to the database."""
         if not self._connected or not self.client:
             return False
         
@@ -134,17 +110,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
                       id: str,
                       labels: List[str],
                       properties: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Add a node to the graph.
-        
-        Args:
-            id: Unique identifier for the node
-            labels: List of labels for the node
-            properties: Optional node properties
-            
-        Returns:
-            True if operation successful
-        """
+        """Add a node to the graph."""
         if not self._connected:
             logger.error("Not connected to database")
             return False
@@ -196,18 +162,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
                              target_id: str,
                              type: str,
                              properties: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Add a relationship between nodes.
-        
-        Args:
-            source_id: Source node ID
-            target_id: Target node ID
-            type: Relationship type
-            properties: Optional relationship properties
-            
-        Returns:
-            True if operation successful
-        """
+        """Add a relationship between nodes."""
         if not self._connected:
             logger.error("Not connected to database")
             return False
@@ -254,15 +209,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
             return False
     
     async def get_node(self, id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a node by ID.
-        
-        Args:
-            id: Node ID to retrieve
-            
-        Returns:
-            Node with properties if found, None otherwise
-        """
+        """Get a node by ID."""
         if not self._connected:
             logger.error("Not connected to database")
             return None
@@ -294,10 +241,8 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
                 labels = record["labels"]
                 
                 # Remove namespace prefix from labels
-                clean_labels = []
-                for label in labels:
-                    if label.startswith(self.namespace_prefix):
-                        clean_labels.append(label[len(self.namespace_prefix):])
+                clean_labels = [label[len(self.namespace_prefix):] for label in labels 
+                               if label.startswith(self.namespace_prefix)]
                 
                 # Convert node to dict
                 node_dict = dict(node.items())
@@ -320,29 +265,17 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
                               node_id: str,
                               types: Optional[List[str]] = None,
                               direction: str = "both") -> List[Dict[str, Any]]:
-        """
-        Get relationships for a node.
-        
-        Args:
-            node_id: Node ID to get relationships for
-            types: Optional list of relationship types to filter by
-            direction: Relationship direction ("incoming", "outgoing", or "both")
-            
-        Returns:
-            List of relationships
-        """
+        """Get relationships for a node."""
         if not self._connected:
             logger.error("Not connected to database")
             return []
         
         try:
             # Add namespace prefix to relationship types
-            prefixed_types = None
+            rel_filter = ""
             if types:
                 prefixed_types = [f"{self.namespace_prefix}{t}" for t in types]
                 rel_filter = "|".join(f":{t}" for t in prefixed_types)
-            else:
-                rel_filter = ""
             
             # Create Cypher query based on direction
             if direction == "outgoing":
@@ -421,25 +354,14 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
             return []
     
     async def query(self, query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """
-        Execute a graph query.
-        
-        Args:
-            query: Query string in the database's query language (Cypher)
-            params: Optional query parameters
-            
-        Returns:
-            Query results
-        """
+        """Execute a graph query in Cypher."""
         if not self._connected:
             logger.error("Not connected to database")
             return []
         
         try:
             # Add namespace parameter
-            if params is None:
-                params = {}
-            
+            params = params or {}
             if "namespace" not in params:
                 params["namespace"] = self.namespace
             
@@ -474,15 +396,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
             return []
     
     async def delete_node(self, id: str) -> bool:
-        """
-        Delete a node.
-        
-        Args:
-            id: Node ID to delete
-            
-        Returns:
-            True if deletion successful
-        """
+        """Delete a node."""
         if not self._connected:
             logger.error("Not connected to database")
             return False
@@ -520,17 +434,7 @@ class Neo4jGraphAdapter(GraphDatabaseAdapter):
                                 source_id: str, 
                                 target_id: str,
                                 type: Optional[str] = None) -> bool:
-        """
-        Delete a relationship.
-        
-        Args:
-            source_id: Source node ID
-            target_id: Target node ID
-            type: Optional relationship type
-            
-        Returns:
-            True if deletion successful
-        """
+        """Delete a relationship."""
         if not self._connected:
             logger.error("Not connected to database")
             return False
