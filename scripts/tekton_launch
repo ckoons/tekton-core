@@ -1,7 +1,8 @@
 #!/bin/bash
 # tekton_launch
-# Unified launcher script for Tekton ecosystem with memory and model selection
+# Enhanced unified launcher script for Tekton ecosystem with interactive mode
 # Created: March 30, 2025
+# Updated: April 1, 2025
 
 # Default values
 MODEL_TYPE="claude" # Options: claude, ollama, openai, gemini
@@ -14,6 +15,10 @@ TEMPERATURE="0.7"
 MAX_TOKENS="2048"
 SKIP_HERMES_CHECK=false
 FORCE_FALLBACK=false
+INTERACTIVE=true
+PRESERVE_CWD=true
+LAUNCH_FRAMEWORK=true
+ACTIVE_COMPONENTS=()
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -22,6 +27,687 @@ YELLOW="\033[93m"
 RED="\033[91m"
 BOLD="\033[1m"
 RESET="\033[0m"
+
+# Find Tekton root directory and set up paths
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# If script is running from a symlink, resolve the actual path
+if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    SCRIPT_PATH=$(readlink "${BASH_SOURCE[0]}")
+    SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+fi
+
+# Save the original working directory
+ORIGINAL_DIR="$(pwd)"
+
+# Find the Tekton root directory
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+# Function to display usage
+show_usage() {
+    echo "Tekton - Enhanced unified launcher for AI models and Tekton framework"
+    echo ""
+    echo "Usage: tekton_launch [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --model-type TYPE        Type of model to launch: claude, ollama, openai, gemini (default: claude)"
+    echo "  --model MODEL            Specific model to use (defaults depend on model type)"
+    echo "  --client-id ID           Client ID for Engram (default: tekton)"
+    echo "  --memory-only            Only start the memory service, don't launch the model"
+    echo "  --fallback               Use file-based memory (no vector database)"
+    echo "  --temperature TEMP       Temperature for generation (default: 0.7)"
+    echo "  --max-tokens TOKENS      Maximum tokens to generate (default: 2048)"
+    echo "  --no-memory              Disable memory functions"
+    echo "  --skip-hermes            Skip Hermes service check and integration"
+    echo "  --non-interactive        Run in non-interactive mode (use defaults for unspecified options)"
+    echo "  --no-framework           Don't launch the Tekton framework, just start the AI model"
+    echo "  --components COMP        Comma-separated list of specific components to launch"
+    echo "                           (engram,hermes,rhetor,telos,prometheus,harmonia,athena)"
+    echo "  --help                   Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  Launch Claude interactively:            tekton_launch"
+    echo "  Launch just Ollama with Llama3 model:   tekton_launch --model-type ollama --model llama3"
+    echo "  Launch only memory services:            tekton_launch --memory-only"
+    echo "  Launch full framework with Ollama:      tekton_launch --model-type ollama --components all"
+}
+
+# Function to check if a process is running
+is_running() {
+    pgrep -f "$1" >/dev/null
+    return $?
+}
+
+# Function to prompt user for input with default value
+prompt_with_default() {
+    local prompt="$1"
+    local default="$2"
+    local options="$3"
+    local response
+    
+    # If options are provided, show them
+    if [ -n "$options" ]; then
+        prompt="$prompt ($options)"
+    fi
+    
+    # Show prompt with default
+    echo -en "${YELLOW}$prompt ${RESET}[${GREEN}$default${RESET}]: "
+    read -r response
+    
+    # Return user input or default if empty
+    echo "${response:-$default}"
+}
+
+# Function to prompt for yes/no with default
+prompt_yes_no() {
+    local prompt="$1"
+    local default="$2"
+    local response
+    
+    # Prepare default indicator
+    if [ "$default" = "y" ]; then
+        local options="Y/n"
+    else
+        local options="y/N"
+    fi
+    
+    # Show prompt with default
+    echo -en "${YELLOW}$prompt ${RESET}[$options]: "
+    read -r response
+    response=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+    
+    # Return true (0) for yes, false (1) for no
+    if [ -z "$response" ]; then
+        [ "$default" = "y" ]
+        return $?
+    else
+        [ "$response" = "y" ] || [ "$response" = "yes" ]
+        return $?
+    fi
+}
+
+# Function to detect and list available components
+detect_components() {
+    echo -e "${BLUE}Detecting Tekton components...${RESET}"
+    
+    local components=()
+    
+    # Check for Engram
+    if [ -d "$TEKTON_DIR/Engram" ] && [ -f "$TEKTON_DIR/Engram/core/engram_consolidated" ]; then
+        components+=("engram")
+        echo -e "${GREEN}✓ Engram (Memory System)${RESET}"
+    else
+        echo -e "${RED}✗ Engram not found or incomplete${RESET}"
+    fi
+    
+    # Check for Hermes
+    if [ -d "$TEKTON_DIR/Hermes" ] && [ -f "$TEKTON_DIR/Hermes/hermes/core/service_discovery.py" ]; then
+        components+=("hermes")
+        echo -e "${GREEN}✓ Hermes (Database & Messaging)${RESET}"
+    else
+        echo -e "${YELLOW}⚠ Hermes not found or incomplete${RESET}"
+    fi
+    
+    # Check for Rhetor
+    if [ -d "$TEKTON_DIR/Rhetor" ]; then
+        if [ -d "$TEKTON_DIR/Rhetor/rhetor" ] && [ -f "$TEKTON_DIR/Rhetor/rhetor/__init__.py" ]; then
+            components+=("rhetor")
+            echo -e "${GREEN}✓ Rhetor (Communication)${RESET}"
+        else
+            echo -e "${YELLOW}⚠ Rhetor found but not fully implemented${RESET}"
+        fi
+    fi
+    
+    # Check for Telos
+    if [ -d "$TEKTON_DIR/Telos" ]; then
+        if [ -d "$TEKTON_DIR/Telos/telos" ] && [ -f "$TEKTON_DIR/Telos/telos/__init__.py" ]; then
+            components+=("telos")
+            echo -e "${GREEN}✓ Telos (User Interface)${RESET}"
+        else
+            echo -e "${YELLOW}⚠ Telos found but not fully implemented${RESET}"
+        fi
+    fi
+    
+    # Check for Sophia
+    if [ -d "$TEKTON_DIR/Sophia" ]; then
+        if [ -d "$TEKTON_DIR/Sophia/sophia" ] && [ -f "$TEKTON_DIR/Sophia/sophia/core/ml_engine.py" ]; then
+            components+=("sophia")
+            echo -e "${GREEN}✓ Sophia (Machine Learning)${RESET}"
+        else
+            echo -e "${YELLOW}⚠ Sophia found but not fully implemented${RESET}"
+        fi
+    fi
+    
+    # Check for Prometheus
+    if [ -d "$TEKTON_DIR/Prometheus" ] && [ -f "$TEKTON_DIR/Prometheus/prometheus/core/planning_engine.py" ]; then
+        components+=("prometheus")
+        echo -e "${GREEN}✓ Prometheus (Planning)${RESET}"
+    else
+        echo -e "${YELLOW}⚠ Prometheus not found or incomplete${RESET}"
+    fi
+    
+    # Check for Harmonia
+    if [ -d "$TEKTON_DIR/Harmonia" ]; then
+        if [ -d "$TEKTON_DIR/Harmonia/harmonia" ] && [ -f "$TEKTON_DIR/Harmonia/harmonia/core/workflow.py" ]; then
+            components+=("harmonia")
+            echo -e "${GREEN}✓ Harmonia (Workflow)${RESET}"
+        else
+            echo -e "${YELLOW}⚠ Harmonia found but not fully implemented${RESET}"
+        fi
+    fi
+    
+    # Check for Athena
+    if [ -d "$TEKTON_DIR/Athena" ]; then
+        if [ -d "$TEKTON_DIR/Athena/athena" ] && [ -f "$TEKTON_DIR/Athena/athena/core/entity.py" ]; then
+            components+=("athena")
+            echo -e "${GREEN}✓ Athena (Knowledge Graph)${RESET}"
+        else
+            echo -e "${YELLOW}⚠ Athena found but not fully implemented${RESET}"
+        fi
+    fi
+    
+    # Return the list of components
+    echo "${components[@]}"
+}
+
+# Function to check Tekton status
+check_tekton_status() {
+    local any_running=false
+    
+    # Check if any component is running
+    if is_running "engram.api.consolidated_server" || \
+       is_running "hermes.*database_manager" || \
+       is_running "rhetor.core" || \
+       is_running "telos.core" || \
+       is_running "prometheus.core" || \
+       is_running "harmonia.core" || \
+       is_running "athena.core" || \
+       is_running "sophia.core"; then
+        any_running=true
+    fi
+    
+    echo "$any_running"
+}
+
+# Interactive component selection
+select_components() {
+    local all_components=("$@")
+    local selected_components=()
+    
+    echo -e "${BLUE}${BOLD}Select components to launch:${RESET}"
+    
+    for comp in "${all_components[@]}"; do
+        case "$comp" in
+            "engram")
+                if prompt_yes_no "Launch Engram (Memory System)?" "y"; then
+                    selected_components+=("engram")
+                fi
+                ;;
+            "hermes")
+                if prompt_yes_no "Launch Hermes (Database & Messaging)?" "y"; then
+                    selected_components+=("hermes")
+                fi
+                ;;
+            "rhetor")
+                if prompt_yes_no "Launch Rhetor (Communication)?" "y"; then
+                    selected_components+=("rhetor")
+                fi
+                ;;
+            "telos")
+                if prompt_yes_no "Launch Telos (User Interface)?" "y"; then
+                    selected_components+=("telos")
+                fi
+                ;;
+            "prometheus")
+                if prompt_yes_no "Launch Prometheus (Planning)?" "n"; then
+                    selected_components+=("prometheus")
+                fi
+                ;;
+            "harmonia")
+                if prompt_yes_no "Launch Harmonia (Workflow)?" "n"; then
+                    selected_components+=("harmonia")
+                fi
+                ;;
+            "athena")
+                if prompt_yes_no "Launch Athena (Knowledge Graph)?" "n"; then
+                    selected_components+=("athena")
+                fi
+                
+                if prompt_yes_no "Launch Sophia (Machine Learning)?" "n"; then
+                    selected_components+=("sophia")
+                fi
+                ;;
+        esac
+    done
+    
+    echo "${selected_components[@]}"
+}
+
+# Launch Engram component
+launch_engram() {
+    echo -e "${BLUE}${BOLD}Launching Engram Memory System...${RESET}"
+    
+    # Check if Engram memory service is already running
+    if is_running "engram.api.consolidated_server"; then
+        echo -e "${GREEN}Engram memory service is already running${RESET}"
+        return 0
+    fi
+    
+    # Find the consolidated server script
+    ENGRAM_STARTUP="$TEKTON_DIR/Engram/core/engram_consolidated"
+    
+    if [ -x "$ENGRAM_STARTUP" ]; then
+        # Start the service (note: engram_consolidated doesn't accept --client-id)
+        if [ "$ENGRAM_USE_FALLBACK" = "1" ]; then
+            "$ENGRAM_STARTUP" --data-dir "$HOME/.tekton/data" --fallback > "$HOME/.tekton/logs/engram.log" 2>&1 &
+        elif [ "$ENGRAM_USE_HERMES" = "1" ]; then
+            ENGRAM_USE_HERMES=1 "$ENGRAM_STARTUP" --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1 &
+        else
+            "$ENGRAM_STARTUP" --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1 &
+        fi
+        
+        STARTUP_PID=$!
+        echo -e "${GREEN}Started Engram memory service with PID: $STARTUP_PID${RESET}"
+        
+        # Wait for service to be ready
+        echo -e "${BLUE}Waiting for Engram service to be ready...${RESET}"
+        for i in {1..10}; do
+            sleep 1
+            ps aux | grep "$STARTUP_PID" | grep -v "grep" > /dev/null 2>&1
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}Memory service failed to start${RESET}"
+                cat "$HOME/.tekton/logs/engram.log"
+                return 1
+            fi
+            
+            # Try connecting to health endpoint
+            if curl -s "http://127.0.0.1:8000/health" > /dev/null 2>&1; then
+                echo -e "${GREEN}Engram memory service is online!${RESET}"
+                return 0
+            fi
+            
+            echo -n "."
+        done
+        echo ""
+        echo -e "${YELLOW}Engram service may not be fully ready, but continuing...${RESET}"
+        return 0
+    else
+        echo -e "${RED}Engram consolidated server script not found at $ENGRAM_STARTUP${RESET}"
+        return 1
+    fi
+}
+
+# Launch Hermes component
+launch_hermes() {
+    echo -e "${BLUE}${BOLD}Launching Hermes Database & Messaging...${RESET}"
+    
+    # Check if Hermes is already running
+    if is_running "hermes.*database_manager"; then
+        echo -e "${GREEN}Hermes services are already running${RESET}"
+        return 0
+    fi
+    
+    # Set up Python path
+    HERMES_DIR="$TEKTON_DIR/Hermes"
+    export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
+    
+    # Launch the database manager and service registry
+    python3 -c "
+import sys, os, subprocess, asyncio
+sys.path.insert(0, '$HERMES_DIR')
+
+async def start_hermes():
+    try:
+        # Start database manager
+        from hermes.core.database.manager import DatabaseManager
+        print('${BLUE}Starting Hermes Database Manager...${RESET}')
+        
+        # Create the database manager with logging
+        os.makedirs('$HOME/.tekton/data/hermes', exist_ok=True)
+        db_manager = DatabaseManager(
+            root_dir='$HOME/.tekton/data/hermes',
+            log_level='INFO'
+        )
+        
+        # Start the database manager
+        await db_manager.start()
+        print('${GREEN}Hermes Database Manager started successfully${RESET}')
+        
+        # Keep the manager running
+        while True:
+            await asyncio.sleep(1)
+    except Exception as e:
+        print(f'${RED}Error starting Hermes services: {e}${RESET}')
+        sys.exit(1)
+
+# Start in a separate process
+subprocess.Popen(
+    [sys.executable, '-c', f'''
+import sys, asyncio
+sys.path.insert(0, '{HERMES_DIR}')
+from hermes.core.database.manager import DatabaseManager
+import os
+
+async def run():
+    os.makedirs('{HOME}/.tekton/data/hermes', exist_ok=True)
+    db_manager = DatabaseManager(
+        root_dir='{HOME}/.tekton/data/hermes',
+        log_level='INFO'
+    )
+    await db_manager.start()
+    while True:
+        await asyncio.sleep(1)
+
+asyncio.run(run())
+'''],
+    stdout=open(f'{HOME}/.tekton/logs/hermes_db.log', 'w'),
+    stderr=open(f'{HOME}/.tekton/logs/hermes_db.log', 'w'),
+    close_fds=True
+)
+
+# Start service registry in a separate process
+subprocess.Popen(
+    [sys.executable, '-c', f'''
+import sys, asyncio
+sys.path.insert(0, '{HERMES_DIR}')
+from hermes.core.service_discovery import ServiceRegistry
+import os
+
+async def run():
+    registry = ServiceRegistry()
+    await registry.start()
+    while True:
+        await asyncio.sleep(1)
+
+asyncio.run(run())
+'''],
+    stdout=open(f'{HOME}/.tekton/logs/hermes_registry.log', 'w'),
+    stderr=open(f'{HOME}/.tekton/logs/hermes_registry.log', 'w'),
+    close_fds=True
+)
+
+print('${GREEN}Hermes services started successfully${RESET}')
+" &
+    
+    # Give services time to start
+    sleep 2
+    
+    # Check if services started successfully
+    if is_running "hermes.*database_manager"; then
+        echo -e "${GREEN}Hermes Database Manager is running${RESET}"
+        return 0
+    else
+        echo -e "${RED}Failed to start Hermes services${RESET}"
+        cat "$HOME/.tekton/logs/hermes_db.log"
+        return 1
+    fi
+}
+
+# Launch Rhetor component
+launch_rhetor() {
+    echo -e "${BLUE}${BOLD}Launching Rhetor Communication System...${RESET}"
+    
+    # Check if Rhetor is already running
+    if is_running "rhetor.core"; then
+        echo -e "${GREEN}Rhetor services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Rhetor is implemented
+    if [ -d "$TEKTON_DIR/Rhetor/rhetor" ] && [ -f "$TEKTON_DIR/Rhetor/rhetor/__init__.py" ]; then
+        # Set up Rhetor environment
+        RHETOR_DIR="$TEKTON_DIR/Rhetor"
+        RHETOR_VENV="$RHETOR_DIR/venv"
+        
+        # Check if setup script exists and virtual environment needs to be created
+        if [ -f "$RHETOR_DIR/setup.sh" ] && [ ! -d "$RHETOR_VENV" ]; then
+            echo -e "${YELLOW}Setting up Rhetor virtual environment...${RESET}"
+            (cd "$RHETOR_DIR" && bash ./setup.sh)
+        fi
+        
+        # Set up Python path
+        if [ -d "$RHETOR_VENV" ]; then
+            # Use the virtual environment's Python
+            RHETOR_PYTHON="$RHETOR_VENV/bin/python"
+            echo -e "${GREEN}Using Rhetor virtual environment at $RHETOR_VENV${RESET}"
+        else
+            # Fall back to system Python if venv doesn't exist
+            RHETOR_PYTHON="python3"
+            export PYTHONPATH="$RHETOR_DIR:$PYTHONPATH"
+            echo -e "${YELLOW}No virtual environment found, using system Python${RESET}"
+        fi
+        
+        # Register Rhetor with Hermes
+        if [ "$HERMES_AVAILABLE" = "1" ] && [ -f "$RHETOR_DIR/register_with_hermes.py" ]; then
+            echo -e "${BLUE}Registering Rhetor with Hermes...${RESET}"
+            if [ -d "$RHETOR_VENV" ]; then
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$TEKTON_DIR:$PYTHONPATH" "$RHETOR_PYTHON" "$RHETOR_DIR/register_with_hermes.py" 
+            else
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$RHETOR_DIR:$TEKTON_DIR:$PYTHONPATH" python3 "$RHETOR_DIR/register_with_hermes.py"
+            fi
+        fi
+        
+        echo -e "${GREEN}Rhetor component initialized successfully${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Rhetor component is not yet implemented${RESET}"
+        echo -e "${YELLOW}Skipping Rhetor launch${RESET}"
+        return 0
+    fi
+}
+
+# Launch Telos component
+launch_telos() {
+    echo -e "${BLUE}${BOLD}Launching Telos User Interface...${RESET}"
+    
+    # Check if Telos is already running
+    if is_running "telos.core"; then
+        echo -e "${GREEN}Telos services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Telos is implemented
+    if [ -d "$TEKTON_DIR/Telos/telos" ] && [ -f "$TEKTON_DIR/Telos/telos/__init__.py" ]; then
+        # Set up Telos environment
+        TELOS_DIR="$TEKTON_DIR/Telos"
+        TELOS_VENV="$TELOS_DIR/venv"
+        
+        # Check if setup script exists and virtual environment needs to be created
+        if [ -f "$TELOS_DIR/setup.sh" ] && [ ! -d "$TELOS_VENV" ]; then
+            echo -e "${YELLOW}Setting up Telos virtual environment...${RESET}"
+            (cd "$TELOS_DIR" && bash ./setup.sh)
+        fi
+        
+        # Set up Python path
+        if [ -d "$TELOS_VENV" ]; then
+            # Use the virtual environment's Python
+            TELOS_PYTHON="$TELOS_VENV/bin/python"
+            echo -e "${GREEN}Using Telos virtual environment at $TELOS_VENV${RESET}"
+        else
+            # Fall back to system Python if venv doesn't exist
+            TELOS_PYTHON="python3"
+            export PYTHONPATH="$TELOS_DIR:$PYTHONPATH"
+            echo -e "${YELLOW}No virtual environment found, using system Python${RESET}"
+        fi
+        
+        # Register Telos with Hermes
+        if [ "$HERMES_AVAILABLE" = "1" ] && [ -f "$TELOS_DIR/register_with_hermes.py" ]; then
+            echo -e "${BLUE}Registering Telos with Hermes...${RESET}"
+            if [ -d "$TELOS_VENV" ]; then
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$TEKTON_DIR:$PYTHONPATH" "$TELOS_PYTHON" "$TELOS_DIR/register_with_hermes.py" 
+            else
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$TELOS_DIR:$TEKTON_DIR:$PYTHONPATH" python3 "$TELOS_DIR/register_with_hermes.py"
+            fi
+        fi
+        
+        echo -e "${GREEN}Telos component initialized successfully${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Telos component is not yet implemented${RESET}"
+        echo -e "${YELLOW}Skipping Telos launch${RESET}"
+        return 0
+    fi
+}
+
+# Launch Prometheus component
+launch_prometheus() {
+    echo -e "${BLUE}${BOLD}Launching Prometheus Planning System...${RESET}"
+    
+    # Check if Prometheus is already running
+    if is_running "prometheus.core"; then
+        echo -e "${GREEN}Prometheus services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Prometheus is implemented
+    if [ -d "$TEKTON_DIR/Prometheus" ] && [ -f "$TEKTON_DIR/Prometheus/prometheus/core/planning_engine.py" ]; then
+        # Set up Python path
+        export PYTHONPATH="$TEKTON_DIR/Prometheus:$PYTHONPATH"
+        
+        echo -e "${GREEN}Prometheus planning engine is available${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Prometheus planning engine is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Prometheus launch${RESET}"
+        return 0
+    fi
+}
+
+# Launch Harmonia component
+launch_harmonia() {
+    echo -e "${BLUE}${BOLD}Launching Harmonia Workflow System...${RESET}"
+    
+    # Check if Harmonia is already running
+    if is_running "harmonia.core"; then
+        echo -e "${GREEN}Harmonia services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Harmonia is implemented
+    if [ -d "$TEKTON_DIR/Harmonia/harmonia" ] && [ -f "$TEKTON_DIR/Harmonia/harmonia/core/workflow.py" ]; then
+        # Set up Python path
+        export PYTHONPATH="$TEKTON_DIR/Harmonia:$PYTHONPATH"
+        
+        echo -e "${GREEN}Harmonia workflow engine is available${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Harmonia workflow engine is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Harmonia launch${RESET}"
+        return 0
+    fi
+}
+
+# Launch Athena component
+launch_athena() {
+    echo -e "${BLUE}${BOLD}Launching Athena Knowledge Graph...${RESET}"
+    
+    # Check if Athena is already running
+    if is_running "athena.core"; then
+        echo -e "${GREEN}Athena services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Athena is implemented
+    if [ -d "$TEKTON_DIR/Athena/athena" ] && [ -f "$TEKTON_DIR/Athena/athena/core/entity.py" ]; then
+        # Set up Athena environment
+        ATHENA_DIR="$TEKTON_DIR/Athena"
+        ATHENA_VENV="$ATHENA_DIR/venv"
+        
+        # Check if setup script exists and virtual environment needs to be created
+        if [ -f "$ATHENA_DIR/setup.sh" ] && [ ! -d "$ATHENA_VENV" ]; then
+            echo -e "${YELLOW}Setting up Athena virtual environment...${RESET}"
+            (cd "$ATHENA_DIR" && bash ./setup.sh)
+        fi
+        
+        # Set up Python path
+        if [ -d "$ATHENA_VENV" ]; then
+            # Use the virtual environment's Python
+            ATHENA_PYTHON="$ATHENA_VENV/bin/python"
+            echo -e "${GREEN}Using Athena virtual environment at $ATHENA_VENV${RESET}"
+        else
+            # Fall back to system Python if venv doesn't exist
+            ATHENA_PYTHON="python3"
+            export PYTHONPATH="$ATHENA_DIR:$PYTHONPATH"
+            echo -e "${YELLOW}No virtual environment found, using system Python${RESET}"
+        fi
+        
+        # Register Athena with Hermes
+        if [ "$HERMES_AVAILABLE" = "1" ] && [ -f "$ATHENA_DIR/register_with_hermes.py" ]; then
+            echo -e "${BLUE}Registering Athena with Hermes...${RESET}"
+            if [ -d "$ATHENA_VENV" ]; then
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$TEKTON_DIR:$PYTHONPATH" "$ATHENA_PYTHON" "$ATHENA_DIR/register_with_hermes.py" 
+            else
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$ATHENA_DIR:$TEKTON_DIR:$PYTHONPATH" python3 "$ATHENA_DIR/register_with_hermes.py"
+            fi
+        fi
+        
+        echo -e "${GREEN}Athena knowledge graph initialized successfully${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Athena knowledge graph is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Athena launch${RESET}"
+        return 0
+    fi
+}
+
+# Launch Sophia component
+launch_sophia() {
+    echo -e "${BLUE}${BOLD}Launching Sophia Machine Learning System...${RESET}"
+    
+    # Check if Sophia is already running
+    if is_running "sophia.core"; then
+        echo -e "${GREEN}Sophia services are already running${RESET}"
+        return 0
+    fi
+    
+    # Check if Sophia is implemented
+    if [ -d "$TEKTON_DIR/Sophia/sophia" ] && [ -f "$TEKTON_DIR/Sophia/sophia/core/ml_engine.py" ]; then
+        # Set up Sophia environment
+        SOPHIA_DIR="$TEKTON_DIR/Sophia"
+        SOPHIA_VENV="$SOPHIA_DIR/venv"
+        
+        # Check if setup script exists and virtual environment needs to be created
+        if [ -f "$SOPHIA_DIR/setup.sh" ] && [ ! -d "$SOPHIA_VENV" ]; then
+            echo -e "${YELLOW}Setting up Sophia virtual environment...${RESET}"
+            (cd "$SOPHIA_DIR" && bash ./setup.sh)
+        fi
+        
+        # Set up Python path
+        if [ -d "$SOPHIA_VENV" ]; then
+            # Use the virtual environment's Python
+            SOPHIA_PYTHON="$SOPHIA_VENV/bin/python"
+            echo -e "${GREEN}Using Sophia virtual environment at $SOPHIA_VENV${RESET}"
+        else
+            # Fall back to system Python if venv doesn't exist
+            SOPHIA_PYTHON="python3"
+            export PYTHONPATH="$SOPHIA_DIR:$PYTHONPATH"
+            echo -e "${YELLOW}No virtual environment found, using system Python${RESET}"
+        fi
+        
+        # Register Sophia with Hermes
+        if [ "$HERMES_AVAILABLE" = "1" ] && [ -f "$SOPHIA_DIR/register_with_hermes.py" ]; then
+            echo -e "${BLUE}Registering Sophia with Hermes...${RESET}"
+            if [ -d "$SOPHIA_VENV" ]; then
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$TEKTON_DIR:$PYTHONPATH" "$SOPHIA_PYTHON" "$SOPHIA_DIR/register_with_hermes.py" 
+            else
+                HERMES_DIR=$HERMES_DIR PYTHONPATH="$SOPHIA_DIR:$TEKTON_DIR:$PYTHONPATH" python3 "$SOPHIA_DIR/register_with_hermes.py"
+            fi
+        fi
+        
+        echo -e "${GREEN}Sophia machine learning system initialized successfully${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Sophia machine learning system is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Sophia launch${RESET}"
+        return 0
+    fi
+}
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -64,22 +750,20 @@ while [[ $# -gt 0 ]]; do
       SKIP_HERMES_CHECK=true
       shift
       ;;
+    --non-interactive)
+      INTERACTIVE=false
+      shift
+      ;;
+    --no-framework)
+      LAUNCH_FRAMEWORK=false
+      shift
+      ;;
+    --components)
+      IFS=',' read -r -a ACTIVE_COMPONENTS <<< "$2"
+      shift 2
+      ;;
     --help)
-      echo "Tekton - Unified launcher script for AI models with Hermes integration"
-      echo ""
-      echo "Usage: tekton_launch [OPTIONS]"
-      echo ""
-      echo "Options:"
-      echo "  --model-type TYPE        Type of model to launch: claude, ollama, openai, gemini (default: claude)"
-      echo "  --model MODEL            Specific model to use (defaults depend on model type)"
-      echo "  --client-id ID           Client ID for Engram (default: tekton)"
-      echo "  --memory-only            Only start the memory service, don't launch the model"
-      echo "  --fallback               Use file-based memory (no vector database)"
-      echo "  --temperature TEMP       Temperature for generation (default: 0.7)"
-      echo "  --max-tokens TOKENS      Maximum tokens to generate (default: 2048)"
-      echo "  --no-memory              Disable memory functions"
-      echo "  --skip-hermes            Skip Hermes service check and integration"
-      echo "  --help                   Show this help message"
+      show_usage
       exit 0
       ;;
     *)
@@ -90,33 +774,117 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
-
-# Find the Tekton root directory
-TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Banner
+echo -e "${BLUE}${BOLD}====== Tekton Orchestration System ======${RESET}"
 echo -e "${GREEN}Using Tekton installation at: $TEKTON_DIR${RESET}"
+echo ""
 
-# Create necessary directories if they don't exist
+# Create necessary directories
 mkdir -p "$HOME/.tekton/data/vector"
 mkdir -p "$HOME/.tekton/data/keyvalue"
 mkdir -p "$HOME/.tekton/data/graph"
+mkdir -p "$HOME/.tekton/data/hermes"
 mkdir -p "$HOME/.tekton/logs"
 echo -e "${GREEN}Ensured data directories exist in $HOME/.tekton${RESET}"
+
+# Check if any Tekton components are already running
+TEKTON_RUNNING=$(check_tekton_status)
+
+# If we're in interactive mode and no specific options were provided
+if [ "$INTERACTIVE" = true ] && [ ${#ACTIVE_COMPONENTS[@]} -eq 0 ]; then
+    # Detect available components
+    AVAILABLE_COMPONENTS=($(detect_components))
+    
+    # Check if Tekton is already running
+    if [ "$TEKTON_RUNNING" = true ]; then
+        echo -e "${YELLOW}Some Tekton components are already running${RESET}"
+        # Get current status
+        $TEKTON_DIR/scripts/tekton_status
+        echo ""
+        
+        # Ask if user wants to launch additional components
+        if prompt_yes_no "Would you like to launch additional Tekton components?" "n"; then
+            LAUNCH_FRAMEWORK=true
+        else
+            LAUNCH_FRAMEWORK=false
+        fi
+    else
+        # Ask if user wants to launch the framework
+        if prompt_yes_no "Would you like to launch the Tekton framework?" "y"; then
+            LAUNCH_FRAMEWORK=true
+            # If yes, ask which components
+            ACTIVE_COMPONENTS=($(select_components "${AVAILABLE_COMPONENTS[@]}"))
+        else
+            LAUNCH_FRAMEWORK=false
+        fi
+    fi
+    
+    # Ask about model type
+    MODEL_TYPE=$(prompt_with_default "Which AI model type would you like to use?" "$MODEL_TYPE" "claude, ollama, openai, gemini")
+    
+    # Ask about specific model
+    case "$MODEL_TYPE" in
+        "claude")
+            MODEL=$(prompt_with_default "Which Claude model would you like to use?" "$MODEL" "claude-3-sonnet-20240229, claude-3-opus-20240229, claude-3-5-sonnet")
+            ;;
+        "ollama")
+            # Try to list available Ollama models
+            if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+                MODELS=$(curl -s http://localhost:11434/api/tags | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    models = data.get('models', [])
+    print(', '.join([model.get('name') for model in models]))
+except:
+    print('llama3, mistral, gemma')
+")
+                MODEL=$(prompt_with_default "Which Ollama model would you like to use?" "llama3" "$MODELS")
+            else
+                echo -e "${YELLOW}Ollama doesn't appear to be running. Please start it first.${RESET}"
+                MODEL=$(prompt_with_default "Which Ollama model would you like to use?" "llama3" "llama3, mistral, gemma")
+            fi
+            ;;
+        "openai")
+            MODEL=$(prompt_with_default "Which OpenAI model would you like to use?" "gpt-4o" "gpt-4o, gpt-4-turbo, gpt-3.5-turbo")
+            ;;
+        "gemini")
+            MODEL=$(prompt_with_default "Which Gemini model would you like to use?" "gemini-1.5-pro" "gemini-1.5-pro, gemini-1.5-flash")
+            ;;
+    esac
+    
+    # Ask about client ID
+    CLIENT_ID=$(prompt_with_default "Enter a client ID for this session" "$CLIENT_ID")
+    
+    # Ask about memory functions
+    if prompt_yes_no "Enable memory functions?" "y"; then
+        MEMORY_FUNCTIONS=true
+    else
+        MEMORY_FUNCTIONS=false
+    fi
+elif [ ${#ACTIVE_COMPONENTS[@]} -eq 0 ]; then
+    # Non-interactive mode but no components specified - use default core components
+    ACTIVE_COMPONENTS=("engram" "hermes")
+fi
+
+# Special case for "all" components
+if [[ " ${ACTIVE_COMPONENTS[*]} " == *" all "* ]]; then
+    ACTIVE_COMPONENTS=($(detect_components))
+fi
+
+# Add Tekton core to Python path
+export PYTHONPATH="$TEKTON_DIR/tekton-core:$PYTHONPATH"
 
 # Find the Engram directory
 ENGRAM_DIR="$TEKTON_DIR/Engram"
 if [ -d "$ENGRAM_DIR" ]; then
   echo -e "${GREEN}Found Engram at: $ENGRAM_DIR${RESET}"
+  export PYTHONPATH="$ENGRAM_DIR:$PYTHONPATH"
 else
   echo -e "${RED}Engram directory not found at $ENGRAM_DIR${RESET}"
   echo -e "${RED}Cannot continue without Engram${RESET}"
   exit 1
 fi
-
-# Add Engram to Python path
-export PYTHONPATH="$ENGRAM_DIR:$PYTHONPATH"
 
 # Find the Hermes directory
 HERMES_DIR="$TEKTON_DIR/Hermes"
@@ -152,7 +920,7 @@ if [ "$USE_SMART_DETECTION" = true ]; then
     
     if [ -f "$ENGRAM_DIR/utils/detect_best_vector_db.py" ]; then
         # Run detection script to determine the best DB
-        DB_INFO=$(python "$ENGRAM_DIR/utils/detect_best_vector_db.py" --quiet 2>/dev/null)
+        DB_INFO=$(python3 "$ENGRAM_DIR/utils/detect_best_vector_db.py" --quiet 2>/dev/null)
         DB_AVAILABLE=$?
         
         if [ $DB_AVAILABLE -eq 0 ] && [ -n "$DB_INFO" ]; then
@@ -209,71 +977,60 @@ if [ "$ENGRAM_USE_VECTORDB" = "lancedb" ]; then
     fi
 
     # Check for CUDA for optimizations
-    CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())" 2>/dev/null)
+    CUDA_AVAILABLE=$(python3 -c "import torch; print(torch.cuda.is_available())" 2>/dev/null)
     if [ "$CUDA_AVAILABLE" == "True" ]; then
         echo -e "${GREEN}CUDA detected, enabling GPU acceleration...${RESET}"
         export LANCEDB_USE_CUDA=1
     fi
 fi
 
-# Start the memory service if needed
-if [ "$MEMORY_ONLY" = true ] || [ "$MODEL_TYPE" = "claude" ]; then
-    # Check if Engram memory service is already running
-    ps aux | grep "engram.api.consolidated_server" | grep -v "grep" > /dev/null 2>&1
-    PS_CHECK=$?
+# Launch Tekton framework components if requested
+if [ "$LAUNCH_FRAMEWORK" = true ]; then
+    echo -e "${BLUE}${BOLD}Launching Tekton framework components...${RESET}"
     
-    if [ $PS_CHECK -eq 0 ]; then
-        echo -e "${GREEN}Engram memory service is already running${RESET}"
-    else
-        echo -e "${BLUE}Starting Engram memory service...${RESET}"
-        
-        # Find the consolidated server script
-        ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
-        
-        if [ -x "$ENGRAM_STARTUP" ]; then
-            # Start the service (note: engram_consolidated doesn't accept --client-id)
-            if [ "$ENGRAM_USE_FALLBACK" = "1" ]; then
-                "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" --fallback > /tmp/engram_error.log 2>&1 &
-            elif [ "$ENGRAM_USE_HERMES" = "1" ]; then
-                ENGRAM_USE_HERMES=1 "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
-            else
-                "$ENGRAM_STARTUP" --data-dir "$HOME/.engram" > /tmp/engram_error.log 2>&1 &
-            fi
-            
-            STARTUP_PID=$!
-            echo -e "${GREEN}Started Engram memory service with PID: $STARTUP_PID${RESET}"
-            
-            # Wait for service to be ready
-            echo -e "${BLUE}Waiting for service to be ready...${RESET}"
-            for i in {1..10}; do
-                sleep 1
-                ps aux | grep "$STARTUP_PID" | grep -v "grep" > /dev/null 2>&1
-                if [ $? -ne 0 ]; then
-                    echo -e "${RED}Memory service failed to start${RESET}"
-                    cat /tmp/engram_error.log
-                    exit 1
-                fi
-                
-                # Try connecting to health endpoint
-                if curl -s "http://127.0.0.1:8000/health" > /dev/null 2>&1; then
-                    echo -e "${GREEN}Memory service is online!${RESET}"
-                    break
-                fi
-                
-                echo -n "."
-            done
-            echo ""
-        else
-            echo -e "${RED}Engram consolidated server script not found${RESET}"
-            exit 1
-        fi
+    # Always launch Engram if the framework is enabled
+    if [[ " ${ACTIVE_COMPONENTS[*]} " != *" engram "* ]]; then
+        ACTIVE_COMPONENTS+=("engram")
     fi
     
-    # If we only wanted to start the memory service, exit now
-    if [ "$MEMORY_ONLY" = true ]; then
-        echo -e "${GREEN}${BOLD}Memory services started successfully. Exiting per --memory-only flag.${RESET}"
-        exit 0
-    fi
+    # Launch each selected component
+    for component in "${ACTIVE_COMPONENTS[@]}"; do
+        case "$component" in
+            "engram")
+                launch_engram
+                ;;
+            "hermes")
+                launch_hermes
+                ;;
+            "rhetor")
+                launch_rhetor
+                ;;
+            "telos")
+                launch_telos
+                ;;
+            "prometheus")
+                launch_prometheus
+                ;;
+            "harmonia")
+                launch_harmonia
+                ;;
+            "athena")
+                launch_athena
+                ;;
+            "sophia")
+                launch_sophia
+                ;;
+            *)
+                echo -e "${YELLOW}Unknown component: $component${RESET}"
+                ;;
+        esac
+    done
+fi
+
+# If we only wanted to start the framework services, exit now
+if [ "$MEMORY_ONLY" = true ]; then
+    echo -e "${GREEN}${BOLD}Memory services started successfully. Exiting per --memory-only flag.${RESET}"
+    exit 0
 fi
 
 # Display memory system information
@@ -289,8 +1046,13 @@ else
     fi
 fi
 
-# Store the current working directory
-CURRENT_DIR="$(pwd)"
+# Return to the original directory if preserve CWD is enabled
+if [ "$PRESERVE_CWD" = true ]; then
+    cd "$ORIGINAL_DIR"
+    echo -e "${GREEN}Working in: $ORIGINAL_DIR${RESET}"
+else
+    echo -e "${GREEN}Working in: $(pwd)${RESET}"
+fi
 
 # Launch the appropriate model
 echo -e "${BLUE}${BOLD}Launching $MODEL_TYPE model: $MODEL${RESET}"
@@ -320,10 +1082,15 @@ import sys, os
 # Set client ID for this Claude instance
 os.environ['ENGRAM_CLIENT_ID'] = '${CLIENT_ID}'
 
-# Add Engram and Hermes directories to Python path
+# Add Tekton directories to Python path
+TEKTON_DIR = '${TEKTON_DIR}'
 ENGRAM_DIR = '${ENGRAM_DIR}'
 HERMES_DIR = '${HERMES_DIR}'
 
+if TEKTON_DIR not in sys.path:
+    sys.path.insert(0, TEKTON_DIR)
+    print(f\"${YELLOW}Added {TEKTON_DIR} to Python path${RESET}\")
+    
 if ENGRAM_DIR not in sys.path:
     sys.path.insert(0, ENGRAM_DIR)
     print(f\"${YELLOW}Added {ENGRAM_DIR} to Python path${RESET}\")
@@ -331,6 +1098,12 @@ if ENGRAM_DIR not in sys.path:
 if HERMES_DIR not in sys.path and ${SKIP_HERMES_CHECK} != True:
     sys.path.insert(0, HERMES_DIR)
     print(f\"${YELLOW}Added {HERMES_DIR} to Python path${RESET}\")
+
+# Add working directory to Python path
+WORKING_DIR = '${ORIGINAL_DIR}'
+if WORKING_DIR not in sys.path:
+    sys.path.insert(0, WORKING_DIR)
+    print(f\"${YELLOW}Added {WORKING_DIR} to Python path${RESET}\")
 
 # Import memory functions from engram with Hermes integration
 try:
@@ -402,6 +1175,13 @@ try:
         from engram.cli.quickmem import m, t, r, w, l, c, k, s, a, p, v, d, n, q, y, z
         print(\"${GREEN}💭 Memory functions loaded from engram package (Client: ${CLIENT_ID})!${RESET}\")
     
+    # Load latent reasoning mixin if available
+    try:
+        from tekton.core.latent_reasoning import LatentReasoningMixin
+        print(\"${GREEN}🧠 Latent reasoning capabilities available!${RESET}\")
+    except ImportError as e:
+        print(f\"${YELLOW}Latent reasoning not available: {e}${RESET}\")
+    
     # Try to load communication functions
     try:
         from engram.cli.comm_quickmem import sm, gm, ho, cc, lc, sc, gc, cs, wi, dl, do, di
@@ -468,7 +1248,7 @@ print(\"\")"
         if [ "$SKIP_HERMES_CHECK" != true ] && [ -d "$HERMES_DIR" ]; then
             echo -e "${BLUE}Registering Ollama with Hermes service registry...${RESET}"
             
-            python -c "
+            python3 -c "
 import sys, os
 import asyncio
 
@@ -511,7 +1291,7 @@ except Exception as e:
         fi
         
         # Build command
-        CMD="python $OLLAMA_BRIDGE $MODEL --prompt-type combined --client-id $CLIENT_ID --temperature $TEMPERATURE --max-tokens $MAX_TOKENS"
+        CMD="python3 $OLLAMA_BRIDGE $MODEL --prompt-type combined --client-id $CLIENT_ID --temperature $TEMPERATURE --max-tokens $MAX_TOKENS"
         
         if [ "$MEMORY_FUNCTIONS" = true ]; then
             CMD="$CMD --memory-functions"
@@ -527,7 +1307,6 @@ except Exception as e:
         
         # Execute the command
         echo -e "${GREEN}${BOLD}Starting Ollama with model: $MODEL${RESET}"
-        cd "$CURRENT_DIR"
         $CMD
         ;;
         

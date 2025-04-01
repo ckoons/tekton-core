@@ -1,6 +1,6 @@
 #!/bin/bash
-# tekton_kill - script to kill all Tekton-related processes
-# Created: March 30, 2025
+# tekton_kill - Gracefully shut down all Tekton components
+# Created: April 2, 2025
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -10,62 +10,80 @@ RED="\033[91m"
 BOLD="\033[1m"
 RESET="\033[0m"
 
-# Function to kill processes by pattern
-kill_processes() {
-    local pattern=$1
-    local name=$2
-    local pids=$(pgrep -f "$pattern" 2>/dev/null)
-    
-    if [ -n "$pids" ]; then
-        echo -e "${BLUE}Found $name processes:${RESET} $pids"
-        echo -e "${YELLOW}Killing $name processes...${RESET}"
-        
-        for pid in $pids; do
-            # Get process name for display
-            proc_name=$(ps -p $pid -o comm= 2>/dev/null)
-            if [ -n "$proc_name" ]; then
-                echo -e "${RED}Killing${RESET} $pid ($proc_name)"
-                kill -9 $pid 2>/dev/null
-            fi
-        done
-    else
-        echo -e "${GREEN}No $name processes found.${RESET}"
-    fi
+# Function to check if a process is running
+is_running() {
+    pgrep -f "$1" >/dev/null
+    return $?
 }
 
-# Display header
-echo -e "${BLUE}${BOLD}Tekton Process Killer${RESET}"
-echo -e "${YELLOW}This will terminate all Tekton-related processes${RESET}"
-echo ""
-
-# Kill Engram consolidated server
-kill_processes "engram.api.consolidated_server" "Engram consolidated server"
-
-# Kill Engram with Claude processes
-kill_processes "engram_with_claude" "Engram with Claude" 
-
-# Kill Engram with Ollama processes
-kill_processes "engram_with_ollama" "Engram with Ollama"
-
-# Kill Python processes related to Hermes
-kill_processes "hermes.*database_manager" "Hermes database"
-kill_processes "hermes.*service_discovery" "Hermes service discovery"
-kill_processes "hermes.*vector_engine" "Hermes vector engine"
-
-# Kill Ollama bridge processes
-kill_processes "ollama_bridge.py" "Ollama bridge"
-
-# Check if any processes survived
-echo -e "${BLUE}${BOLD}Checking for surviving processes...${RESET}"
-echo -e "${YELLOW}Running: ps aux | grep -E '(engram|hermes|tekton|ollama_bridge)' | grep -v grep${RESET}"
-remaining=$(ps aux | grep -E '(engram|hermes|tekton|ollama_bridge)' | grep -v grep)
-
-if [ -n "$remaining" ]; then
-    echo -e "${RED}${BOLD}Warning: Some processes may still be running:${RESET}"
-    echo "$remaining"
-    echo -e "${YELLOW}You may need to kill these manually.${RESET}"
+# Find Tekton root directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
 else
-    echo -e "${GREEN}${BOLD}All Tekton processes terminated successfully.${RESET}"
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
 
-echo -e "${BLUE}${BOLD}Done.${RESET}"
+# Display information
+echo -e "${BLUE}${BOLD}====== Tekton Shutdown ======${RESET}"
+echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
+echo ""
+
+# Components to shut down (in reverse dependency order)
+components=(
+    "sophia.core"
+    "athena.core"
+    "prometheus.core"
+    "harmonia.core"
+    "telos.core"
+    "rhetor.core"
+    "ergon.core"
+    "engram_with_ollama"
+    "engram_with_claude"
+    "engram.api.consolidated_server"
+    "hermes.*database_manager"
+)
+
+# Track whether we shut down anything
+anything_killed=false
+
+# Shut down each component
+for comp in "${components[@]}"; do
+    if is_running "$comp"; then
+        echo -e "${YELLOW}Shutting down $comp...${RESET}"
+        pkill -f "$comp"
+        sleep 1
+        
+        # Check if it was killed
+        if ! is_running "$comp"; then
+            echo -e "${GREEN}✓ Successfully shut down $comp${RESET}"
+            anything_killed=true
+        else
+            echo -e "${RED}✗ Failed to shut down $comp gracefully, using SIGKILL${RESET}"
+            pkill -9 -f "$comp"
+            anything_killed=true
+        fi
+    fi
+done
+
+# If nothing was killed, report that
+if [ "$anything_killed" = false ]; then
+    echo -e "${GREEN}No running Tekton components found.${RESET}"
+fi
+
+# Kill any leftover python processes in the Tekton directory
+if pgrep -f "$TEKTON_DIR.*python" >/dev/null; then
+    echo -e "${YELLOW}Killing remaining python processes in Tekton directory...${RESET}"
+    pkill -f "$TEKTON_DIR.*python"
+fi
+
+# Make sure Hermes services are completely stopped
+if [ -d "$TEKTON_DIR/Hermes" ]; then
+    echo -e "${YELLOW}Ensuring Hermes services are completely stopped...${RESET}"
+    pkill -f "hermes.core"
+fi
+
+echo ""
+echo -e "${GREEN}${BOLD}Tekton shutdown complete.${RESET}"
