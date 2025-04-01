@@ -1,127 +1,410 @@
 """
-Knowledge Engine - Core graph database interaction and knowledge management.
+Athena Knowledge Engine
 
-This module provides the main interface for interacting with the knowledge graph,
-including entity and relationship management, querying, and reasoning.
+Core knowledge graph engine and management capabilities.
 """
 
+import os
+import json
 import logging
-from typing import Dict, List, Any, Optional, Union, Tuple
+import asyncio
+from typing import Dict, Any, List, Optional, Set, Tuple, Union
+from pathlib import Path
 
-# Configure logger
-logger = logging.getLogger(__name__)
+from .entity import Entity
+from .relationship import Relationship
 
+try:
+    # Attempt to import Neo4j adapter if available
+    from .graph.neo4j_adapter import Neo4jAdapter as GraphAdapter
+    USING_NEO4J = True
+except ImportError:
+    # Fall back to in-memory adapter if Neo4j is not available
+    from .graph.memory_adapter import MemoryAdapter as GraphAdapter
+    USING_NEO4J = False
+
+logger = logging.getLogger("athena.engine")
 
 class KnowledgeEngine:
     """
-    Main interface for interacting with the knowledge graph.
+    Core knowledge graph engine for Athena.
     
-    This class provides methods for managing entities and relationships,
-    querying the graph, and performing reasoning operations.
+    Manages entity and relationship creation, querying, and inference.
     """
     
-    def __init__(self, 
-                db_url: Optional[str] = None, 
-                username: Optional[str] = None, 
-                password: Optional[str] = None):
+    def __init__(self, data_path: Optional[str] = None):
         """
         Initialize the knowledge engine.
         
         Args:
-            db_url: Neo4j database URL (e.g., bolt://localhost:7687)
-            username: Neo4j username
-            password: Neo4j password
+            data_path: Path to store graph data (if using file-based adapter)
         """
-        self.db_url = db_url
-        self.username = username
-        self.password = password
+        self.data_path = data_path or os.path.expanduser("~/.tekton/data/athena")
+        self.is_initialized = False
+        self.adapter = None
         
-        # Placeholder for database connection
-        self.graph = None
-        
-        logger.info("Knowledge engine initialized")
-    
-    def connect(self) -> bool:
+    async def initialize(self) -> bool:
         """
-        Connect to the graph database.
+        Initialize the knowledge engine and database connection.
         
         Returns:
-            True if connection successful
+            True if successful
         """
-        # TODO: Implement actual database connection
-        logger.info(f"Connecting to database at {self.db_url}")
+        logger.info("Initializing Athena Knowledge Engine...")
+        
+        # Ensure data directory exists
+        os.makedirs(self.data_path, exist_ok=True)
+        
+        # Initialize the graph adapter
+        adapter_config = {
+            "data_path": self.data_path,
+            "use_neo4j": USING_NEO4J
+        }
+        
+        if USING_NEO4J:
+            logger.info("Using Neo4j graph database adapter")
+        else:
+            logger.info("Using in-memory graph adapter with file persistence")
+            
+        try:
+            self.adapter = GraphAdapter(**adapter_config)
+            await self.adapter.connect()
+            
+            # Initialize schema if needed
+            await self.adapter.initialize_schema()
+            
+            self.is_initialized = True
+            logger.info("Athena Knowledge Engine initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize knowledge engine: {e}")
+            return False
+            
+    async def shutdown(self) -> bool:
+        """
+        Shut down the knowledge engine and close connections.
+        
+        Returns:
+            True if successful
+        """
+        logger.info("Shutting down Athena Knowledge Engine...")
+        
+        if self.adapter:
+            try:
+                await self.adapter.disconnect()
+                logger.info("Athena Knowledge Engine shut down successfully")
+                return True
+            except Exception as e:
+                logger.error(f"Error shutting down knowledge engine: {e}")
+                return False
         return True
-    
-    def add_entity(self, entity_type: str, properties: Dict[str, Any]) -> str:
+        
+    async def add_entity(self, entity: Entity) -> str:
         """
-        Add an entity to the knowledge graph.
+        Add a new entity to the knowledge graph.
         
         Args:
-            entity_type: Type of entity (e.g., Person, Organization)
-            properties: Dictionary of entity properties
+            entity: Entity object to add
             
         Returns:
             Entity ID
         """
-        # TODO: Implement actual entity creation
-        entity_id = f"{entity_type.lower()}_{len(properties)}"
-        logger.info(f"Added entity {entity_id} of type {entity_type}")
-        return entity_id
-    
-    def add_relationship(self, 
-                       source_id: str, 
-                       relationship_type: str, 
-                       target_id: str,
-                       properties: Optional[Dict[str, Any]] = None) -> str:
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            entity_id = await self.adapter.create_entity(entity)
+            logger.info(f"Added entity: {entity.name} (ID: {entity_id})")
+            return entity_id
+        except Exception as e:
+            logger.error(f"Error adding entity: {e}")
+            raise
+            
+    async def get_entity(self, entity_id: str) -> Optional[Entity]:
         """
-        Add a relationship between entities.
+        Retrieve an entity by ID.
         
         Args:
-            source_id: Source entity ID
-            relationship_type: Type of relationship
-            target_id: Target entity ID
-            properties: Optional relationship properties
+            entity_id: Entity ID to retrieve
+            
+        Returns:
+            Entity object or None if not found
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            entity = await self.adapter.get_entity(entity_id)
+            return entity
+        except Exception as e:
+            logger.error(f"Error retrieving entity {entity_id}: {e}")
+            return None
+            
+    async def update_entity(self, entity: Entity) -> bool:
+        """
+        Update an existing entity.
+        
+        Args:
+            entity: Updated entity object
+            
+        Returns:
+            True if successful
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            success = await self.adapter.update_entity(entity)
+            if success:
+                logger.info(f"Updated entity: {entity.name} (ID: {entity.entity_id})")
+            return success
+        except Exception as e:
+            logger.error(f"Error updating entity {entity.entity_id}: {e}")
+            return False
+            
+    async def delete_entity(self, entity_id: str) -> bool:
+        """
+        Delete an entity by ID.
+        
+        Args:
+            entity_id: Entity ID to delete
+            
+        Returns:
+            True if successful
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            success = await self.adapter.delete_entity(entity_id)
+            if success:
+                logger.info(f"Deleted entity with ID: {entity_id}")
+            return success
+        except Exception as e:
+            logger.error(f"Error deleting entity {entity_id}: {e}")
+            return False
+            
+    async def add_relationship(self, relationship: Relationship) -> str:
+        """
+        Add a new relationship to the knowledge graph.
+        
+        Args:
+            relationship: Relationship object to add
             
         Returns:
             Relationship ID
         """
-        # TODO: Implement actual relationship creation
-        rel_id = f"{source_id}_{relationship_type}_{target_id}"
-        logger.info(f"Added relationship {rel_id} ({relationship_type})")
-        return rel_id
-    
-    def query(self, query_string: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            relationship_id = await self.adapter.create_relationship(relationship)
+            logger.info(f"Added relationship: {relationship.relationship_type} (ID: {relationship_id})")
+            return relationship_id
+        except Exception as e:
+            logger.error(f"Error adding relationship: {e}")
+            raise
+            
+    async def get_relationship(self, relationship_id: str) -> Optional[Relationship]:
         """
-        Execute a Cypher query against the knowledge graph.
+        Retrieve a relationship by ID.
         
         Args:
-            query_string: Cypher query string
-            params: Optional query parameters
+            relationship_id: Relationship ID to retrieve
+            
+        Returns:
+            Relationship object or None if not found
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            relationship = await self.adapter.get_relationship(relationship_id)
+            return relationship
+        except Exception as e:
+            logger.error(f"Error retrieving relationship {relationship_id}: {e}")
+            return None
+            
+    async def update_relationship(self, relationship: Relationship) -> bool:
+        """
+        Update an existing relationship.
+        
+        Args:
+            relationship: Updated relationship object
+            
+        Returns:
+            True if successful
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            success = await self.adapter.update_relationship(relationship)
+            if success:
+                logger.info(f"Updated relationship: {relationship.relationship_type} (ID: {relationship.relationship_id})")
+            return success
+        except Exception as e:
+            logger.error(f"Error updating relationship {relationship.relationship_id}: {e}")
+            return False
+            
+    async def delete_relationship(self, relationship_id: str) -> bool:
+        """
+        Delete a relationship by ID.
+        
+        Args:
+            relationship_id: Relationship ID to delete
+            
+        Returns:
+            True if successful
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            success = await self.adapter.delete_relationship(relationship_id)
+            if success:
+                logger.info(f"Deleted relationship with ID: {relationship_id}")
+            return success
+        except Exception as e:
+            logger.error(f"Error deleting relationship {relationship_id}: {e}")
+            return False
+            
+    async def search_entities(self, query: str, entity_type: Optional[str] = None, limit: int = 10) -> List[Entity]:
+        """
+        Search for entities matching a query.
+        
+        Args:
+            query: Search query
+            entity_type: Optional entity type to filter by
+            limit: Maximum number of results to return
+            
+        Returns:
+            List of matching entities
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            entities = await self.adapter.search_entities(query, entity_type, limit)
+            return entities
+        except Exception as e:
+            logger.error(f"Error searching entities: {e}")
+            return []
+            
+    async def get_entity_relationships(self, 
+                                    entity_id: str, 
+                                    relationship_type: Optional[str] = None,
+                                    direction: str = "both") -> List[Tuple[Relationship, Entity]]:
+        """
+        Get all relationships for an entity.
+        
+        Args:
+            entity_id: Entity ID to query
+            relationship_type: Optional relationship type to filter by
+            direction: Direction of relationships ('outgoing', 'incoming', or 'both')
+            
+        Returns:
+            List of (relationship, connected entity) tuples
+        """
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            relationships = await self.adapter.get_entity_relationships(entity_id, relationship_type, direction)
+            return relationships
+        except Exception as e:
+            logger.error(f"Error getting entity relationships for {entity_id}: {e}")
+            return []
+            
+    async def execute_query(self, query: str, params: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+        """
+        Execute a raw graph query.
+        
+        Args:
+            query: Query string in the graph database language (e.g., Cypher for Neo4j)
+            params: Query parameters
             
         Returns:
             Query results
         """
-        # TODO: Implement actual query execution
-        logger.info(f"Executing query: {query_string}")
-        return []
-    
-    def ask(self, question: str) -> str:
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            results = await self.adapter.execute_query(query, params or {})
+            return results
+        except Exception as e:
+            logger.error(f"Error executing query: {e}")
+            return []
+            
+    async def find_path(self, 
+                      source_id: str, 
+                      target_id: str, 
+                      max_depth: int = 3) -> List[List[Union[Entity, Relationship]]]:
         """
-        Answer a natural language question using the knowledge graph.
+        Find paths between two entities.
         
         Args:
-            question: Natural language question
+            source_id: Source entity ID
+            target_id: Target entity ID
+            max_depth: Maximum path length
             
         Returns:
-            Answer based on knowledge graph
+            List of paths, where each path is a list of alternating Entity and Relationship objects
         """
-        # TODO: Implement question answering logic
-        logger.info(f"Processing question: {question}")
-        return f"I don't know the answer to '{question}' yet."
+        if not self.is_initialized:
+            await self.initialize()
+            
+        try:
+            paths = await self.adapter.find_paths(source_id, target_id, max_depth)
+            return paths
+        except Exception as e:
+            logger.error(f"Error finding paths: {e}")
+            return []
     
-    def close(self) -> None:
+    async def get_status(self) -> Dict[str, Any]:
         """
-        Close the database connection.
+        Get the status of the knowledge engine.
+        
+        Returns:
+            Status information dictionary
         """
-        logger.info("Closing knowledge engine connection")
-        # TODO: Implement actual connection closing
+        if not self.is_initialized:
+            return {
+                "status": "not_initialized",
+                "adapter_type": "none"
+            }
+            
+        try:
+            adapter_type = "neo4j" if USING_NEO4J else "memory"
+            entity_count = await self.adapter.count_entities()
+            relationship_count = await self.adapter.count_relationships()
+            
+            return {
+                "status": "initialized",
+                "adapter_type": adapter_type,
+                "entity_count": entity_count,
+                "relationship_count": relationship_count,
+                "data_path": self.data_path
+            }
+        except Exception as e:
+            logger.error(f"Error getting engine status: {e}")
+            return {
+                "status": "error",
+                "adapter_type": "neo4j" if USING_NEO4J else "memory",
+                "error": str(e)
+            }
+
+# Global singleton instance
+_engine = KnowledgeEngine()
+
+async def get_knowledge_engine() -> KnowledgeEngine:
+    """
+    Get the global knowledge engine instance.
+    
+    Returns:
+        KnowledgeEngine instance
+    """
+    if not _engine.is_initialized:
+        await _engine.initialize()
+    return _engine
