@@ -22,3 +22,12 @@
 [submodule "Synthesis"]
 	path = Synthesis
 	url = https://github.com/ckoons/Synthesis.git
+[submodule "Athena"]
+	path = Athena
+	url = https://github.com/ckoons/Athena.git
+[submodule "Harmonia"]
+	path = Harmonia
+	url = https://github.com/ckoons/Harmonia.git
+[submodule "Hermes"]
+	path = Hermes
+	url = https://github.com/ckoons/Hermes.git
