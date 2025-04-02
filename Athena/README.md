@@ -1,5 +1,10 @@
 # Athena - Knowledge Graph Engine for Tekton
 
+<div align="center">
+  <img src="images/icon.jpg" alt="Athena Logo" width="800"/>
+  <h3>Tekton<br>AI Driven Orchestration</h3>
+</div>
+
 Athena is the knowledge management component of the Tekton ecosystem, providing structured knowledge representation, reasoning, and factual grounding for other components.
 
 ## Overview
