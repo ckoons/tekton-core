@@ -1,7 +1,7 @@
 # Tekton Orchestration System
 
 <div align="center">
-  <img src="images/icon.jpg" alt="Tekton Logo" width="800"/>
+  <img src="images/icon.png" alt="Tekton Logo" width="800"/>
   <h3>Tekton<br>AI Driven Orchestration</h3>
 </div>
 
@@ -59,9 +59,46 @@ Tekton integrates with:
 - Python 3.10+
 - Linux or macOS
 
-## Getting Started
+## Installation
 
-Coming soon.
+Tekton uses the modern UV package manager for fast, reliable Python dependency management.
+
+### Quick Install
+
+```bash
+# Install Tekton with UV
+./tekton-install.sh
+```
+
+### Manual Installation
+
+1. Install UV package manager:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. Create a Python environment:
+   ```bash
+   uv venv .venv --python=python3.10
+   source .venv/bin/activate
+   ```
+
+3. Install Tekton Core:
+   ```bash
+   uv pip install -e tekton-core
+   ```
+
+### Setting Up Components
+
+To set up individual Tekton components:
+
+```bash
+# Setup a specific component
+./component-setup.sh Engram
+
+# Setup all components
+./setup-all.sh
+```
 
 ## License
 
