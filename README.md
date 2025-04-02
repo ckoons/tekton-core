@@ -90,7 +90,14 @@ Tekton uses the modern UV package manager for fast, reliable Python dependency m
 
 ### Setting Up Components
 
-To set up individual Tekton components:
+First, initialize all submodules:
+
+```bash
+# Clone submodules (required after initial clone)
+git submodule update --init --recursive
+```
+
+Then set up individual or all Tekton components:
 
 ```bash
 # Setup a specific component
@@ -99,6 +106,108 @@ To set up individual Tekton components:
 # Setup all components
 ./setup-all.sh
 ```
+
+## External Tool Registration
+
+Tekton supports external tool registration through Ergon's MCP (Model Control Protocol) integration. This allows tools to be dynamically registered, discovered, and used by various components.
+
+### Registering a Tool
+
+```python
+from ergon.core.repository.mcp import register_tool
+
+# Register a Python function as an MCP tool
+def my_tool(input_text: str, max_length: int = 100) -> str:
+    """Process the input text and return a result."""
+    # Implementation
+    return result
+
+register_tool(
+    name="text_processor",
+    description="Processes text input",
+    function=my_tool,
+    schema={
+        "name": "text_processor",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "input_text": {
+                    "type": "string",
+                    "description": "Text to process"
+                },
+                "max_length": {
+                    "type": "integer",
+                    "description": "Maximum length",
+                    "default": 100
+                }
+            },
+            "required": ["input_text"]
+        }
+    },
+    tags=["text", "processing"]
+)
+```
+
+### Using the Decorator
+
+```python
+from ergon.core.repository.mcp import mcp_tool
+
+@mcp_tool(
+    name="image_analyzer",
+    description="Analyzes images",
+    schema={
+        "name": "image_analyzer",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string",
+                    "description": "URL of the image"
+                }
+            },
+            "required": ["image_url"]
+        }
+    },
+    tags=["image", "analysis"]
+)
+def analyze_image(image_url: str) -> dict:
+    """Analyze an image and return metadata."""
+    # Implementation
+    return result
+```
+
+### Listing Available Tools
+
+```python
+from ergon.core.repository.mcp import get_registered_tools, get_tool
+from ergon.core.repository.repository import RepositoryService
+
+# Get all registered MCP tools with metadata
+all_tools = get_registered_tools()
+for name, tool_info in all_tools.items():
+    print(f"Tool: {name}")
+    print(f"  Description: {tool_info['description']}")
+    print(f"  Version: {tool_info['version']}")
+    print(f"  Tags: {', '.join(tool_info['tags'])}")
+    print(f"  Schema: {tool_info['schema']['parameters']}")
+
+# Get detailed information about a specific tool
+text_tool = get_tool("text_processor")
+if text_tool:
+    print(f"Found tool: {text_tool['name']}")
+    print(f"Metadata: {text_tool['metadata']}")
+
+# Search for tools with specific capabilities using the repository
+repo = RepositoryService()
+image_tools = repo.search_components("image", limit=5)
+for tool, score in image_tools:
+    print(f"Found image tool: {tool.name} (relevance: {score:.2f})")
+    for capability in tool.capabilities:
+        print(f"  Capability: {capability.name}")
+```
+
+For more detailed examples, see the [MCP Tool Registration documentation](/Ergon/ergon/core/repository/mcp/README.md).
 
 ## License
 
