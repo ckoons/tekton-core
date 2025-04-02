@@ -1,5 +1,11 @@
 # Harmonia - Workflow Orchestration Engine for Tekton
 
+<div align="center">
+  <img src="images/icon.jpg" alt="Harmonia Logo" width="800"/>
+  <h3>Tekton<br>AI Driven Orchestration</h3>
+</div>
+
+
 Harmonia is the workflow orchestration engine for the Tekton ecosystem, providing sophisticated workflow management, state tracking, and component coordination.
 
 ## Overview
