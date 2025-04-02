@@ -1,5 +1,10 @@
 # Hermes - Central Database Services and Messaging Framework for Tekton
 
+<div align="center">
+  <img src="images/icon.jpg" alt="Hermes Logo" width="800"/>
+  <h3>Tekton<br>AI Driven Orchestration</h3>
+</div>
+
 Hermes is the central database and messaging framework for the Tekton ecosystem, providing centralized database services, registration protocol, and inter-component communication.
 
 ## Overview
