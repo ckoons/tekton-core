@@ -1,8 +1,0 @@
-name: Disable All Workflows
-
-on:
-  # This won't actually run any workflows
-  workflow_dispatch:
-
-# This file exists to prevent other workflows from running on push/PR events
-# Its presence overrides the workflows in subdirectories
