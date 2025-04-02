@@ -58,10 +58,16 @@ Tekton integrates with:
 
 - Python 3.10+
 - Linux or macOS
+- UV package manager (installed automatically if not present)
 
 ## Installation
 
-Tekton uses the modern UV package manager for fast, reliable Python dependency management.
+Tekton uses the modern UV package manager for fast, reliable Python dependency management. UV offers several advantages:
+
+- **Speed**: 10-100x faster than pip for installations
+- **Reliability**: Improved dependency resolution and conflict detection
+- **Isolation**: Better environment management with cross-platform compatibility
+- **Modern features**: Includes lockfiles, global tool installations, Python version management
 
 ### Quick Install
 
@@ -106,6 +112,21 @@ Then set up individual or all Tekton components:
 # Setup all components
 ./setup-all.sh
 ```
+
+### Managing Requirements
+
+Tekton includes a centralized requirements management system:
+
+```bash
+# Compile requirements for all components
+./requirements-compile.sh
+```
+
+This script:
+- Uses UV to compile requirements.in to requirements.txt for each component
+- Extracts requirements from setup.py if no requirements.in exists
+- Handles special cases like Codex with its own compilation script
+- Creates reproducible builds with pinned dependencies
 
 ## External Tool Registration
 
