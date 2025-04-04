@@ -50,9 +50,34 @@ Tekton integrates with:
 - **Ergon**: For specialized agent creation and workflow management
 - **Rhetor**: For AI communication, prompt engineering and context management
 - **Sophia**: For Machine Learning, self improvement of Tekton and all component operations
-- **Telos**: For User communication, requierments development & analysis, evaluation and goals
+- **Telos**: For User communication, requirements development & analysis, evaluation and goals
+- **Hermes**: For centralized coordination, database services, and component registration
 - **Local Models**: Deepseek Coder, CodeLlama, etc.
 - **Remote APIs**: Claude, GPT, etc.
+
+## Core Philosophy
+
+Tekton is built on several foundational principles:
+
+### Single Point of Control
+- Hermes acts as the central coordination point, automatically managing all required services
+- Components don't need to handle service management themselves
+- Resource allocation is coordinated across the ecosystem
+
+### Automatic Discovery and Registration
+- Components register with Hermes to announce their capabilities
+- Components automatically discover available services without manual configuration
+- Registration includes health monitoring and capability announcement
+
+### Unified Configuration
+- Common configuration is shared across services for simplified management
+- Environment-based configuration with sensible defaults
+- Central data directories for consistent storage
+
+### Resource Optimization
+- Database connection pooling and intelligent resource sharing
+- Hardware-specific optimizations (GPU acceleration, Apple Silicon support)
+- Graceful degradation when preferred resources are unavailable
 
 ## Requirements
 

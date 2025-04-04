@@ -3,7 +3,7 @@
 Tekton Launcher - Python implementation of the Tekton component launcher
 
 This script provides a programmable way to launch and coordinate Tekton components
-using the StartUpInstructions protocol and component_registration module.
+using the StartUpInstructions protocol and dependency-aware component lifecycle management.
 """
 
 import argparse
@@ -30,13 +30,14 @@ sys.path.insert(0, os.path.join(TEKTON_DIR, "tekton-core"))
 
 # Import Tekton modules
 try:
-    from tekton.core.heartbeat_monitor import HeartbeatMonitor
+    from tekton.core.heartbeat_monitor import HeartbeatMonitor, ComponentHeartbeat
+    from tekton.core.startup_coordinator import StartUpCoordinator
 except ImportError:
     logger.error("Failed to import Tekton core modules. Make sure tekton-core is properly installed.")
     sys.exit(1)
 
 # Import local modules
-from startup_utils import start_components_with_startup_process, shutdown_handler
+from startup_utils import ComponentLauncher, shutdown_handler
 
 
 async def main():
@@ -66,19 +67,24 @@ async def main():
     parser.add_argument(
         "--restart",
         action="store_true",
-        help="Restart components if Hermes restarts"
+        help="Restart components if they fail or if Hermes restarts"
     )
     parser.add_argument(
-        "--verbose",
+        "--debug",
         action="store_true",
-        help="Enable verbose logging"
+        help="Enable debug logging"
+    )
+    parser.add_argument(
+        "--base-dir",
+        default=TEKTON_DIR,
+        help="Base directory for Tekton components"
     )
     
     args = parser.parse_args()
     
     # Configure logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=log_level)
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
     
     # Set Hermes URL in environment
     os.environ["HERMES_URL"] = args.hermes_url
@@ -86,64 +92,83 @@ async def main():
     # Set unique startup timestamp
     os.environ["TEKTON_STARTUP_TIMESTAMP"] = str(int(time.time()))
     
-    # Determine which components to launch
-    components_to_launch = []
-    if args.all:
-        # Launch all available components
-        for component in ["Synthesis", "Harmonia", "Athena", "Sophia", "Prometheus", "Rhetor", "Telos"]:
-            if os.path.isdir(os.path.join(TEKTON_DIR, component)):
-                components_to_launch.append(component)
-    else:
-        # Launch specified components
-        components_to_launch = args.components
-    
-    if not components_to_launch:
-        logger.error("No components specified. Use --all to launch all components.")
-        sys.exit(1)
-    
-    # Launch components
-    logger.info(f"Launching components: {', '.join(components_to_launch)}")
-    results = await start_components_with_startup_process(
-        components_to_launch, 
-        use_subprocess=not args.direct,
-        hermes_url=args.hermes_url
+    # Create component launcher
+    launcher = ComponentLauncher(
+        base_dir=args.base_dir,
+        hermes_url=args.hermes_url,
+        use_direct=args.direct,
+        restart_mode=args.restart
     )
     
-    # Report results
-    success_count = sum(1 for result in results.values() if result)
-    logger.info(f"Successfully launched {success_count}/{len(results)} components")
+    # Initialize the launcher
+    await launcher.initialize()
     
-    for component, result in results.items():
-        status = "SUCCESS" if result else "FAILED"
-        logger.info(f"{component}: {status}")
+    # Add event handlers for component status reporting
+    def on_component_start(component, success):
+        if success:
+            logger.info(f"✅ Component {component} started successfully")
+        else:
+            logger.error(f"❌ Component {component} start failed")
     
-    # If any components failed, exit with error code
-    if success_count < len(results):
-        sys.exit(1)
+    def on_component_fail(component, reason):
+        logger.error(f"❌ Component {component} failed: {reason}")
     
-    # If restart mode is enabled, keep running to monitor component health
-    if args.restart:
-        logger.info("Entering monitoring mode to handle component restarts")
+    launcher.on_component_start = on_component_start
+    launcher.on_component_fail = on_component_fail
+    
+    try:
+        # Launch components
+        results = await launcher.launch_components(
+            components=args.components,
+            all_components=args.all
+        )
         
-        # Create monitor
-        monitor = HeartbeatMonitor(hermes_url=args.hermes_url)
-        await monitor.start()
+        # Report results summary
+        success_count = sum(1 for result in results.values() if result)
+        logger.info(f"Successfully launched {success_count}/{len(results)} components")
         
-        # Set up signal handlers for graceful shutdown
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(
-                sig,
-                lambda s=sig: asyncio.create_task(shutdown_handler(s, monitor))
-            )
-        
-        # Keep the script running
-        try:
-            # Run forever
-            while True:
-                await asyncio.sleep(3600)  # Sleep for an hour
-        except asyncio.CancelledError:
-            pass
+        # If restart mode is enabled, set up monitoring
+        if args.restart:
+            logger.info("Entering monitoring mode to handle component restarts")
+            
+            # Set up component monitoring
+            await launcher.setup_component_monitoring()
+            
+            # Set up signal handlers for graceful shutdown
+            loop = asyncio.get_event_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(shutdown_handler(s, launcher.heartbeat_monitor))
+                )
+            
+            # Start process monitoring
+            monitor_task = asyncio.create_task(launcher.monitor_processes())
+            
+            # Keep the script running
+            try:
+                # Run forever
+                while True:
+                    await asyncio.sleep(3600)  # Sleep for an hour
+            except asyncio.CancelledError:
+                # Cancel monitoring task
+                monitor_task.cancel()
+                
+            # Wait for monitoring task to complete
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
+                
+        # If we're not in restart mode, just exit
+        elif not args.restart:
+            # If any components failed, exit with error code
+            if success_count < len(results):
+                sys.exit(1)
+    
+    finally:
+        # Clean up on exit
+        await launcher.shutdown()
 
 
 if __name__ == "__main__":
