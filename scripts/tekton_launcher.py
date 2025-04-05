@@ -4,6 +4,7 @@ Tekton Launcher - Python implementation of the Tekton component launcher
 
 This script provides a programmable way to launch and coordinate Tekton components
 using the StartUpInstructions protocol and dependency-aware component lifecycle management.
+Enhanced with deadlock avoidance and component lifecycle management.
 """
 
 import argparse
@@ -13,7 +14,8 @@ import os
 import signal
 import sys
 import time
-from typing import Dict, List, Any, Optional, Set, Union
+import uuid
+from typing import Dict, List, Any, Optional, Set, Union, Tuple
 
 # Configure logging
 logging.basicConfig(
@@ -31,13 +33,28 @@ sys.path.insert(0, os.path.join(TEKTON_DIR, "tekton-core"))
 # Import Tekton modules
 try:
     from tekton.core.heartbeat_monitor import HeartbeatMonitor, ComponentHeartbeat
-    from tekton.core.startup_coordinator import StartUpCoordinator
+    from tekton.core.lifecycle import (
+        ComponentState, 
+        ReadinessCondition, 
+        ComponentRegistration,
+        PersistentMessageQueue
+    )
+    from tekton.core.dependency import DependencyResolver
+    from tekton.core.component_lifecycle import ComponentRegistry
+    from tekton.core.startup_coordinator import EnhancedStartUpCoordinator as StartUpCoordinator
+    USING_ENHANCED_LIFECYCLE = True
+    logger.info("Using enhanced component lifecycle management")
 except ImportError:
     logger.error("Failed to import Tekton core modules. Make sure tekton-core is properly installed.")
     sys.exit(1)
 
 # Import local modules
 from startup_utils import ComponentLauncher, shutdown_handler
+from launcher import (
+    EnhancedComponentLauncher,
+    on_component_start,
+    on_component_fail
+)
 
 
 async def main():
@@ -79,6 +96,18 @@ async def main():
         default=TEKTON_DIR,
         help="Base directory for Tekton components"
     )
+    # Enhanced lifecycle is now the only option
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Default timeout for component operations (in seconds)"
+    )
+    parser.add_argument(
+        "--resolve-deadlocks",
+        action="store_true",
+        help="Periodically check for and resolve potential deadlocks"
+    )
     
     args = parser.parse_args()
     
@@ -93,26 +122,19 @@ async def main():
     os.environ["TEKTON_STARTUP_TIMESTAMP"] = str(int(time.time()))
     
     # Create component launcher
-    launcher = ComponentLauncher(
+    logger.info("Using enhanced component launcher with deadlock avoidance")
+    launcher = EnhancedComponentLauncher(
         base_dir=args.base_dir,
         hermes_url=args.hermes_url,
         use_direct=args.direct,
-        restart_mode=args.restart
+        restart_mode=args.restart,
+        timeout=args.timeout
     )
     
     # Initialize the launcher
     await launcher.initialize()
     
-    # Add event handlers for component status reporting
-    def on_component_start(component, success):
-        if success:
-            logger.info(f"✅ Component {component} started successfully")
-        else:
-            logger.error(f"❌ Component {component} start failed")
-    
-    def on_component_fail(component, reason):
-        logger.error(f"❌ Component {component} failed: {reason}")
-    
+    # Set event handlers for component status reporting
     launcher.on_component_start = on_component_start
     launcher.on_component_fail = on_component_fail
     
@@ -145,18 +167,34 @@ async def main():
             # Start process monitoring
             monitor_task = asyncio.create_task(launcher.monitor_processes())
             
+            # If deadlock resolution is enabled, set up periodic checks
+            deadlock_resolution_task = None
+            if args.resolve_deadlocks and hasattr(launcher, 'resolve_deadlocks'):
+                logger.info("Setting up periodic deadlock resolution")
+                
+                async def periodic_deadlock_resolution():
+                    while True:
+                        await asyncio.sleep(60)  # Check every minute
+                        await launcher.resolve_deadlocks()
+                
+                deadlock_resolution_task = asyncio.create_task(periodic_deadlock_resolution())
+            
             # Keep the script running
             try:
                 # Run forever
                 while True:
                     await asyncio.sleep(3600)  # Sleep for an hour
             except asyncio.CancelledError:
-                # Cancel monitoring task
+                # Cancel tasks
                 monitor_task.cancel()
+                if deadlock_resolution_task:
+                    deadlock_resolution_task.cancel()
                 
-            # Wait for monitoring task to complete
+            # Wait for tasks to complete
             try:
                 await monitor_task
+                if deadlock_resolution_task:
+                    await deadlock_resolution_task
             except asyncio.CancelledError:
                 pass
                 

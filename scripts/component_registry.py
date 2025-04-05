@@ -20,6 +20,32 @@ except ImportError:
     logger.error("Failed to import Tekton core modules. Make sure tekton-core is properly installed.")
     raise
 
+# Component dependency map
+COMPONENT_DEPENDENCIES = {
+    "engram": [],
+    "hermes": [],
+    "athena": ["hermes"],
+    "sophia": ["hermes"],
+    "prometheus": ["athena"],
+    "synthesis": ["prometheus"],
+    "harmonia": ["hermes"],
+    "rhetor": ["sophia"],
+    "telos": ["rhetor"]
+}
+
+def get_component_dependencies(component_name: str) -> List[str]:
+    """
+    Get dependencies for a specified component.
+    
+    Args:
+        component_name: Name of the component
+        
+    Returns:
+        List of component names that this component depends on
+    """
+    component_name_lower = component_name.lower()
+    return COMPONENT_DEPENDENCIES.get(component_name_lower, [])
+
 
 async def create_startup_instructions(component_name: str) -> StartUpInstructions:
     """

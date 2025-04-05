@@ -11,6 +11,7 @@ import logging
 import subprocess
 from typing import Dict, List, Any, Optional, Set, Union
 import asyncio
+import shutil
 
 # Configure logging
 logger = logging.getLogger("tekton_launcher.starter")
@@ -26,6 +27,114 @@ try:
 except ImportError:
     logger.error("Failed to import Tekton core modules. Make sure tekton-core is properly installed.")
     raise
+
+    
+async def create_virtual_environment(component_name: str, component_dir: str) -> bool:
+    """
+    Create or update a virtual environment for a component.
+    
+    Args:
+        component_name: Name of the component
+        component_dir: Directory of the component
+        
+    Returns:
+        Success status
+    """
+    logger.info(f"Creating virtual environment for {component_name}")
+    
+    # Check if Python is available
+    python_path = shutil.which("python3") or shutil.which("python")
+    if not python_path:
+        logger.error("Python executable not found")
+        return False
+    
+    # Check if we can create virtual environments
+    venv_module = subprocess.run(
+        [python_path, "-m", "venv", "--help"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    if venv_module.returncode != 0:
+        logger.error("Python venv module not available")
+        return False
+    
+    # Set up virtual environment
+    venv_dir = os.path.join(component_dir, "venv")
+    
+    # Create virtual environment if it doesn't exist
+    if not os.path.exists(venv_dir):
+        logger.info(f"Creating new virtual environment in {venv_dir}")
+        try:
+            subprocess.run(
+                [python_path, "-m", "venv", venv_dir],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        except subprocess.SubprocessError as e:
+            logger.error(f"Failed to create virtual environment: {e}")
+            return False
+    
+    # Get pip executable for the virtual environment
+    if os.name == "nt":  # Windows
+        pip_executable = os.path.join(venv_dir, "Scripts", "pip")
+    else:  # Unix/Linux/Mac
+        pip_executable = os.path.join(venv_dir, "bin", "pip")
+    
+    # Check if pip exists
+    if not os.path.exists(pip_executable):
+        logger.error(f"Pip not found in virtual environment: {pip_executable}")
+        return False
+    
+    # Upgrade pip
+    logger.info("Upgrading pip in virtual environment")
+    try:
+        subprocess.run(
+            [pip_executable, "install", "--upgrade", "pip"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+    except subprocess.SubprocessError as e:
+        logger.warning(f"Failed to upgrade pip: {e}")
+        
+    # Install requirements if requirements.txt exists
+    requirements_file = os.path.join(component_dir, "requirements.txt")
+    if os.path.exists(requirements_file):
+        logger.info(f"Installing requirements from {requirements_file}")
+        try:
+            subprocess.run(
+                [pip_executable, "install", "-r", requirements_file],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        except subprocess.SubprocessError as e:
+            logger.error(f"Failed to install requirements: {e}")
+            return False
+    
+    # Install in development mode
+    setup_py = os.path.join(component_dir, "setup.py")
+    if os.path.exists(setup_py):
+        logger.info(f"Installing component in development mode from {setup_py}")
+        try:
+            subprocess.run(
+                [pip_executable, "install", "-e", component_dir],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+        except subprocess.SubprocessError as e:
+            logger.error(f"Failed to install component in development mode: {e}")
+            return False
+    
+    logger.info(f"Virtual environment for {component_name} created successfully")
+    return True
 
 
 async def start_component(component_name: str, instructions: StartUpInstructions, use_subprocess: bool = True) -> bool:
