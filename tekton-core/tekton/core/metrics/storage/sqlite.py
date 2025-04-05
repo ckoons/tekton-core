@@ -1,8 +1,7 @@
 """
-Storage systems for Tekton metrics.
+SQLite storage for metrics data.
 
-This module provides storage mechanisms for metrics data
-collected during system operation.
+This module provides SQLite-based storage for metrics data.
 """
 
 import os
@@ -10,31 +9,23 @@ import json
 import time
 import sqlite3
 import logging
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 
+from .base import MetricsStorage
+from .schema import SQLITE_SCHEMA, SQLITE_INDEXES
+
 logger = logging.getLogger(__name__)
-
-class MetricsStorage:
-    """Base class for metrics storage."""
-    
-    def store_session(self, session_data):
-        """Store a session's metrics data."""
-        raise NotImplementedError("Subclasses must implement store_session")
-    
-    def get_session(self, session_id):
-        """Retrieve a session by ID."""
-        raise NotImplementedError("Subclasses must implement get_session")
-    
-    def get_sessions(self, filters=None, limit=100, offset=0):
-        """Retrieve multiple sessions with optional filtering."""
-        raise NotImplementedError("Subclasses must implement get_sessions")
-
 
 class SQLiteMetricsStorage(MetricsStorage):
     """Stores metrics in a SQLite database."""
     
     def __init__(self, db_path="metrics.db"):
+        """Initialize SQLite storage.
+        
+        Args:
+            db_path: Path to SQLite database file
+        """
         self.db_path = db_path
         self._initialize_db()
     
@@ -43,71 +34,12 @@ class SQLiteMetricsStorage(MetricsStorage):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create main tables
-        tables = {
-            "sessions": '''
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    prompt TEXT,
-                    config TEXT,
-                    start_time REAL,
-                    end_time REAL,
-                    response TEXT,
-                    performance TEXT,
-                    spectral_metrics TEXT,
-                    created_at REAL
-                )
-            ''',
-            "component_activations": '''
-                CREATE TABLE IF NOT EXISTS component_activations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT,
-                    component_id TEXT,
-                    activation_data TEXT,
-                    timestamp REAL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id)
-                )
-            ''',
-            "propagation_steps": '''
-                CREATE TABLE IF NOT EXISTS propagation_steps (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT,
-                    source TEXT,
-                    destination TEXT,
-                    info_content REAL,
-                    data TEXT,
-                    timestamp REAL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id)
-                )
-            ''',
-            "parameter_usage": '''
-                CREATE TABLE IF NOT EXISTS parameter_usage (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT,
-                    component_id TEXT,
-                    total_params INTEGER,
-                    active_params INTEGER,
-                    utilization REAL,
-                    layer_data TEXT,
-                    timestamp REAL,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id)
-                )
-            '''
-        }
-        
         # Create tables
-        for _, create_sql in tables.items():
+        for table_name, create_sql in SQLITE_SCHEMA.items():
             cursor.execute(create_sql)
         
         # Create indexes
-        indexes = [
-            'CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time)',
-            'CREATE INDEX IF NOT EXISTS idx_component_activations_session ON component_activations(session_id)',
-            'CREATE INDEX IF NOT EXISTS idx_propagation_steps_session ON propagation_steps(session_id)',
-            'CREATE INDEX IF NOT EXISTS idx_parameter_usage_session ON parameter_usage(session_id)'
-        ]
-        
-        for index_sql in indexes:
+        for index_sql in SQLITE_INDEXES:
             cursor.execute(index_sql)
         
         conn.commit()
@@ -125,8 +57,8 @@ class SQLiteMetricsStorage(MetricsStorage):
             # Store main session data
             cursor.execute(
                 'INSERT INTO sessions (id, prompt, config, start_time, end_time, '
-                'response, performance, spectral_metrics, created_at) '
-                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'response, performance, spectral_metrics, catastrophe_metrics, created_at) '
+                'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 (
                     data['id'],
                     data['prompt'],
@@ -136,6 +68,7 @@ class SQLiteMetricsStorage(MetricsStorage):
                     data.get('response'),
                     json.dumps(data.get('performance', {})),
                     json.dumps(data.get('spectral_metrics', {})),
+                    json.dumps(data.get('catastrophe_metrics', {})),
                     time.time()
                 )
             )
@@ -186,6 +119,66 @@ class SQLiteMetricsStorage(MetricsStorage):
                         usage.get('timestamp', 0)
                     )
                 )
+                
+            # Store latent reasoning records
+            for record in data.get('latent_reasoning', []):
+                cursor.execute(
+                    'INSERT INTO latent_reasoning (session_id, component_id, iteration, '
+                    'initial_confidence, final_confidence, iterations_required, '
+                    'cognitive_convergence_rate, reasoning_data, timestamp) '
+                    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (
+                        data['id'],
+                        record.get('component_id', ''),
+                        record.get('iteration', 0),
+                        record.get('initial_confidence', 0.0),
+                        record.get('final_confidence', 0.0),
+                        record.get('iterations_required', 0),
+                        record.get('cognitive_convergence_rate', 0.0),
+                        json.dumps({k: v for k, v in record.items() 
+                                 if k not in ['component_id', 'iteration', 'initial_confidence', 
+                                             'final_confidence', 'iterations_required', 
+                                             'cognitive_convergence_rate', 'timestamp']}),
+                        record.get('timestamp', 0)
+                    )
+                )
+                
+            # Store cross-modal operations
+            for operation in data.get('cross_modal_operations', []):
+                cursor.execute(
+                    'INSERT INTO cross_modal_operations (session_id, source_modality, '
+                    'target_modality, operation_type, success, operation_data, timestamp) '
+                    'VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    (
+                        data['id'],
+                        operation.get('source_modality', ''),
+                        operation.get('target_modality', ''),
+                        operation.get('operation_type', ''),
+                        1 if operation.get('success', False) else 0,
+                        json.dumps({k: v for k, v in operation.items() 
+                                 if k not in ['source_modality', 'target_modality', 
+                                             'operation_type', 'success', 'timestamp']}),
+                        operation.get('timestamp', 0)
+                    )
+                )
+                
+            # Store concept stability data
+            for concept_id, observations in data.get('concept_stability', {}).items():
+                for obs in observations:
+                    cursor.execute(
+                        'INSERT INTO concept_stability (session_id, concept_id, context, '
+                        'vector_representation, stability_data, timestamp) '
+                        'VALUES (?, ?, ?, ?, ?, ?)',
+                        (
+                            data['id'],
+                            concept_id,
+                            obs.get('context', ''),
+                            json.dumps(obs.get('vector_representation', [])),
+                            json.dumps({k: v for k, v in obs.items() 
+                                     if k not in ['context', 'vector_representation', 'timestamp']}),
+                            obs.get('timestamp', 0)
+                        )
+                    )
             
             conn.commit()
             
@@ -213,8 +206,9 @@ class SQLiteMetricsStorage(MetricsStorage):
             session_data = dict(session_row)
             
             # Parse JSON fields
-            for field in ['config', 'performance', 'spectral_metrics']:
-                session_data[field] = json.loads(session_data[field])
+            for field in ['config', 'performance', 'spectral_metrics', 'catastrophe_metrics']:
+                if session_data.get(field):
+                    session_data[field] = json.loads(session_data[field])
             
             # Get component activations
             cursor.execute(
@@ -272,6 +266,79 @@ class SQLiteMetricsStorage(MetricsStorage):
                 }
             
             session_data['parameter_usage'] = parameter_usage
+            
+            # Get latent reasoning data
+            cursor.execute(
+                'SELECT component_id, iteration, initial_confidence, final_confidence, '
+                'iterations_required, cognitive_convergence_rate, reasoning_data, timestamp '
+                'FROM latent_reasoning WHERE session_id = ? ORDER BY timestamp', (session_id,)
+            )
+            
+            latent_reasoning = []
+            for row in cursor.fetchall():
+                record = {
+                    'component_id': row['component_id'],
+                    'iteration': row['iteration'],
+                    'initial_confidence': row['initial_confidence'],
+                    'final_confidence': row['final_confidence'],
+                    'iterations_required': row['iterations_required'],
+                    'cognitive_convergence_rate': row['cognitive_convergence_rate'],
+                    'timestamp': row['timestamp']
+                }
+                
+                # Add additional data if present
+                record.update(json.loads(row['reasoning_data']))
+                latent_reasoning.append(record)
+            
+            session_data['latent_reasoning'] = latent_reasoning
+            
+            # Get cross-modal operations
+            cursor.execute(
+                'SELECT source_modality, target_modality, operation_type, success, '
+                'operation_data, timestamp FROM cross_modal_operations '
+                'WHERE session_id = ? ORDER BY timestamp', (session_id,)
+            )
+            
+            cross_modal_operations = []
+            for row in cursor.fetchall():
+                operation = {
+                    'source_modality': row['source_modality'],
+                    'target_modality': row['target_modality'],
+                    'operation_type': row['operation_type'],
+                    'success': bool(row['success']),
+                    'timestamp': row['timestamp']
+                }
+                
+                # Add additional data if present
+                operation.update(json.loads(row['operation_data']))
+                cross_modal_operations.append(operation)
+            
+            session_data['cross_modal_operations'] = cross_modal_operations
+            
+            # Get concept stability data
+            cursor.execute(
+                'SELECT concept_id, context, vector_representation, stability_data, timestamp '
+                'FROM concept_stability WHERE session_id = ? ORDER BY timestamp', (session_id,)
+            )
+            
+            concept_stability = {}
+            for row in cursor.fetchall():
+                concept_id = row['concept_id']
+                
+                if concept_id not in concept_stability:
+                    concept_stability[concept_id] = []
+                
+                observation = {
+                    'context': row['context'],
+                    'vector_representation': json.loads(row['vector_representation']),
+                    'timestamp': row['timestamp']
+                }
+                
+                # Add additional data if present
+                observation.update(json.loads(row['stability_data']))
+                concept_stability[concept_id].append(observation)
+            
+            session_data['concept_stability'] = concept_stability
             
             return session_data
             
@@ -339,7 +406,7 @@ class SQLiteMetricsStorage(MetricsStorage):
         
         try:
             # Build query based on filters
-            query = "SELECT id, start_time, spectral_metrics FROM sessions"
+            query = "SELECT id, start_time, spectral_metrics, catastrophe_metrics FROM sessions"
             params = []
             
             if filters:
@@ -363,7 +430,8 @@ class SQLiteMetricsStorage(MetricsStorage):
                 {
                     'id': row['id'],
                     'start_time': row['start_time'],
-                    'metrics': json.loads(row['spectral_metrics'])
+                    'spectral_metrics': json.loads(row['spectral_metrics']),
+                    'catastrophe_metrics': json.loads(row['catastrophe_metrics']) if row['catastrophe_metrics'] else {}
                 }
                 for row in cursor.fetchall()
             ]
@@ -373,104 +441,3 @@ class SQLiteMetricsStorage(MetricsStorage):
             raise
         finally:
             conn.close()
-
-
-class JSONFileMetricsStorage(MetricsStorage):
-    """Stores metrics in JSON files."""
-    
-    def __init__(self, directory="metrics"):
-        """Initialize JSON file storage."""
-        self.directory = directory
-        os.makedirs(directory, exist_ok=True)
-        
-        # Create index file if it doesn't exist
-        self.index_path = os.path.join(directory, "index.json")
-        if not os.path.exists(self.index_path):
-            with open(self.index_path, 'w') as f:
-                json.dump({"sessions": {}}, f)
-    
-    def store_session(self, session_data):
-        """Store a session's metrics data."""
-        # Convert to dict if it's a SessionData object
-        data = session_data.to_dict() if hasattr(session_data, 'to_dict') else session_data
-            
-        # Create session directory and write data
-        session_id = data['id']
-        session_dir = os.path.join(self.directory, session_id)
-        os.makedirs(session_dir, exist_ok=True)
-        
-        with open(os.path.join(session_dir, "session.json"), 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        # Update index
-        try:
-            with open(self.index_path, 'r') as f:
-                index = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            index = {"sessions": {}}
-        
-        # Add to index with prompt truncation
-        index["sessions"][session_id] = {
-            "prompt": data['prompt'][:100] + "..." if len(data['prompt']) > 100 else data['prompt'],
-            "start_time": data['start_time'],
-            "end_time": data.get('end_time'),
-            "file": f"{session_id}/session.json"
-        }
-        
-        with open(self.index_path, 'w') as f:
-            json.dump(index, f, indent=2)
-    
-    def get_session(self, session_id):
-        """Retrieve a session by ID."""
-        session_file = os.path.join(self.directory, session_id, "session.json")
-        
-        try:
-            with open(session_file, 'r') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            logger.error(f"Error loading session {session_id}: {str(e)}")
-            return None
-    
-    def get_sessions(self, filters=None, limit=100, offset=0):
-        """Retrieve multiple sessions with optional filtering."""
-        try:
-            with open(self.index_path, 'r') as f:
-                index = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-        
-        # Get all sessions from index with ID added
-        all_sessions = [
-            {**session_info, "id": session_id}
-            for session_id, session_info in index.get("sessions", {}).items()
-        ]
-        
-        # Sort by start time (descending)
-        all_sessions.sort(key=lambda x: x.get("start_time", 0), reverse=True)
-        
-        # Apply filters
-        if filters:
-            filtered_sessions = []
-            for session in all_sessions:
-                include = True
-                
-                if 'start_time_min' in filters and session.get('start_time', 0) < filters['start_time_min']:
-                    include = False
-                
-                if 'start_time_max' in filters and session.get('start_time', 0) > filters['start_time_max']:
-                    include = False
-                
-                if 'prompt_like' in filters and filters['prompt_like'] not in session.get('prompt', ''):
-                    include = False
-                
-                if include:
-                    filtered_sessions.append(session)
-            
-            all_sessions = filtered_sessions
-        
-        # Apply pagination and load full data
-        return [
-            self.get_session(session_info["id"])
-            for session_info in all_sessions[offset:offset + limit]
-            if self.get_session(session_info["id"])
-        ]

@@ -12,8 +12,8 @@ from typing import Dict, List, Any, Optional, Callable, Union
 import inspect
 
 from .collector import MetricsCollector
-from .storage import SQLiteMetricsStorage
-from .analyzer import SpectralAnalyzer
+from .storage.sqlite import SQLiteMetricsStorage
+from .analysis.spectral_analyzer import SpectralAnalyzer
 from .visualization import ConsoleVisualizer, JSONVisualizer
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,63 @@ class MetricsManager:
             return
             
         self.collector.record_parameter_usage(component_id, total_params, active_params, layer_data)
+        
+    def record_latent_reasoning(self, component_id: str, iteration: int, initial_confidence: float,
+                               final_confidence: float, iterations_required: int,
+                               reasoning_data: Optional[Dict[str, Any]] = None):
+        """Record latent space reasoning metrics.
+        
+        Args:
+            component_id: ID of the component doing the reasoning
+            iteration: Current iteration number
+            initial_confidence: Initial confidence score
+            final_confidence: Final confidence score
+            iterations_required: Total iterations required
+            reasoning_data: Optional additional data about the reasoning process
+        """
+        if not self.enabled or not self.current_session_id:
+            return
+            
+        self.collector.record_latent_reasoning(
+            component_id, iteration, initial_confidence, final_confidence, 
+            iterations_required, reasoning_data
+        )
+        
+    def record_cross_modal_operation(self, source_modality: str, target_modality: str, 
+                                    operation_type: str, success: bool,
+                                    operation_data: Optional[Dict[str, Any]] = None):
+        """Record cross-modal integration metrics.
+        
+        Args:
+            source_modality: Source modality (e.g., "text", "image", "audio")
+            target_modality: Target modality
+            operation_type: Type of cross-modal operation
+            success: Whether the operation was successful
+            operation_data: Optional additional data about the operation
+        """
+        if not self.enabled or not self.current_session_id:
+            return
+            
+        self.collector.record_cross_modal_operation(
+            source_modality, target_modality, operation_type, success, operation_data
+        )
+        
+    def record_concept_stability(self, concept_id: str, context: str, vector_representation: List[float],
+                                stability_data: Optional[Dict[str, Any]] = None):
+        """Record concept stability metrics.
+        
+        Args:
+            concept_id: Identifier for the concept
+            context: Context in which the concept was observed
+            vector_representation: Vector representation of the concept
+            stability_data: Optional additional data about concept stability
+        """
+        if not self.enabled or not self.current_session_id:
+            return
+            
+        self.collector.record_concept_stability(
+            concept_id, context, vector_representation, stability_data
+        )
     
     def get_session(self, session_id: str) -> Dict[str, Any]:
         """Get a session by ID.
@@ -196,6 +253,46 @@ class MetricsManager:
         """
         sessions = self.get_sessions(limit=limit)
         return self.analyzer.identify_catastrophe_points(sessions, window_size=window_size)
+        
+    def analyze_bifurcation_proximity(self, num_recent: int = 10) -> Dict[str, Any]:
+        """Calculate the bifurcation proximity index for recent sessions.
+        
+        BPI indicates how close the system is to a capability bifurcation.
+        
+        Args:
+            num_recent: Number of recent sessions to consider
+            
+        Returns:
+            Dict with bifurcation proximity analysis
+        """
+        sessions = self.get_sessions(limit=num_recent)
+        return self.analyzer.calculate_bifurcation_proximity(sessions, num_recent=num_recent)
+        
+    def analyze_parameter_sensitivity(self, parameters: List[str] = None, limit: int = 100) -> Dict[str, Any]:
+        """Calculate sensitivity to different control parameters.
+        
+        Args:
+            parameters: Optional list of parameters to analyze
+            limit: Maximum number of sessions to analyze
+            
+        Returns:
+            Dict with parameter sensitivity analysis
+        """
+        sessions = self.get_sessions(limit=limit)
+        return self.analyzer.calculate_control_parameter_sensitivity(sessions, parameters=parameters)
+        
+    def detect_hysteresis(self, parameter: str, limit: int = 100) -> Dict[str, Any]:
+        """Calculate hysteresis in performance as a parameter changes.
+        
+        Args:
+            parameter: The parameter to analyze
+            limit: Maximum number of sessions to analyze
+            
+        Returns:
+            Dict with hysteresis analysis
+        """
+        sessions = self.get_sessions(limit=limit)
+        return self.analyzer.calculate_hysteresis_detection(sessions, parameter=parameter)
     
     def visualize_session(self, session_id: str, format: str = "console") -> str:
         """Visualize a session.

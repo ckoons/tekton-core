@@ -1,10 +1,12 @@
-# Tekton Computational Spectral Analysis
+# Tekton Computational Spectral Analysis & Catastrophe Theory
 
-This module implements a comprehensive metrics collection and analysis system for the Tekton architecture, based on computational spectral analysis principles.
+This module implements a comprehensive metrics collection and analysis system for the Tekton architecture, based on computational spectral analysis and catastrophe theory principles.
 
 ## Overview
 
 The spectral analysis framework captures and analyzes fine-grained metrics about the computational behavior of AI systems, focusing on:
+
+### Core Spectral Metrics
 
 1. **Depth Efficiency (DE)** - Measures information preservation across layers
 2. **Parametric Utilization (PU)** - Quantifies parameter usage efficiency
@@ -12,13 +14,55 @@ The spectral analysis framework captures and analyzes fine-grained metrics about
 4. **Modularity Quotient (MQ)** - Measures information exchange between module boundaries
 5. **Architectural Elasticity (AE)** - Quantifies performance change relative to architectural modification
 
+### Latent Space and Cross-Modal Metrics
+
+6. **Cognitive Convergence Rate (CCR)** - Measures efficiency of thought refinement in latent space
+7. **Latent Space Navigation Efficiency (LSNE)** - Quantifies reasoning process efficiency
+8. **Cross-Modal Integration Index (CMII)** - Measures information integration across modalities
+9. **Conceptual Stability Coefficient (CSC)** - Quantifies consistency of concept representations
+
+### Catastrophe Theory Metrics
+
+10. **Bifurcation Proximity Index (BPI)** - Indicates how close the system is to a capability bifurcation
+11. **Control Parameter Sensitivity Map (CPSM)** - Identifies which parameters are approaching critical thresholds
+12. **State Space Stability Metric (SSSM)** - Quantifies stability of current capability region
+13. **Hysteresis Detection Index (HDI)** - Identifies asymmetric behavior characteristic of fold catastrophes
+14. **Critical Slowing Down Detector (CSDD)** - Detects increased system response time near thresholds
+
+## Module Structure
+
+The metrics module has been organized into specialized submodules:
+
+```
+metrics/
+├── __init__.py           # Main imports and exports
+├── collector.py          # Session data collection
+├── integration.py        # High-level integration and metrics manager
+├── utils.py              # Shared utility functions
+├── visualization.py      # Visualization utilities
+├── analysis/             # Analysis functionality
+│   ├── __init__.py
+│   ├── spectral_analyzer.py      # Core analysis interface
+│   ├── architectural_elasticity.py
+│   ├── bifurcation.py            
+│   ├── catastrophe_points.py
+│   ├── hysteresis.py
+│   └── parameter_sensitivity.py
+└── storage/              # Data storage
+    ├── __init__.py
+    ├── base.py           # Storage interface
+    ├── schema.py         # Database schema
+    ├── sqlite.py         # SQLite implementation
+    └── json_file.py      # JSON file storage
+```
+
 ## Usage
 
 ### Basic Metrics Collection
 
 ```python
-from tekton.core.metrics import MetricsCollector, MetricsStorage
-from tekton.core.metrics.storage import SQLiteMetricsStorage
+from tekton.core.metrics import MetricsCollector
+from tekton.core.metrics import SQLiteMetricsStorage
 
 # Initialize storage and collector
 storage = SQLiteMetricsStorage("metrics.db")
@@ -101,6 +145,21 @@ print(metrics.visualize_trend(limit=20))
 
 # Find catastrophe points
 catastrophes = metrics.find_catastrophe_points(limit=100)
+
+# Analyze bifurcation proximity
+bpi = metrics.analyze_bifurcation_proximity(num_recent=20)
+print(f"Bifurcation Proximity Index: {bpi['bifurcation_proximity_index']}")
+print(f"Interpretation: {bpi['interpretation']}")
+
+# Analyze parameter sensitivity
+sensitivity = metrics.analyze_parameter_sensitivity(parameters=["temperature", "max_tokens"], limit=100)
+for param, values in sensitivity.items():
+    print(f"{param}: {values['interpretation']}")
+
+# Detect hysteresis for a parameter
+hysteresis = metrics.detect_hysteresis(parameter="temperature", limit=100)
+print(f"Hysteresis Index: {hysteresis['hysteresis_index']}")
+print(f"Interpretation: {hysteresis['interpretation']}")
 ```
 
 ### Using the Decorator
@@ -138,10 +197,23 @@ def process_text(text: str) -> str:
   - Low values (<0.3): Poor module separation
   - Target: Balance between modularity and necessary integration
 
+- **Cognitive Convergence Rate (CCR)**
+  - High values: Efficient thought refinement
+  - Low values: Inefficient iteration through latent space
+  - Target: Maximize to improve reasoning efficiency
+
+- **Latent Space Navigation Efficiency (LSNE)**
+  - High values: Direct path through concept space
+  - Low values: Wandering or indirect reasoning
+  - Target: Maximize to reduce computational overhead
+
 ### Using the Analyzer
 
 ```python
-from tekton.core.metrics.analyzer import SpectralAnalyzer
+from tekton.core.metrics import SpectralAnalyzer
+
+# Or more explicitly:
+# from tekton.core.metrics.analysis.spectral_analyzer import SpectralAnalyzer
 
 analyzer = SpectralAnalyzer(storage)
 
@@ -159,6 +231,34 @@ for point in catastrophes:
     print(f"Catastrophe at {point['time']}: {point['changes']}")
 ```
 
+## Catastrophe Theory Analysis
+
+The system includes tools for analyzing AI capabilities through the lens of catastrophe theory:
+
+### Bifurcation Analysis
+```python
+# Get bifurcation proximity analysis
+bpi = analyzer.calculate_bifurcation_proximity(sessions)
+print(f"Bifurcation Proximity Index: {bpi['bifurcation_proximity_index']}")
+print(f"Interpretation: {bpi['interpretation']}")
+```
+
+### Parameter Sensitivity Analysis
+```python
+# Analyze control parameter sensitivity
+sensitivity = analyzer.calculate_control_parameter_sensitivity(sessions, parameters=["temperature"])
+print(f"Temperature sensitivity: {sensitivity['temperature']['normalized_sensitivity']}")
+print(f"Non-linearity: {sensitivity['temperature']['non_linearity']}")
+```
+
+### Hysteresis Detection
+```python
+# Detect parameter hysteresis
+hysteresis = analyzer.calculate_hysteresis_detection(sessions, parameter="temperature")
+print(f"Hysteresis Index: {hysteresis['hysteresis_index']}")
+print(f"Interpretation: {hysteresis['interpretation']}")
+```
+
 ## Integration with Sophia
 
 The metrics system is designed to provide data for Sophia's self-improvement capabilities:
@@ -167,6 +267,8 @@ The metrics system is designed to provide data for Sophia's self-improvement cap
 2. The catastrophe detection can map capability emergence thresholds
 3. Architectural elasticity metrics can guide model scaling decisions
 4. Component-level metrics can identify bottlenecks and inefficiencies
+5. Bifurcation analysis can predict when the system is approaching new capability thresholds
+6. Parameter sensitivity analysis can guide efficient architecture optimization
 
 ## Future Directions
 
@@ -176,3 +278,7 @@ This system lays the groundwork for more sophisticated spectral analysis:
 2. **Capability Emergence Prediction** - Forecast new capabilities before they emerge
 3. **Architecture Self-Modification** - Enable systems to reconfigure based on spectral metrics
 4. **Cognitive Load Balancing** - Distribute computation optimally across available resources
+5. **Automated Catastrophe Mapping** - Create multi-dimensional maps of capability phase transitions
+6. **Pre-Bifurcation Capability Enhancement** - Optimize parameters near bifurcation points for maximal capabilities
+7. **Latent Space Topology Analysis** - Map and navigate the geometric structure of latent space
+8. **Cross-Modal Transfer Optimization** - Enhance information flow between different modalities

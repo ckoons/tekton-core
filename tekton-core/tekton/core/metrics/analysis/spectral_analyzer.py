@@ -1,14 +1,20 @@
 """
-Spectral analysis tools for Tekton metrics.
+Core spectral analysis functionality for Tekton metrics.
 
-This module provides tools for analyzing metrics data
-and generating spectral insights.
+This module provides the SpectralAnalyzer class that serves as the main interface
+for all spectral and catastrophe theory analysis.
 """
 
-import numpy as np
-import pandas as pd
 import logging
+import numpy as np
 from typing import Dict, List, Any, Optional, Union, Tuple
+
+from .bifurcation import calculate_bifurcation_proximity
+from .parameter_sensitivity import calculate_control_parameter_sensitivity
+from .hysteresis import calculate_hysteresis_detection
+from .catastrophe_points import identify_catastrophe_points
+from .architectural_elasticity import find_architectural_elasticity
+from ..utils import session_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +39,7 @@ class SpectralAnalyzer:
             Dict of analysis results
         """
         # Ensure we have dict format
-        data = session_data.to_dict() if hasattr(session_data, 'to_dict') else session_data
+        data = session_to_dict(session_data)
         
         results = {
             "session_id": data["id"],
@@ -128,201 +134,27 @@ class SpectralAnalyzer:
         return overall
     
     def find_architectural_elasticity(self, sessions):
-        """Calculate architectural elasticity from session data.
-        
-        Architectural Elasticity (AE) = Δ(performance) / Δ(architectural_complexity)
-        
-        Args:
-            sessions: List of session data objects
-            
-        Returns:
-            Dict of elasticity metrics
-        """
-        if len(sessions) < 2:
-            return {"error": "Need at least 2 sessions to calculate elasticity"}
-        
-        # Convert to list of dicts
-        session_dicts = []
-        for session in sessions:
-            if hasattr(session, 'to_dict'):
-                session_dicts.append(session.to_dict())
-            else:
-                session_dicts.append(session)
-        
-        # Sort by start time
-        session_dicts.sort(key=lambda x: x.get('start_time', 0))
-        
-        # Calculate changes between consecutive sessions
-        elasticity_points = []
-        
-        for i in range(1, len(session_dicts)):
-            prev = session_dicts[i-1]
-            curr = session_dicts[i]
-            
-            # Extract performance metric (accuracy, success rate, etc.)
-            prev_perf = prev.get('performance', {}).get('accuracy', 0)
-            curr_perf = curr.get('performance', {}).get('accuracy', 0)
-            
-            # Extract complexity metrics
-            prev_complexity = self._calculate_complexity(prev)
-            curr_complexity = self._calculate_complexity(curr)
-            
-            # Calculate elasticity if complexity changed
-            if abs(curr_complexity - prev_complexity) > 0.001:
-                elasticity = (curr_perf - prev_perf) / (curr_complexity - prev_complexity)
-                
-                elasticity_points.append({
-                    "from_session": prev['id'],
-                    "to_session": curr['id'],
-                    "performance_delta": curr_perf - prev_perf,
-                    "complexity_delta": curr_complexity - prev_complexity,
-                    "elasticity": elasticity
-                })
-        
-        # Calculate overall elasticity
-        if elasticity_points:
-            avg_elasticity = np.mean([p["elasticity"] for p in elasticity_points])
-            max_elasticity = max([p["elasticity"] for p in elasticity_points])
-            min_elasticity = min([p["elasticity"] for p in elasticity_points])
-        else:
-            avg_elasticity = 0
-            max_elasticity = 0
-            min_elasticity = 0
-        
-        return {
-            "points": elasticity_points,
-            "average": avg_elasticity,
-            "maximum": max_elasticity,
-            "minimum": min_elasticity
-        }
+        """Calculate architectural elasticity from session data."""
+        return find_architectural_elasticity(sessions)
     
     def identify_catastrophe_points(self, sessions, window_size=5):
-        """Identify potential catastrophe points in model behavior.
+        """Identify potential catastrophe points in model behavior."""
+        return identify_catastrophe_points(sessions, window_size)
         
-        Args:
-            sessions: List of session data
-            window_size: Window size for detecting sudden changes
-            
-        Returns:
-            List of potential catastrophe points
-        """
-        if len(sessions) < window_size * 2:
-            return {"error": f"Need at least {window_size*2} sessions to identify catastrophe points"}
-        
-        # Convert to list of dicts
-        session_dicts = []
-        for session in sessions:
-            if hasattr(session, 'to_dict'):
-                session_dicts.append(session.to_dict())
-            else:
-                session_dicts.append(session)
-        
-        # Sort by start time
-        session_dicts.sort(key=lambda x: x.get('start_time', 0))
-        
-        # Extract metrics series
-        times = [s.get('start_time', 0) for s in session_dicts]
-        accuracies = [s.get('performance', {}).get('accuracy', 0) for s in session_dicts]
-        de_values = [s.get('spectral_metrics', {}).get('depth_efficiency', 0) for s in session_dicts]
-        pu_values = [s.get('spectral_metrics', {}).get('parametric_utilization', 0) for s in session_dicts]
-        mq_values = [s.get('spectral_metrics', {}).get('modularity_quotient', 0) for s in session_dicts]
-        
-        # Detect sudden changes in metrics
-        catastrophe_points = []
-        
-        for i in range(window_size, len(session_dicts) - window_size):
-            # Calculate before/after averages
-            before_acc = np.mean(accuracies[i-window_size:i])
-            after_acc = np.mean(accuracies[i:i+window_size])
-            acc_change = after_acc - before_acc
-            
-            before_de = np.mean(de_values[i-window_size:i])
-            after_de = np.mean(de_values[i:i+window_size])
-            de_change = after_de - before_de
-            
-            before_pu = np.mean(pu_values[i-window_size:i])
-            after_pu = np.mean(pu_values[i:i+window_size])
-            pu_change = after_pu - before_pu
-            
-            before_mq = np.mean(mq_values[i-window_size:i])
-            after_mq = np.mean(mq_values[i:i+window_size])
-            mq_change = after_mq - before_mq
-            
-            # Calculate change magnitudes
-            acc_magnitude = abs(acc_change) / max(before_acc, 0.001)
-            de_magnitude = abs(de_change) / max(before_de, 0.001)
-            pu_magnitude = abs(pu_change) / max(before_pu, 0.001)
-            mq_magnitude = abs(mq_change) / max(before_mq, 0.001)
-            
-            # Check for significant changes
-            significant_changes = []
-            
-            if acc_magnitude > 0.2:  # 20% change threshold
-                significant_changes.append(("accuracy", acc_change, acc_magnitude))
-            
-            if de_magnitude > 0.2:
-                significant_changes.append(("depth_efficiency", de_change, de_magnitude))
-            
-            if pu_magnitude > 0.2:
-                significant_changes.append(("parametric_utilization", pu_change, pu_magnitude))
-            
-            if mq_magnitude > 0.2:
-                significant_changes.append(("modularity_quotient", mq_change, mq_magnitude))
-            
-            if significant_changes:
-                catastrophe_points.append({
-                    "session_id": session_dicts[i]['id'],
-                    "time": times[i],
-                    "changes": significant_changes,
-                    "magnitude": max(c[2] for c in significant_changes)
-                })
-        
-        # Sort by magnitude (descending)
-        catastrophe_points.sort(key=lambda x: x["magnitude"], reverse=True)
-        
-        return catastrophe_points
+    def calculate_bifurcation_proximity(self, sessions, num_recent=10):
+        """Calculate the bifurcation proximity index for recent sessions."""
+        return calculate_bifurcation_proximity(sessions, num_recent)
     
-    def _calculate_complexity(self, session_data):
-        """Calculate architectural complexity metric.
+    def calculate_control_parameter_sensitivity(self, sessions, parameters=None):
+        """Calculate sensitivity to different control parameters."""
+        return calculate_control_parameter_sensitivity(sessions, parameters)
         
-        Args:
-            session_data: Session data dict
-            
-        Returns:
-            Complexity score
-        """
-        # Count components
-        component_count = len(session_data.get('component_activations', {}))
-        
-        # Count total parameters
-        total_params = sum(data.get('total', 0) for data in session_data.get('parameter_usage', {}).values())
-        
-        # Count propagation steps
-        prop_steps = len(session_data.get('propagation_path', []))
-        
-        # Calculate modularity
-        mq = session_data.get('spectral_metrics', {}).get('modularity_quotient', 0.5)
-        
-        # Combine into complexity score
-        # Higher complexity for more components, more parameters, more propagation steps, lower modularity
-        complexity = (
-            component_count * 0.3 + 
-            np.log1p(total_params) * 0.3 + 
-            prop_steps * 0.2 + 
-            (1 - mq) * 0.2
-        )
-        
-        return complexity
+    def calculate_hysteresis_detection(self, sessions, parameter):
+        """Calculate hysteresis in performance as a parameter changes."""
+        return calculate_hysteresis_detection(sessions, parameter)
     
     def _calculate_spectral_metrics(self, session_data):
-        """Calculate spectral metrics for a session.
-        
-        Args:
-            session_data: Session data dict
-            
-        Returns:
-            Dict of spectral metrics
-        """
+        """Calculate spectral metrics for a session."""
         metrics = {}
         
         # Calculate Depth Efficiency (DE)
@@ -377,15 +209,7 @@ class SpectralAnalyzer:
         return metrics
     
     def _generate_insights(self, session_data, analysis_results):
-        """Generate insights from session data and analysis.
-        
-        Args:
-            session_data: Session data dict
-            analysis_results: Analysis results dict
-            
-        Returns:
-            Dict of insights
-        """
+        """Generate insights from session data and analysis."""
         insights = {}
         
         # Get spectral metrics
