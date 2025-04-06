@@ -1,0 +1,21 @@
+#!/bin/bash
+# Launch script for Hephaestus GUI
+
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Check if Python is available
+if ! command -v python3 &> /dev/null; then
+    echo "Error: Python 3 is required but not found"
+    exit 1
+fi
+
+# Check if the Hephaestus package is installed
+if ! python3 -c "import hephaestus" &> /dev/null; then
+    echo "Installing Hephaestus in development mode..."
+    cd "$SCRIPT_DIR/Hephaestus" && python3 -m pip install -e .
+fi
+
+# Launch Hephaestus
+echo "Starting Hephaestus GUI..."
+python3 -m hephaestus.ui.main "$@"
