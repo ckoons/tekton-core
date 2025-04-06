@@ -1,6 +1,6 @@
 [submodule "Hephaestus"]
 	path = Hephaestus
-	url = ./Hephaestus
+	url = https://github.com/ckoons/Hephaestus.git
 
 [submodule "Codex"]
 	path = Codex
