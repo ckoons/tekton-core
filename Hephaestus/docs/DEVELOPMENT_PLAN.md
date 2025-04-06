@@ -53,6 +53,7 @@ Hephaestus will serve as the integrated GUI for the Tekton Multi-AI Engineering 
 - Minimal scaffold for UI server
 - Core package setup
 - Integration with Tekton build system
+- Deadlock prevention subsystem
 
 ### Phase 2: Core Components
 
@@ -92,6 +93,38 @@ Hephaestus integrates with Tekton through:
 2. **Component Registry**: Auto-discovery of available components
 3. **Startup Coordinator**: Lifecycle management
 4. **Resource Monitor**: System status visualization
+5. **Component Lifecycle**: Deadlock prevention system
+
+## Deadlock Prevention System
+
+Hephaestus implements a comprehensive deadlock prevention system to ensure reliable operation even when components face startup issues or circular dependencies.
+
+### Key Features
+1. **Component Lifecycle States**
+   - Fine-grained state tracking (UNKNOWN, INITIALIZING, READY, DEGRADED, FAILED, STOPPING, RESTARTING)
+   - Transparent transitions between states
+   - Real-time state visualization
+
+2. **Dependency Management**
+   - Automatic dependency tracking
+   - Cycle detection and resolution
+   - Graceful degradation for non-critical dependencies
+
+3. **Timeout Handling**
+   - Explicit operation timeouts
+   - Graceful recovery from timeouts
+   - Clear error reporting
+
+4. **Health Monitoring**
+   - Periodic component health checks
+   - Proactive issue detection
+   - Auto-recovery where possible
+
+### Implementation Details
+- Observer pattern for state change notification
+- Async event loop for non-blocking monitoring
+- WebSocket updates for real-time UI feedback
+- Circuit breaker pattern for dependency isolation
 
 ## Launch Mechanisms
 

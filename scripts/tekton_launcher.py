@@ -108,6 +108,11 @@ async def main():
         action="store_true",
         help="Periodically check for and resolve potential deadlocks"
     )
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Launch with Hephaestus GUI interface"
+    )
     
     args = parser.parse_args()
     
@@ -144,6 +149,25 @@ async def main():
             components=args.components,
             all_components=args.all
         )
+        
+        # Launch GUI if requested
+        gui_process = None
+        if args.gui:
+            logger.info("Launching Hephaestus GUI")
+            import subprocess
+            hephaestus_launch_path = os.path.join(args.base_dir, "hephaestus_launch")
+            if os.path.exists(hephaestus_launch_path):
+                # Start GUI in a subprocess
+                gui_process = subprocess.Popen(
+                    [hephaestus_launch_path, "--debug" if args.debug else ""],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                logger.info(f"Hephaestus GUI started with PID {gui_process.pid}")
+            else:
+                logger.error(f"Hephaestus launcher not found at {hephaestus_launch_path}")
+                logger.warning("GUI not available. Make sure Hephaestus is properly installed.")
         
         # Report results summary
         success_count = sum(1 for result in results.values() if result)

@@ -13,6 +13,8 @@ Hephaestus provides a unified graphical interface for all Tekton components, ena
 - Real-time status monitoring of the Tekton ecosystem
 - Integration with Hermes for seamless communication
 - Cross-component workflow visualization
+- Deadlock prevention system with enhanced lifecycle management
+- Dependency cycle detection and resolution
 
 ## Project Status
 
@@ -66,3 +68,20 @@ Hephaestus follows the Tekton architectural principles while adding a presentati
 - Integration with the Hermes messaging system
 - Decoupled from core functionality for optional use
 - Extensible to accommodate new Tekton components
+- Enhanced lifecycle management with deadlock prevention
+- Graceful degradation for robust operation
+
+### Deadlock Prevention
+
+The deadlock prevention system ensures Hephaestus and Tekton components operate reliably even in the presence of:
+
+- Circular dependencies between components
+- Slow-starting or intermittently failing components
+- Network connectivity issues
+- Resource constraints
+
+The system uses:
+- Fine-grained component state tracking
+- Automatic cycle detection and resolution
+- Timeout management with graceful recovery
+- Health monitoring with proactive intervention

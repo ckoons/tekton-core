@@ -4,9 +4,15 @@ fastapi>=0.68.0
 uvicorn>=0.15.0
 websockets>=10.0
 pydantic>=1.9.0
+asyncio>=3.4.3
+uuid>=1.30
 
 # Integration dependencies
 hermes-client>=0.1.0  # This will be replaced with the actual Hermes client
+
+# Deadlock prevention dependencies
+# These will be resolved from Tekton core installation
+# tekton-core>=0.1.0
 
 # UI dependencies - these would be installed via npm
 # Listed here for documentation purposes
