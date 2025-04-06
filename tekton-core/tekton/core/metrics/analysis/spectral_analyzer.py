@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Core spectral analysis functionality for Tekton metrics.
 
@@ -7,6 +8,7 @@ for all spectral and catastrophe theory analysis.
 
 import logging
 import numpy as np
+import time
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 from .bifurcation import calculate_bifurcation_proximity
@@ -14,20 +16,27 @@ from .parameter_sensitivity import calculate_control_parameter_sensitivity
 from .hysteresis import calculate_hysteresis_detection
 from .catastrophe_points import identify_catastrophe_points
 from .architectural_elasticity import find_architectural_elasticity
-from ..utils import session_to_dict
+from .utils import session_to_dict
+from .analyzer_components.base_analyzer import BaseAnalyzer
+from .analyzer_components.metrics import calculate_spectral_metrics
+from .analyzer_components.insights import generate_insights
+from .analyzer_components.spectral_utils import (
+    compute_frequency_components,
+    calculate_band_powers,
+    calculate_spectral_entropy,
+    detect_dominant_frequencies
+)
+from .analyzer_components.cross_dimensional import (
+    analyze_cross_dimensional,
+    analyze_time_trends
+)
+from .analyzer_components.anomaly_detection import detect_anomalies
 
 logger = logging.getLogger(__name__)
 
-class SpectralAnalyzer:
+
+class SpectralAnalyzer(BaseAnalyzer):
     """Analyzes metrics data to extract spectral insights."""
-    
-    def __init__(self, storage=None):
-        """Initialize spectral analyzer.
-        
-        Args:
-            storage: Optional metrics storage engine
-        """
-        self.storage = storage
     
     def analyze_session(self, session_data):
         """Analyze a single session.
@@ -54,14 +63,14 @@ class SpectralAnalyzer:
         else:
             # Calculate basic spectral metrics if not already present
             try:
-                spectral = self._calculate_spectral_metrics(data)
+                spectral = calculate_spectral_metrics(data)
                 results["spectral"] = spectral
             except Exception as e:
                 logger.error(f"Error calculating spectral metrics: {str(e)}")
                 results["spectral"] = {}
         
         # Calculate additional insights
-        results["insights"] = self._generate_insights(data, results)
+        results["insights"] = generate_insights(data, results)
         
         return results
     
@@ -152,121 +161,219 @@ class SpectralAnalyzer:
     def calculate_hysteresis_detection(self, sessions, parameter):
         """Calculate hysteresis in performance as a parameter changes."""
         return calculate_hysteresis_detection(sessions, parameter)
+
+
+class EnhancedSpectralAnalyzer(BaseAnalyzer):
+    """
+    Enhanced spectral analyzer with complete implementation of spectral metrics.
     
-    def _calculate_spectral_metrics(self, session_data):
-        """Calculate spectral metrics for a session."""
-        metrics = {}
+    This analyzer implements advanced techniques for detecting patterns in
+    component behavior across multiple dimensions.
+    """
+
+    def __init__(self, dimensions=None, sampling_rate=1.0):
+        """
+        Initialize enhanced spectral analyzer.
         
-        # Calculate Depth Efficiency (DE)
-        total_layers = sum(len(data.get("layers", {})) 
-                         for data in session_data.get("parameter_usage", {}).values())
-        if "accuracy" in session_data.get("performance", {}) and total_layers > 0:
-            metrics["depth_efficiency"] = session_data["performance"]["accuracy"] / total_layers
-        else:
-            metrics["depth_efficiency"] = 0
-            
-        # Calculate Parametric Utilization (PU)
-        total_params = sum(data.get("total", 0) for data in session_data.get("parameter_usage", {}).values())
-        active_params = sum(data.get("active", 0) for data in session_data.get("parameter_usage", {}).values())
-        
-        if total_params > 0:
-            metrics["parametric_utilization"] = active_params / total_params
-        else:
-            metrics["parametric_utilization"] = 0
-            
-        # Calculate Minimum Propagation Threshold (MPT)
-        if session_data.get("propagation_path"):
-            # Count unique components in the propagation path
-            components = set()
-            for step in session_data["propagation_path"]:
-                components.add(step.get("source", ""))
-                components.add(step.get("destination", ""))
-            
-            metrics["min_propagation_threshold"] = len(components)
-        else:
-            metrics["min_propagation_threshold"] = 0
-            
-        # Calculate Modularity Quotient (MQ)
-        cross_module_flow = 0
-        within_module_flow = 0
-        
-        for step in session_data.get("propagation_path", []):
-            source = step.get("source", "")
-            dest = step.get("destination", "")
-            
-            # If source and destination are in the same component family
-            if source.split('.')[0] == dest.split('.')[0]:
-                within_module_flow += step.get("info_content", 1)
-            else:
-                cross_module_flow += step.get("info_content", 1)
-        
-        total_flow = cross_module_flow + within_module_flow
-        if total_flow > 0:
-            metrics["modularity_quotient"] = 1 - (cross_module_flow / total_flow)
-        else:
-            metrics["modularity_quotient"] = 0
-            
-        return metrics
+        Args:
+            dimensions: List of dimensions to analyze
+            sampling_rate: Sampling rate in Hz
+        """
+        super().__init__()
+        self.dimensions = dimensions or ['latency', 'throughput', 'error_rate', 'memory_usage', 'cpu_usage']
+        self.sampling_rate = sampling_rate
+        self.frequency_bands = {
+            'ultra_low': (0.0, 0.01),  # long-term trends (hours)
+            'very_low': (0.01, 0.1),   # medium-term trends (minutes)
+            'low': (0.1, 1.0),         # short-term trends (seconds)
+            'medium': (1.0, 10.0),     # transient behavior
+            'high': (10.0, 100.0)      # rapid fluctuations
+        }
+        self.history = {}
     
-    def _generate_insights(self, session_data, analysis_results):
-        """Generate insights from session data and analysis."""
-        insights = {}
+    def analyze_session(self, session_data):
+        """Perform comprehensive spectral analysis on session data.
         
-        # Get spectral metrics
-        spectral = analysis_results.get("spectral", {})
-        
-        # Insight: Efficiency classification
-        if "depth_efficiency" in spectral:
-            de = spectral["depth_efficiency"]
-            if de > 0.8:
-                insights["depth_efficiency"] = "Excellent - very high efficiency per layer"
-            elif de > 0.5:
-                insights["depth_efficiency"] = "Good - efficient use of layers"
-            elif de > 0.3:
-                insights["depth_efficiency"] = "Moderate - some layer inefficiency"
-            else:
-                insights["depth_efficiency"] = "Poor - significant layer inefficiency"
-        
-        # Insight: Parameter utilization
-        if "parametric_utilization" in spectral:
-            pu = spectral["parametric_utilization"]
-            if pu > 0.8:
-                insights["parametric_utilization"] = "Excellent - very high parameter utilization"
-            elif pu > 0.5:
-                insights["parametric_utilization"] = "Good - effective parameter usage"
-            elif pu > 0.3:
-                insights["parametric_utilization"] = "Moderate - some parameter wastage"
-            else:
-                insights["parametric_utilization"] = "Poor - significant parameter wastage"
-        
-        # Insight: Propagation efficiency
-        if "min_propagation_threshold" in spectral:
-            mpt = spectral["min_propagation_threshold"]
-            component_count = analysis_results.get("component_count", 0)
+        Args:
+            session_data: Session data containing time series for each dimension
             
-            if component_count > 0:
-                propagation_ratio = mpt / component_count
+        Returns:
+            Dict of analysis results
+        """
+        results = {}
+
+        # Convert session_data to format with time series if needed
+        data = self._prepare_session_data(session_data)
+        
+        # Extract time series for each dimension
+        for dimension in self.dimensions:
+            if dimension in data:
+                try:
+                    # Apply FFT to get frequency components
+                    freq_components = compute_frequency_components(data[dimension], self.sampling_rate)
+                    
+                    # Calculate power in each frequency band
+                    band_powers = calculate_band_powers(freq_components, self.frequency_bands)
+                    
+                    # Calculate spectral entropy
+                    spectral_entropy = calculate_spectral_entropy(freq_components)
+                    
+                    # Detect dominant frequencies
+                    dominant_freqs = detect_dominant_frequencies(freq_components)
+                    
+                    # Calculate coherence with other dimensions
+                    coherence = self._calculate_coherence(data, dimension)
+                    
+                    # Store results for this dimension
+                    results[dimension] = {
+                        'band_powers': band_powers,
+                        'spectral_entropy': spectral_entropy,
+                        'dominant_frequencies': dominant_freqs,
+                        'coherence': coherence
+                    }
+                except Exception as e:
+                    logger.error(f"Error analyzing dimension {dimension}: {str(e)}")
+        
+        # Cross-dimensional analysis
+        try:
+            results['cross_dimensional'] = analyze_cross_dimensional(data, self.dimensions)
+        except Exception as e:
+            logger.error(f"Error in cross-dimensional analysis: {str(e)}")
+        
+        # Store in history for trend analysis
+        session_id = session_data.get('id', str(time.time()))
+        self.history[session_id] = {
+            'timestamp': time.time(),
+            'results': results
+        }
+        
+        # Trim history if too large
+        if len(self.history) > 100:
+            oldest = min(self.history.keys(), key=lambda k: self.history[k]['timestamp'])
+            del self.history[oldest]
+        
+        return results
+
+    def _prepare_session_data(self, session_data):
+        """Prepare session data for spectral analysis.
+        
+        Args:
+            session_data: Raw session data
+            
+        Returns:
+            Dict with time series for each dimension
+        """
+        # If data is already in the right format, return it
+        if any(dim in session_data for dim in self.dimensions):
+            return session_data
+        
+        # Otherwise, try to extract time series from component activations/metrics
+        prepared_data = {}
+        
+        # Extract from component metrics if available
+        if 'component_metrics' in session_data:
+            for component_id, metrics in session_data['component_metrics'].items():
+                for metric_name, values in metrics.items():
+                    if not isinstance(values, list):
+                        continue
+                    
+                    dim_name = f"{component_id}.{metric_name}"
+                    prepared_data[dim_name] = values
+        
+        # Extract from performance timeline if available
+        if 'performance' in session_data and 'timeline' in session_data['performance']:
+            for metric_name, values in session_data['performance']['timeline'].items():
+                prepared_data[metric_name] = values
+        
+        # Map to standard dimensions if possible
+        for std_dim in self.dimensions:
+            for dim_name in list(prepared_data.keys()):
+                if std_dim in dim_name.lower():
+                    if std_dim not in prepared_data:
+                        prepared_data[std_dim] = prepared_data[dim_name]
+        
+        return prepared_data
+
+    def _calculate_coherence(self, session_data, dimension):
+        """Calculate coherence between this dimension and others.
+        
+        Args:
+            session_data: Session data containing time series
+            dimension: Current dimension
+            
+        Returns:
+            Dict mapping dimension names to coherence values
+        """
+        coherence = {}
+        
+        # Skip if we don't have the current dimension
+        if dimension not in session_data:
+            return coherence
+        
+        current_series = np.array(session_data[dimension])
+        
+        # Calculate coherence with other dimensions
+        for other_dim in self.dimensions:
+            if other_dim == dimension or other_dim not in session_data:
+                continue
                 
-                if propagation_ratio > 0.9:
-                    insights["propagation"] = "Excessive - nearly all components involved"
-                elif propagation_ratio > 0.7:
-                    insights["propagation"] = "High - most components involved"
-                elif propagation_ratio > 0.4:
-                    insights["propagation"] = "Moderate - selective component usage"
-                else:
-                    insights["propagation"] = "Efficient - minimal component usage"
-        
-        # Insight: Modularity assessment
-        if "modularity_quotient" in spectral:
-            mq = spectral["modularity_quotient"]
+            other_series = np.array(session_data[other_dim])
             
-            if mq > 0.8:
-                insights["modularity"] = "Very High - clear module boundaries"
-            elif mq > 0.6:
-                insights["modularity"] = "High - good module separation"
-            elif mq > 0.4:
-                insights["modularity"] = "Moderate - some module overlap"
-            else:
-                insights["modularity"] = "Low - poor module separation"
+            # Both series must be the same length
+            min_length = min(len(current_series), len(other_series))
+            if min_length < 2:
+                coherence[other_dim] = 0.0
+                continue
+                
+            current = current_series[:min_length]
+            other = other_series[:min_length]
+            
+            try:
+                # Calculate correlation (simplified coherence)
+                # In a full implementation, we would use proper frequency-domain coherence
+                correlation = np.corrcoef(current, other)[0, 1]
+                coherence[other_dim] = abs(correlation)  # Use absolute value for coherence
+            except Exception as e:
+                logger.error(f"Error calculating coherence for {dimension}-{other_dim}: {str(e)}")
+                coherence[other_dim] = 0.0
         
-        return insights
+        return coherence
+
+    def analyze_time_trends(self, session_ids=None):
+        """Analyze trends over time across multiple sessions.
+        
+        Args:
+            session_ids: Optional list of session IDs to include
+            
+        Returns:
+            Dict of trend analysis results
+        """
+        if len(self.history) < 2:
+            return {'error': 'Not enough historical data for trend analysis'}
+        
+        # Use all sessions if not specified
+        if session_ids is None:
+            sessions = list(self.history.values())
+        else:
+            sessions = [self.history[sid] for sid in session_ids if sid in self.history]
+            if len(sessions) < 2:
+                return {'error': 'Not enough matching sessions for trend analysis'}
+        
+        # Sort by timestamp
+        sessions.sort(key=lambda s: s['timestamp'])
+        
+        return analyze_time_trends(sessions, self.dimensions)
+
+    def detect_anomalies(self, session_data):
+        """Detect anomalies in the session data compared to historical patterns.
+        
+        Args:
+            session_data: Current session data
+            
+        Returns:
+            Dict of detected anomalies
+        """
+        # Analyze the current session
+        current_results = self.analyze_session(session_data)
+        
+        return detect_anomalies(session_data, current_results, self.history)

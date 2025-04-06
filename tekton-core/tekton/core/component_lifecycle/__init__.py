@@ -6,11 +6,9 @@ to prevent deadlocks during the startup process.
 """
 
 from .registry import ComponentRegistry
-from .healthcheck import (
-    monitor_component_health, 
-    process_heartbeat,
-    attempt_component_recovery
-)
+from .monitor import monitor_component_health
+from .heartbeat import process_heartbeat
+from .recovery import attempt_component_recovery
 from .capability import (
     register_capability,
     register_fallback_handler,
