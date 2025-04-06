@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(TEKTON_DIR, "tekton-core"))
 
 # Import Tekton modules
 try:
-    from tekton.core.heartbeat_monitor import HeartbeatMonitor, ComponentHeartbeat
+    from tekton.core.heartbeat import HeartbeatMonitor, ComponentHeartbeat
     from tekton.core.lifecycle import (
         ComponentState, 
         ReadinessCondition, 

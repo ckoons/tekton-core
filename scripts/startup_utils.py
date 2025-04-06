@@ -21,7 +21,7 @@ logger = logging.getLogger("tekton_launcher.utils")
 # Import Tekton modules
 try:
     from tekton.core.startup_instructions import StartUpInstructions
-    from tekton.core.heartbeat_monitor import HeartbeatMonitor, ComponentHeartbeat
+    from tekton.core.heartbeat import HeartbeatMonitor, ComponentHeartbeat
     from tekton.core.startup_coordinator import StartUpCoordinator
     from tekton.core.component_registration import ComponentRegistration
 except ImportError:

@@ -25,7 +25,10 @@ class ComponentState(Enum):
     UNKNOWN = "unknown"            # State not known or not tracked
     INITIALIZING = "initializing"  # Starting up but not ready for operations
     READY = "ready"                # Fully operational and accepting requests
+    ACTIVE = "active"              # Actively processing tasks
     DEGRADED = "degraded"          # Running with limited functionality
+    INACTIVE = "inactive"          # Temporarily not accepting new requests
+    ERROR = "error"                # Operational error state but recoverable
     FAILED = "failed"              # Failed to start or crashed
     STOPPING = "stopping"          # Graceful shutdown in progress
     RESTARTING = "restarting"      # Temporary unavailable during restart
@@ -33,7 +36,7 @@ class ComponentState(Enum):
     @classmethod
     def is_active(cls, state):
         """Check if the state is considered active (can serve requests)."""
-        return state in [cls.READY.value, cls.DEGRADED.value]
+        return state in [cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value]
     
     @classmethod
     def is_terminal(cls, state):
@@ -44,6 +47,16 @@ class ComponentState(Enum):
     def is_transitioning(cls, state):
         """Check if the state is a transitional state."""
         return state in [cls.INITIALIZING.value, cls.STOPPING.value, cls.RESTARTING.value]
+    
+    @classmethod
+    def is_degraded(cls, state):
+        """Check if the state is a degraded state."""
+        return state in [cls.DEGRADED.value, cls.ERROR.value, cls.INACTIVE.value]
+    
+    @classmethod
+    def can_serve_requests(cls, state):
+        """Check if the component can serve requests in this state."""
+        return state in [cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value]
     
     @classmethod
     def validate_transition(cls, from_state, to_state):
@@ -60,34 +73,89 @@ class ComponentState(Enum):
         # Define valid transitions
         valid_transitions = {
             cls.UNKNOWN.value: [
-                cls.INITIALIZING.value, cls.READY.value, cls.DEGRADED.value, 
-                cls.FAILED.value, cls.STOPPING.value
+                cls.INITIALIZING.value, cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value, 
+                cls.INACTIVE.value, cls.ERROR.value, cls.FAILED.value, cls.STOPPING.value
             ],
             cls.INITIALIZING.value: [
-                cls.READY.value, cls.DEGRADED.value, cls.FAILED.value, 
-                cls.STOPPING.value, cls.RESTARTING.value
+                cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value, cls.ERROR.value, 
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
             ],
             cls.READY.value: [
-                cls.DEGRADED.value, cls.FAILED.value, cls.STOPPING.value, 
-                cls.RESTARTING.value
+                cls.ACTIVE.value, cls.DEGRADED.value, cls.INACTIVE.value, cls.ERROR.value,
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
+            ],
+            cls.ACTIVE.value: [
+                cls.READY.value, cls.DEGRADED.value, cls.INACTIVE.value, cls.ERROR.value,
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
             ],
             cls.DEGRADED.value: [
-                cls.READY.value, cls.FAILED.value, cls.STOPPING.value, 
-                cls.RESTARTING.value
+                cls.READY.value, cls.ACTIVE.value, cls.ERROR.value, cls.INACTIVE.value,
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
+            ],
+            cls.INACTIVE.value: [
+                cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value, cls.ERROR.value,
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
+            ],
+            cls.ERROR.value: [
+                cls.READY.value, cls.ACTIVE.value, cls.DEGRADED.value, cls.INACTIVE.value,
+                cls.FAILED.value, cls.STOPPING.value, cls.RESTARTING.value
             ],
             cls.FAILED.value: [
                 cls.INITIALIZING.value, cls.RESTARTING.value
             ],
             cls.STOPPING.value: [
-                cls.UNKNOWN.value, cls.FAILED.value
+                cls.UNKNOWN.value, cls.FAILED.value, cls.INACTIVE.value
             ],
             cls.RESTARTING.value: [
-                cls.INITIALIZING.value, cls.READY.value, cls.DEGRADED.value, 
-                cls.FAILED.value
+                cls.INITIALIZING.value, cls.READY.value, cls.ACTIVE.value, 
+                cls.DEGRADED.value, cls.ERROR.value, cls.FAILED.value
             ]
         }
         
         return to_state in valid_transitions.get(from_state, [])
+        
+    @classmethod
+    def get_transition_reasons(cls):
+        """
+        Get standard transition reasons for state changes.
+        
+        Returns:
+            Dictionary mapping transition types to reason codes
+        """
+        return {
+            "startup": {
+                "normal_startup": "Component started normally",
+                "fast_startup": "Component started quickly",
+                "slow_startup": "Component started slowly",
+                "partial_startup": "Component started with limited functionality"
+            },
+            "degradation": {
+                "resource_exhaustion": "Component running out of resources",
+                "dependency_failure": "Dependent component is unavailable",
+                "throughput_reduction": "Component processing throughput reduced",
+                "latency_increase": "Component response time increased",
+                "error_rate_increase": "Component error rate exceeded threshold",
+                "partial_functionality": "Some component features unavailable"
+            },
+            "recovery": {
+                "self_healing": "Component recovered automatically",
+                "dependency_restored": "Required dependency became available",
+                "resource_restored": "Resource constraints resolved",
+                "manual_intervention": "Manual intervention resolved issues",
+                "config_update": "Configuration update resolved issues",
+                "restart_recovery": "Component recovered after restart"
+            },
+            "failure": {
+                "initialization_error": "Error during component initialization",
+                "critical_dependency": "Critical dependency unavailable",
+                "resource_starvation": "Severe resource constraints",
+                "internal_error": "Unrecoverable internal error",
+                "crash": "Component process crashed",
+                "deadlock": "Component deadlocked",
+                "config_error": "Invalid configuration",
+                "version_mismatch": "Incompatible component versions"
+            }
+        }
 
 
 class ReadinessCondition:
@@ -176,8 +244,97 @@ class ComponentRegistration:
         self.metadata = metadata or {}
         self.start_time = time.time()
         self.state = ComponentState.INITIALIZING.value
+        self.state_history = [{
+            "state": self.state,
+            "timestamp": self.start_time,
+            "reason": "initialization",
+            "details": "Component registration created"
+        }]
         self.readiness_conditions = {}
         self.heartbeat_sequence = 0
+        self.health_metrics = {
+            "cpu_usage": 0.0,
+            "memory_usage": 0.0,
+            "request_latency": 0.0,
+            "error_rate": 0.0,
+            "throughput": 0.0,
+            "uptime": 0.0
+        }
+        self.recovery_attempts = 0
+        self.last_recovery_time = 0
+        
+    def update_state(self, new_state: str, reason: str = None, details: str = None) -> bool:
+        """
+        Update component state with validation and history tracking.
+        
+        Args:
+            new_state: New state to transition to
+            reason: Reason code for the transition
+            details: Additional details about the transition
+            
+        Returns:
+            True if state transition was valid and succeeded
+        """
+        # Validate state transition
+        if not ComponentState.validate_transition(self.state, new_state):
+            return False
+            
+        # Record previous state
+        old_state = self.state
+        
+        # Update state
+        self.state = new_state
+        
+        # Record state change in history
+        self.state_history.append({
+            "state": new_state,
+            "previous_state": old_state,
+            "timestamp": time.time(),
+            "reason": reason or "manual_update",
+            "details": details or f"State changed from {old_state} to {new_state}"
+        })
+        
+        # Limit history size
+        if len(self.state_history) > 100:
+            self.state_history = self.state_history[-100:]
+            
+        return True
+        
+    def update_health_metrics(self, metrics: Dict[str, float]) -> None:
+        """
+        Update component health metrics.
+        
+        Args:
+            metrics: Dictionary of health metrics
+        """
+        self.health_metrics.update(metrics)
+        
+        # Calculate uptime
+        self.health_metrics["uptime"] = time.time() - self.start_time
+        
+    def record_recovery_attempt(self, reason: str = None) -> int:
+        """
+        Record a recovery attempt for this component.
+        
+        Args:
+            reason: Optional reason for recovery
+            
+        Returns:
+            Total number of recovery attempts
+        """
+        self.recovery_attempts += 1
+        self.last_recovery_time = time.time()
+        
+        # Add to state history
+        self.state_history.append({
+            "state": self.state,
+            "timestamp": self.last_recovery_time,
+            "reason": "recovery_attempt",
+            "details": reason or f"Recovery attempt #{self.recovery_attempts}",
+            "recovery_count": self.recovery_attempts
+        })
+        
+        return self.recovery_attempts
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -190,7 +347,11 @@ class ComponentRegistration:
             "capabilities": self.capabilities,
             "metadata": self.metadata,
             "start_time": self.start_time,
-            "state": self.state
+            "state": self.state,
+            "state_history": self.state_history,
+            "health_metrics": self.health_metrics,
+            "recovery_attempts": self.recovery_attempts,
+            "last_recovery_time": self.last_recovery_time
         }
     
     @classmethod
@@ -207,7 +368,51 @@ class ComponentRegistration:
         )
         instance.start_time = data.get("start_time", time.time())
         instance.state = data.get("state", ComponentState.INITIALIZING.value)
+        instance.state_history = data.get("state_history", [{
+            "state": instance.state,
+            "timestamp": instance.start_time,
+            "reason": "initialization",
+            "details": "Component loaded from persistence"
+        }])
+        instance.health_metrics = data.get("health_metrics", instance.health_metrics)
+        instance.recovery_attempts = data.get("recovery_attempts", 0)
+        instance.last_recovery_time = data.get("last_recovery_time", 0)
         return instance
+        
+    def get_state_transition_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of state transitions.
+        
+        Returns:
+            Dictionary with state transition statistics
+        """
+        if not self.state_history:
+            return {"transitions": 0}
+            
+        transitions = len(self.state_history) - 1
+        states_visited = set(item["state"] for item in self.state_history)
+        current_state_duration = time.time() - self.state_history[-1]["timestamp"]
+        
+        # Calculate time spent in each state
+        state_durations = {}
+        for i in range(len(self.state_history)):
+            state = self.state_history[i]["state"]
+            start_time = self.state_history[i]["timestamp"]
+            end_time = self.state_history[i+1]["timestamp"] if i < len(self.state_history) - 1 else time.time()
+            
+            if state not in state_durations:
+                state_durations[state] = 0
+                
+            state_durations[state] += end_time - start_time
+            
+        return {
+            "transitions": transitions,
+            "states_visited": len(states_visited),
+            "state_list": list(states_visited),
+            "current_state_duration": current_state_duration,
+            "state_durations": state_durations,
+            "recovery_attempts": self.recovery_attempts
+        }
 
 
 class PersistentMessageQueue:
