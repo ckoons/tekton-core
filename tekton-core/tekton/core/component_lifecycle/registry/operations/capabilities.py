@@ -7,7 +7,7 @@ This module provides functions for managing component capabilities.
 import logging
 from typing import Dict, Any, Optional, List, Callable, Awaitable
 
-from ...graceful_degradation import GracefulDegradationManager
+from tekton.core.graceful_degradation import GracefulDegradationManager
 from ...capability import (
     register_capability,
     register_fallback_handler,
