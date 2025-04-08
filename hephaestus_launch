@@ -1,21 +1,94 @@
 #!/bin/bash
-# Launch script for Hephaestus GUI
+# Launch script for Tekton UI (Hephaestus)
 
-# Get the directory of this script
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
-    echo "Error: Python 3 is required but not found"
+echo -e "${GREEN}=== Tekton UI Launcher ===${NC}"
+
+# Get the directory of this script (Tekton root)
+TEKTON_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+HEPHAESTUS_DIR="${TEKTON_DIR}/Hephaestus"
+
+echo "Tekton directory: ${TEKTON_DIR}"
+echo "Hephaestus directory: ${HEPHAESTUS_DIR}"
+
+# Check if a virtual environment exists, use it if present
+VENV_DIR="${TEKTON_DIR}/venv"
+if [ -d "${VENV_DIR}" ] && [ -f "${VENV_DIR}/bin/activate" ]; then
+    echo -e "${YELLOW}Activating virtual environment...${NC}"
+    source "${VENV_DIR}/bin/activate"
+    PYTHON="python"
+elif command -v python3 &> /dev/null; then
+    PYTHON="python3"
+else
+    echo -e "${RED}Error: Python 3 is required but not found${NC}"
     exit 1
 fi
 
-# Check if the Hephaestus package is installed
-if ! python3 -c "import hephaestus" &> /dev/null; then
-    echo "Installing Hephaestus in development mode..."
-    cd "$SCRIPT_DIR/Hephaestus" && python3 -m pip install -e .
+# Check if static directory exists with index.html
+if [ ! -f "${HEPHAESTUS_DIR}/hephaestus/ui/static/index.html" ]; then
+    echo -e "${YELLOW}UI files not found. Running setup first...${NC}"
+    
+    # Run setup script
+    "${HEPHAESTUS_DIR}/setup_ui.sh"
+    
+    # Check if setup was successful
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Setup failed. Cannot continue.${NC}"
+        exit 1
+    fi
 fi
 
-# Launch Hephaestus
-echo "Starting Hephaestus GUI..."
-python3 -m hephaestus.ui.main "$@"
+# Check if tekton core module is installed
+echo -e "${YELLOW}Checking if tekton core is installed...${NC}"
+${PYTHON} -c "import tekton" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo -e "${YELLOW}Installing tekton-core...${NC}"
+    
+    if command -v uv &> /dev/null; then
+        cd "${TEKTON_DIR}" && uv pip install -e ./tekton-core
+    else
+        cd "${TEKTON_DIR}" && ${PYTHON} -m pip install -e ./tekton-core
+    fi
+fi
+
+# Check if Hephaestus module is installed
+echo -e "${YELLOW}Checking if Hephaestus is installed...${NC}"
+${PYTHON} -c "import hephaestus" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo -e "${YELLOW}Installing Hephaestus...${NC}"
+    
+    if command -v uv &> /dev/null; then
+        cd "${HEPHAESTUS_DIR}" && uv pip install -e .
+    else
+        cd "${HEPHAESTUS_DIR}" && ${PYTHON} -m pip install -e .
+    fi
+fi
+
+# Check if required Python dependencies are installed
+echo -e "${YELLOW}Checking Python dependencies...${NC}"
+if command -v uv &> /dev/null; then
+    # Use uv to check if required packages are installed
+    if ! uv pip freeze | grep -q "fastapi" || ! uv pip freeze | grep -q "uvicorn"; then
+        echo -e "${YELLOW}Installing required Python packages with uv...${NC}"
+        uv pip install fastapi uvicorn aiohttp websockets pydantic
+    fi
+else
+    # Use pip to check and install dependencies
+    if ! ${PYTHON} -m pip freeze | grep -q "fastapi" || ! ${PYTHON} -m pip freeze | grep -q "uvicorn"; then
+        echo -e "${YELLOW}Installing required Python packages with pip...${NC}"
+        ${PYTHON} -m pip install fastapi uvicorn aiohttp websockets pydantic
+    fi
+fi
+
+# Set up the Python path to include Tekton core if not already in PYTHONPATH
+export PYTHONPATH="${TEKTON_DIR}:${PYTHONPATH}"
+
+# Run the UI server from the Tekton directory
+echo -e "${GREEN}Starting Tekton UI...${NC}"
+cd "${TEKTON_DIR}"
+${PYTHON} -m hephaestus.ui.main "$@"
