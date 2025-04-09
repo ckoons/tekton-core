@@ -24,6 +24,7 @@ tekton/core/startup_manager.py
 tekton/core/startup_process.py
 tekton/core/component_lifecycle/__init__.py
 tekton/core/component_lifecycle/capability.py
+tekton/core/component_lifecycle/graceful_degradation.py
 tekton/core/component_lifecycle/healthcheck.py
 tekton/core/component_lifecycle/heartbeat.py
 tekton/core/component_lifecycle/monitor.py
