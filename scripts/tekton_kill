@@ -44,6 +44,7 @@ components=(
     "engram_with_claude"
     "engram.api.consolidated_server"
     "hermes.*database_manager"
+    "hephaestus.ui.main"
 )
 
 # Track whether we shut down anything
@@ -83,6 +84,12 @@ fi
 if [ -d "$TEKTON_DIR/Hermes" ]; then
     echo -e "${YELLOW}Ensuring Hermes services are completely stopped...${RESET}"
     pkill -f "hermes.core"
+fi
+
+# Make sure Hephaestus UI processes are stopped
+if [ -d "$TEKTON_DIR/Hephaestus" ]; then
+    echo -e "${YELLOW}Ensuring Hephaestus UI processes are stopped...${RESET}"
+    pkill -f "hephaestus.ui"
 fi
 
 echo ""

@@ -71,8 +71,23 @@ class ComponentRegistry:
         
         self.lock = asyncio.Lock()
         
-        # Load registrations from disk if available
-        self.components, self.instances = load_registrations(self.data_dir)
+        # Use default values until async load is performed
+        self.components = {}
+        self.instances = {}
+        
+        # Start async load of registrations in the background
+        asyncio.create_task(self._load_registrations_async())
+        
+    async def _load_registrations_async(self):
+        """Asynchronously load registrations from disk."""
+        try:
+            components, instances = await load_registrations(self.data_dir)
+            async with self.lock:
+                self.components = components
+                self.instances = instances
+                logger.debug("Loaded registrations asynchronously")
+        except Exception as e:
+            logger.error(f"Failed to load registrations: {e}")
     
     async def register_component(self, registration: ComponentRegistration) -> Tuple[bool, str]:
         """
