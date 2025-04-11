@@ -138,6 +138,32 @@ Then set up individual or all Tekton components:
 ./setup-all.sh
 ```
 
+### Running Tekton
+
+Tekton provides unified scripts to launch and stop all components in the correct order:
+
+```bash
+# Launch all available Tekton components
+./launch-tekton.sh --components all
+
+# Launch specific components
+./launch-tekton.sh --components engram,hermes,ergon
+
+# Launch with interactive component selection
+./launch-tekton.sh
+
+# Stop all running Tekton components
+./kill-tekton.sh
+```
+
+The launch script supports various options:
+- `--components`: Comma-separated list of components to launch (engram, hermes, ergon, rhetor, athena, prometheus, harmonia, sophia, telos, hephaestus)
+- `--model-type`: Type of model to launch (claude, ollama)
+- `--model`: Specific model to use
+- `--client-id`: Client ID for Engram
+- `--no-ui`: Don't launch the Hephaestus UI
+- `--non-interactive`: Run in non-interactive mode
+
 ### Managing Requirements
 
 Tekton includes a centralized requirements management system:

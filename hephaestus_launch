@@ -1,5 +1,6 @@
 #!/bin/bash
 # Launch script for Tekton UI (Hephaestus)
+# DEPRECATED: Use launch-tekton.sh instead
 
 # Colors for output
 GREEN='\033[0;32m'

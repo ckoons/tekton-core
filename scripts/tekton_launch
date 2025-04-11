@@ -1,5 +1,6 @@
 #!/bin/bash
 # tekton_launch
+# DEPRECATED: Use launch-tekton.sh instead
 # Enhanced unified launcher script for Tekton ecosystem with interactive mode
 # Created: March 30, 2025
 # Updated: April 1, 2025
