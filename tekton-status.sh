@@ -1,0 +1,1 @@
+scripts/tekton_status

@@ -200,10 +200,49 @@ fi
 echo ""
 echo -e "${BLUE}${BOLD}System Resources:${RESET}"
 echo -e "${YELLOW}Memory Usage:${RESET}"
-free -h | grep -v total | awk '{print "  " $1 ": " $3 " used / " $2 " total (" $3/$2*100 "%)"}' | column -t
+# Check if we're on macOS or Linux and use appropriate command
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS - use a simpler approach with vm_stat
+    page_size=$(vm_stat | grep "page size" | awk '{print $8}')
+    if [ -z "$page_size" ]; then
+        page_size=4096  # Default page size if not found
+    fi
+    
+    # Get total physical memory
+    total_mem=$(sysctl -n hw.memsize | awk -v ps="$page_size" '{printf "%.1f", $1/1024/1024/1024}')
+    
+    # Calculate used memory from vm_stat output
+    vm_stat_output=$(vm_stat)
+    wired_pages=$(echo "$vm_stat_output" | grep "Pages wired down" | awk '{print $4}' | tr -d '.')
+    active_pages=$(echo "$vm_stat_output" | grep "Pages active" | awk '{print $3}' | tr -d '.')
+    used_mem=$(echo "$wired_pages $active_pages $page_size" | awk '{printf "%.1f", ($1+$2)*$3/1024/1024/1024}')
+    
+    # Calculate percentage
+    percent=$(echo "$used_mem $total_mem" | awk '{printf "%.1f", ($1/$2)*100}')
+    
+    echo "  ${used_mem}Gi used / ${total_mem}Gi total (${percent}%)"
+else
+    # Linux - use free
+    if command -v free &> /dev/null; then
+        free -h | grep -v total | awk '{print "  " $1 ": " $3 " used / " $2 " total (" $3/$2*100 "%)"}' | column -t
+    else
+        echo "  Memory usage information not available"
+    fi
+fi
 
 echo -e "${YELLOW}CPU Usage:${RESET}"
-top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/  \1% idle/" | awk '{print "  " 100-$1 "% used"}'
+# Check if we're on macOS or Linux and use appropriate command
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS - use top in a different way
+    top -l 1 -n 0 | grep "CPU usage" | awk '{print "  " $3 " user, " $5 " sys, " $7 " idle"}'
+else
+    # Linux - use top with batch mode
+    if command -v top &> /dev/null; then
+        top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/  \1% idle/" | awk '{print "  " 100-$1 "% used"}'
+    else
+        echo "  CPU usage information not available"
+    fi
+fi
 
 echo -e "${YELLOW}Disk Usage:${RESET}"
 df -h / | grep -v Filesystem | awk '{print "  " $3 " used / " $2 " total (" $5 " used)"}'

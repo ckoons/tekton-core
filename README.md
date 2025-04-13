@@ -140,7 +140,7 @@ Then set up individual or all Tekton components:
 
 ### Running Tekton
 
-Tekton provides unified scripts to launch and stop all components in the correct order:
+Tekton provides unified scripts to launch, stop, and monitor all components in the correct order:
 
 ```bash
 # Launch all available Tekton components
@@ -154,6 +154,9 @@ Tekton provides unified scripts to launch and stop all components in the correct
 
 # Stop all running Tekton components
 ./kill-tekton.sh
+
+# Check status of Tekton components and system resources
+./tekton-status.sh
 ```
 
 The launch script supports various options:
@@ -163,6 +166,8 @@ The launch script supports various options:
 - `--client-id`: Client ID for Engram
 - `--no-ui`: Don't launch the Hephaestus UI
 - `--non-interactive`: Run in non-interactive mode
+
+All scripts are located in the `scripts` directory, with convenient symlinks in the root directory for common operations.
 
 ### Managing Requirements
 
