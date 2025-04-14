@@ -74,6 +74,13 @@ kill_processes "engram_with_ollama" "Engram+Ollama"
 kill_processes "engram_with_claude" "Engram+Claude"
 kill_processes "engram.api.consolidated_server" "Engram Memory Server"
 kill_processes "hermes.*database_manager" "Hermes Database"
+
+# Rebuild Hephaestus UI before shutdown to ensure changes are captured
+if [ -f "$SCRIPT_DIR/Hephaestus/build_ui.sh" ]; then
+    echo -e "${YELLOW}Rebuilding Hephaestus UI before shutdown...${RESET}"
+    "$SCRIPT_DIR/Hephaestus/build_ui.sh"
+fi
+
 kill_processes "hephaestus.ui.main" "Hephaestus UI"
 
 # Kill any Python processes related to Tekton
