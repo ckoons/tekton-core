@@ -305,7 +305,7 @@ launch_hephaestus() {
     echo -e "${BLUE}${BOLD}Launching Hephaestus UI...${RESET}"
     
     # Check if Hephaestus is already running
-    if is_running "hephaestus.ui.main"; then
+    if is_running "Hephaestus/ui/server/server.py"; then
         echo -e "${GREEN}Hephaestus UI is already running${RESET}"
         return 0
     fi

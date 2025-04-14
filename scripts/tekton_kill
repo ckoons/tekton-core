@@ -81,7 +81,7 @@ if [ -f "$SCRIPT_DIR/Hephaestus/build_ui.sh" ]; then
     "$SCRIPT_DIR/Hephaestus/build_ui.sh"
 fi
 
-kill_processes "hephaestus.ui.main" "Hephaestus UI"
+kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
 
 # Kill any Python processes related to Tekton
 echo -e "${YELLOW}Checking for any remaining Tekton Python processes...${RESET}"

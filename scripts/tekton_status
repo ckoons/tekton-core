@@ -107,6 +107,7 @@ components=(
     "telos.core:Telos User Interface"
     "harmonia.core:Harmonia Workflow Engine"
     "athena.core:Athena Knowledge Graph"
+    "Hephaestus/ui/server/server.py:Hephaestus UI Server"
 )
 
 any_component_running=false
@@ -127,6 +128,17 @@ done
 
 if [ "$any_component_running" = false ]; then
     echo -e "${YELLOW}${BOLD}No Tekton components are currently running${RESET}"
+fi
+
+echo ""
+echo -e "${BLUE}${BOLD}UI Services:${RESET}"
+
+# Check if Hephaestus UI is running
+if is_running "Hephaestus/ui/server/server.py"; then
+    echo -e "${GREEN}✓ Hephaestus UI is running${RESET}"
+    echo -e "  Access the UI at: http://localhost:8080"
+else
+    echo -e "${RED}✗ Hephaestus UI is not running${RESET}"
 fi
 
 echo ""
