@@ -310,6 +310,14 @@ launch_hephaestus() {
         return 0
     fi
     
+    # Build the UI before launching to ensure fresh content
+    if [ -x "$HEPHAESTUS_DIR/build_ui.sh" ]; then
+        echo -e "${BLUE}Building Hephaestus UI...${RESET}"
+        "$HEPHAESTUS_DIR/build_ui.sh"
+    else
+        echo -e "${YELLOW}No UI build script found, skipping build step${RESET}"
+    fi
+    
     # Launch Hephaestus UI directly
     if [ -x "$HEPHAESTUS_DIR/run_ui.sh" ]; then
         echo -e "${BLUE}Using run_ui.sh script...${RESET}"
