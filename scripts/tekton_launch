@@ -310,17 +310,33 @@ launch_hephaestus() {
         return 0
     fi
     
-    # Build the UI before launching to ensure fresh content
-    if [ -x "$HEPHAESTUS_DIR/build_ui.sh" ]; then
-        echo -e "${BLUE}Building Hephaestus UI...${RESET}"
-        "$HEPHAESTUS_DIR/build_ui.sh"
-    else
-        echo -e "${YELLOW}No UI build script found, skipping build step${RESET}"
-    fi
+    # No build step needed
     
     # Launch Hephaestus UI directly
     if [ -x "$HEPHAESTUS_DIR/run_ui.sh" ]; then
         echo -e "${BLUE}Using run_ui.sh script...${RESET}"
+        
+        # Verify ports are free before launching
+        echo -e "${YELLOW}Checking if ports 8080 and 8081 are available...${RESET}"
+        if lsof -ti :8080 >/dev/null 2>&1; then
+            echo -e "${RED}Error: Port 8080 is already in use. Killing the process...${RESET}"
+            kill -9 $(lsof -ti :8080) 2>/dev/null || true
+            sleep 2
+        fi
+        
+        if lsof -ti :8081 >/dev/null 2>&1; then
+            echo -e "${RED}Error: Port 8081 is already in use. Killing the process...${RESET}"
+            kill -9 $(lsof -ti :8081) 2>/dev/null || true
+            sleep 2
+        fi
+        
+        # Verify ports are now free
+        if lsof -ti :8080 >/dev/null 2>&1 || lsof -ti :8081 >/dev/null 2>&1; then
+            echo -e "${RED}Error: Ports 8080 or 8081 still in use after kill attempts. Cannot start Hephaestus UI.${RESET}"
+            return 1
+        else
+            echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+        fi
         
         # Set up Python path
         export PYTHONPATH="$TEKTON_DIR:$PYTHONPATH"
@@ -330,7 +346,7 @@ launch_hephaestus() {
         HEPHAESTUS_PID=$!
         
         # Wait briefly to see if it crashed
-        sleep 2
+        sleep 3
         if ps -p $HEPHAESTUS_PID > /dev/null; then
             echo -e "${GREEN}✓ Hephaestus UI started successfully${RESET}"
             echo -e "${GREEN}  Access the UI at: http://localhost:8080${RESET}"

@@ -75,13 +75,59 @@ kill_processes "engram_with_claude" "Engram+Claude"
 kill_processes "engram.api.consolidated_server" "Engram Memory Server"
 kill_processes "hermes.*database_manager" "Hermes Database"
 
-# Rebuild Hephaestus UI before shutdown to ensure changes are captured
-if [ -f "$SCRIPT_DIR/Hephaestus/build_ui.sh" ]; then
-    echo -e "${YELLOW}Rebuilding Hephaestus UI before shutdown...${RESET}"
-    "$SCRIPT_DIR/Hephaestus/build_ui.sh"
+# No build step needed
+
+# Kill Hephaestus UI by process name
+kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
+
+# Additional port-based killing to ensure UI server is fully terminated
+# Kill any process holding port 8080 (Hephaestus HTTP server)
+echo -e "${YELLOW}Ensuring Hephaestus HTTP port 8080 is released...${RESET}"
+PIDS_8080=$(lsof -ti :8080 2>/dev/null)
+if [ -n "$PIDS_8080" ]; then
+    echo -e "${YELLOW}Killing processes using port 8080: $PIDS_8080${RESET}"
+    kill $PIDS_8080 2>/dev/null || true
+    sleep 1
+    
+    # Check if any process is still holding the port
+    REMAINING_8080=$(lsof -ti :8080 2>/dev/null)
+    if [ -n "$REMAINING_8080" ]; then
+        echo -e "${RED}Process still holding port 8080, using SIGKILL${RESET}"
+        kill -9 $REMAINING_8080 2>/dev/null || true
+        sleep 1
+    fi
 fi
 
-kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
+# Kill any process holding port 8081 (Hephaestus WebSocket server)
+echo -e "${YELLOW}Ensuring Hephaestus WebSocket port 8081 is released...${RESET}"
+PIDS_8081=$(lsof -ti :8081 2>/dev/null)
+if [ -n "$PIDS_8081" ]; then
+    echo -e "${YELLOW}Killing processes using port 8081: $PIDS_8081${RESET}"
+    kill $PIDS_8081 2>/dev/null || true
+    sleep 1
+    
+    # Check if any process is still holding the port
+    REMAINING_8081=$(lsof -ti :8081 2>/dev/null)
+    if [ -n "$REMAINING_8081" ]; then
+        echo -e "${RED}Process still holding port 8081, using SIGKILL${RESET}"
+        kill -9 $REMAINING_8081 2>/dev/null || true
+        sleep 1
+    fi
+fi
+
+# Verify ports are free
+echo -e "${YELLOW}Verifying ports are released...${RESET}"
+if lsof -ti :8080 >/dev/null 2>&1; then
+    echo -e "${RED}Warning: Port 8080 is still in use${RESET}"
+else
+    echo -e "${GREEN}✓ Port 8080 is free${RESET}"
+fi
+
+if lsof -ti :8081 >/dev/null 2>&1; then
+    echo -e "${RED}Warning: Port 8081 is still in use${RESET}"
+else
+    echo -e "${GREEN}✓ Port 8081 is free${RESET}"
+fi
 
 # Kill any Python processes related to Tekton
 echo -e "${YELLOW}Checking for any remaining Tekton Python processes...${RESET}"
