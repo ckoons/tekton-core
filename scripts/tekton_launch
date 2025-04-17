@@ -1,7 +1,16 @@
 #!/bin/bash
 # tekton_launch - Unified script to launch all Tekton components in the correct order
 # Created: April 11, 2025
-# Updated: April 13, 2025 - Moved to scripts directory and removed deprecated dependencies
+# Updated: April 17, 2025 - Added tekton_kill integration for clean port handling
+
+# ============================
+# Port Assignments by Component
+# ============================
+# Hephaestus UI:       8080 (HTTP server), 8081 (WebSocket server)
+# Engram:              8000 (Memory server)
+# Hermes:              8100 (Service registry), 8101 (Database)
+# Ergon:               8200 (Agent system)
+# Other components may use additional ports as needed
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -13,7 +22,18 @@ RESET="\033[0m"
 
 # Find Tekton root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$SCRIPT_DIR"
+TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Source the tekton_kill script to use its functions
+source "$SCRIPT_DIR/tekton_kill"
+
+# Clean up any existing components and ensure ports are available
+echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
+ensure_ports_available
+if [ $? -ne 0 ]; then
+    echo -e "${YELLOW}Warning: Could not free all required ports. Attempting to continue...${RESET}"
+fi
+echo ""
 
 # Default values
 MODEL_TYPE="claude" 
@@ -317,22 +337,19 @@ launch_hephaestus() {
         echo -e "${BLUE}Using run_ui.sh script...${RESET}"
         
         # Verify ports are free before launching
-        echo -e "${YELLOW}Checking if ports 8080 and 8081 are available...${RESET}"
-        if lsof -ti :8080 >/dev/null 2>&1; then
-            echo -e "${RED}Error: Port 8080 is already in use. Killing the process...${RESET}"
-            kill -9 $(lsof -ti :8080) 2>/dev/null || true
-            sleep 2
-        fi
+        echo -e "${YELLOW}Checking if Hephaestus ports are available...${RESET}"
         
-        if lsof -ti :8081 >/dev/null 2>&1; then
-            echo -e "${RED}Error: Port 8081 is already in use. Killing the process...${RESET}"
-            kill -9 $(lsof -ti :8081) 2>/dev/null || true
-            sleep 2
-        fi
+        # Release Hephaestus ports using the common function from tekton_kill
+        release_port "8080" "Hephaestus HTTP"
+        HTTP_PORT_RESULT=$?
+        
+        release_port "8081" "Hephaestus WebSocket"
+        WS_PORT_RESULT=$?
         
         # Verify ports are now free
-        if lsof -ti :8080 >/dev/null 2>&1 || lsof -ti :8081 >/dev/null 2>&1; then
-            echo -e "${RED}Error: Ports 8080 or 8081 still in use after kill attempts. Cannot start Hephaestus UI.${RESET}"
+        if [ $HTTP_PORT_RESULT -ne 0 ] || [ $WS_PORT_RESULT -ne 0 ]; then
+            echo -e "${RED}Error: Ports 8080 or 8081 still in use. Cannot start Hephaestus UI.${RESET}"
+            echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
             return 1
         else
             echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
@@ -340,6 +357,9 @@ launch_hephaestus() {
         
         # Set up Python path
         export PYTHONPATH="$TEKTON_DIR:$PYTHONPATH"
+        
+        # Create logs directory
+        mkdir -p "$HOME/.tekton/logs"
         
         # Launch the UI server
         (cd "$HEPHAESTUS_DIR" && "./run_ui.sh" --port 8080 > "$HOME/.tekton/logs/hephaestus.log" 2>&1) &
@@ -370,6 +390,17 @@ launch_engram() {
     if is_running "engram.api.consolidated_server"; then
         echo -e "${GREEN}Engram memory service is already running${RESET}"
         return 0
+    fi
+    
+    # Verify port is free before launching
+    echo -e "${YELLOW}Checking if Engram port 8000 is available...${RESET}"
+    release_port "8000" "Engram Memory"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Port 8000 still in use. Cannot start Engram Memory Service.${RESET}"
+        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
+        return 1
+    else
+        echo -e "${GREEN}Port 8000 is available. Proceeding with launch.${RESET}"
     fi
     
     # Find the consolidated server script
@@ -437,6 +468,25 @@ launch_hermes() {
         return 0
     fi
     
+    # Verify ports are free before launching
+    echo -e "${YELLOW}Checking if Hermes ports are available...${RESET}"
+    
+    # Release Hermes ports using the common function from tekton_kill
+    release_port "8100" "Hermes Service Registry"
+    SERVICE_REGISTRY_PORT_RESULT=$?
+    
+    release_port "8101" "Hermes Database"
+    DATABASE_PORT_RESULT=$?
+    
+    # Verify ports are now free
+    if [ $SERVICE_REGISTRY_PORT_RESULT -ne 0 ] || [ $DATABASE_PORT_RESULT -ne 0 ]; then
+        echo -e "${RED}Error: Hermes ports still in use. Cannot start Hermes services.${RESET}"
+        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
+        return 1
+    else
+        echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+    fi
+    
     # Set up Python path
     export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
     
@@ -466,7 +516,8 @@ async def run():
     os.makedirs(\"$HOME_PY_DIR/.tekton/data/hermes\", exist_ok=True)
     db_manager = DatabaseManager(
         root_dir=\"$HOME_PY_DIR/.tekton/data/hermes\",
-        log_level=\"INFO\"
+        log_level=\"INFO\",
+        port=8101  # Explicitly set Hermes Database port
     )
     await db_manager.start()
     while True:
@@ -487,7 +538,7 @@ sys.path.insert(0, \"$HERMES_PY_DIR\")
 from hermes.core.service_discovery import ServiceRegistry
 
 async def run():
-    registry = ServiceRegistry()
+    registry = ServiceRegistry(port=8100)  # Explicitly set Service Registry port
     await registry.start()
     while True:
         await asyncio.sleep(1)
@@ -1100,6 +1151,16 @@ for comp in "${COMPONENTS[@]}"; do
 done
 
 # Finally: UI component (Hephaestus)
+# Always ask about Hephaestus, even if not explicitly selected
+if [[ " ${COMPONENTS[*]} " != *" hephaestus "* ]]; then
+    if [ "$INTERACTIVE" = true ]; then
+        if prompt_yes_no "Launch Hephaestus UI?" "y"; then
+            COMPONENTS+=("hephaestus")
+        fi
+    fi
+fi
+
+# Launch Hephaestus if it's in the component list
 for comp in "${COMPONENTS[@]}"; do
     if [ "$comp" = "hephaestus" ]; then
         launch_hephaestus
@@ -1110,7 +1171,9 @@ done
 if [ "$INTERACTIVE" = true ]; then
     if prompt_yes_no "Would you like to launch an AI model?" "y"; then
         # Ask about model type
-        MODEL_TYPE=$(prompt_with_default "Which AI model type would you like to use?" "$MODEL_TYPE" "claude, ollama")
+        # Store model type in a clean variable to prevent interpretation issues
+        model_type_response=$(prompt_with_default "Which AI model type would you like to use?" "$MODEL_TYPE" "claude, ollama")
+        MODEL_TYPE=$(echo "$model_type_response" | tr -d '[:space:]')
         
         # Ask about specific model
         case "$MODEL_TYPE" in
@@ -1134,6 +1197,12 @@ except:
                     echo -e "${YELLOW}Ollama doesn't appear to be running. Please start it first.${RESET}"
                     MODEL=$(prompt_with_default "Which Ollama model would you like to use?" "llama3" "llama3, mistral, gemma")
                 fi
+                ;;
+            *)
+                echo -e "${RED}Unknown model type: '$MODEL_TYPE'${RESET}"
+                echo -e "${YELLOW}Defaulting to Claude${RESET}"
+                MODEL_TYPE="claude"
+                MODEL="claude-3-sonnet-20240229"
                 ;;
         esac
         

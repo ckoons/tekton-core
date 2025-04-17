@@ -1,7 +1,16 @@
 #!/bin/bash
 # tekton_kill - Master script to stop all Tekton components and AI services
 # Created: April 11, 2025
-# Updated: April 13, 2025 - Moved to scripts directory and standardized naming
+# Updated: April 17, 2025 - Enhanced port handling and reusability for launch script
+
+# ============================
+# Port Assignments by Component
+# ============================
+# Hephaestus UI:       8080 (HTTP server), 8081 (WebSocket server)
+# Engram:              8000 (Memory server)
+# Hermes:              8100 (Service registry), 8101 (Database)
+# Ergon:               8200 (Agent system)
+# Other components may use additional ports as needed
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -13,16 +22,61 @@ RESET="\033[0m"
 
 # Find Tekton root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# Display information
-echo -e "${BLUE}${BOLD}====== Tekton Shutdown ======${RESET}"
-echo -e "${BLUE}Tekton installation: ${YELLOW}$SCRIPT_DIR${RESET}"
-echo ""
+TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Function to check if a process is running
 is_running() {
     pgrep -f "$1" >/dev/null
     return $?
+}
+
+# Function to check if a port is in use
+is_port_used() {
+    lsof -ti :"$1" >/dev/null 2>&1
+    return $?
+}
+
+# Function to release a port if it's in use
+release_port() {
+    local port="$1"
+    local description="$2"
+    local force="$3"  # Set to true to use SIGKILL immediately
+    
+    if is_port_used "$port"; then
+        echo -e "${YELLOW}Releasing $description port $port...${RESET}"
+        local PIDS=$(lsof -ti :"$port" 2>/dev/null)
+        
+        if [ -n "$PIDS" ]; then
+            echo -e "${YELLOW}Killing processes using port $port: $PIDS${RESET}"
+            
+            if [ "$force" = "true" ]; then
+                # Force kill immediately
+                kill -9 $PIDS 2>/dev/null || true
+            else
+                # Try graceful shutdown first
+                kill $PIDS 2>/dev/null || true
+                sleep 1
+                
+                # Check if still in use
+                if is_port_used "$port"; then
+                    echo -e "${RED}Port $port still in use, using SIGKILL${RESET}"
+                    kill -9 $(lsof -ti :"$port" 2>/dev/null) 2>/dev/null || true
+                fi
+            fi
+            
+            sleep 1
+            if is_port_used "$port"; then
+                echo -e "${RED}Warning: Port $port is still in use${RESET}"
+                return 1
+            else
+                echo -e "${GREEN}✓ Port $port successfully released${RESET}"
+                return 0
+            fi
+        fi
+    else
+        echo -e "${GREEN}Port $port is already free${RESET}"
+        return 0
+    fi
 }
 
 # Function to kill all processes matching a pattern
@@ -56,106 +110,96 @@ kill_processes() {
     fi
 }
 
-# Kill Claude AI processes
-kill_processes "claude" "Claude AI"
-
-# Kill Ollama processes that might have been launched by Tekton
-kill_processes "ollama_bridge.py" "Ollama bridge"
-
-# Kill Tekton components in reverse dependency order
-kill_processes "sophia.core" "Sophia (ML Engine)"
-kill_processes "athena.core" "Athena (Knowledge Graph)"
-kill_processes "prometheus.core" "Prometheus (Planning)"
-kill_processes "harmonia.core" "Harmonia (Workflow)"
-kill_processes "telos.core" "Telos (User Interface)"
-kill_processes "rhetor.core" "Rhetor (Context Manager)"
-kill_processes "ergon.core" "Ergon (Agent System)"
-kill_processes "engram_with_ollama" "Engram+Ollama"
-kill_processes "engram_with_claude" "Engram+Claude"
-kill_processes "engram.api.consolidated_server" "Engram Memory Server"
-kill_processes "hermes.*database_manager" "Hermes Database"
-
-# No build step needed
-
-# Kill Hephaestus UI by process name
-kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
-
-# Additional port-based killing to ensure UI server is fully terminated
-# Kill any process holding port 8080 (Hephaestus HTTP server)
-echo -e "${YELLOW}Ensuring Hephaestus HTTP port 8080 is released...${RESET}"
-PIDS_8080=$(lsof -ti :8080 2>/dev/null)
-if [ -n "$PIDS_8080" ]; then
-    echo -e "${YELLOW}Killing processes using port 8080: $PIDS_8080${RESET}"
-    kill $PIDS_8080 2>/dev/null || true
-    sleep 1
+# Function to ensure all Tekton ports are available
+# This can be called from the launch script
+ensure_ports_available() {
+    local result=0
     
-    # Check if any process is still holding the port
-    REMAINING_8080=$(lsof -ti :8080 2>/dev/null)
-    if [ -n "$REMAINING_8080" ]; then
-        echo -e "${RED}Process still holding port 8080, using SIGKILL${RESET}"
-        kill -9 $REMAINING_8080 2>/dev/null || true
-        sleep 1
-    fi
-fi
-
-# Kill any process holding port 8081 (Hephaestus WebSocket server)
-echo -e "${YELLOW}Ensuring Hephaestus WebSocket port 8081 is released...${RESET}"
-PIDS_8081=$(lsof -ti :8081 2>/dev/null)
-if [ -n "$PIDS_8081" ]; then
-    echo -e "${YELLOW}Killing processes using port 8081: $PIDS_8081${RESET}"
-    kill $PIDS_8081 2>/dev/null || true
-    sleep 1
+    # Release Hephaestus ports
+    release_port "8080" "Hephaestus HTTP" || result=1
+    release_port "8081" "Hephaestus WebSocket" || result=1
     
-    # Check if any process is still holding the port
-    REMAINING_8081=$(lsof -ti :8081 2>/dev/null)
-    if [ -n "$REMAINING_8081" ]; then
-        echo -e "${RED}Process still holding port 8081, using SIGKILL${RESET}"
-        kill -9 $REMAINING_8081 2>/dev/null || true
+    # Release Engram ports
+    release_port "8000" "Engram Memory" || result=1
+    
+    # Release Hermes ports
+    release_port "8100" "Hermes Service Registry" || result=1
+    release_port "8101" "Hermes Database" || result=1
+    
+    # Release Ergon ports
+    release_port "8200" "Ergon Agent System" || result=1
+    
+    # Check results
+    if [ $result -eq 0 ]; then
+        echo -e "${GREEN}All Tekton ports are available${RESET}"
+    else
+        echo -e "${RED}Some ports could not be released. Check for running processes.${RESET}"
+    fi
+    
+    return $result
+}
+
+# Main kill process
+# Only execute this part if script is run directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Display information
+    echo -e "${BLUE}${BOLD}====== Tekton Shutdown ======${RESET}"
+    echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
+    echo ""
+    
+    # Kill Claude AI processes
+    kill_processes "claude" "Claude AI"
+    
+    # Kill Ollama processes that might have been launched by Tekton
+    kill_processes "ollama_bridge.py" "Ollama bridge"
+    
+    # Kill Tekton components in reverse dependency order
+    kill_processes "sophia.core" "Sophia (ML Engine)"
+    kill_processes "athena.core" "Athena (Knowledge Graph)"
+    kill_processes "prometheus.core" "Prometheus (Planning)"
+    kill_processes "harmonia.core" "Harmonia (Workflow)"
+    kill_processes "telos.core" "Telos (User Interface)"
+    kill_processes "rhetor.core" "Rhetor (Context Manager)"
+    kill_processes "ergon.core" "Ergon (Agent System)"
+    kill_processes "engram_with_ollama" "Engram+Ollama"
+    kill_processes "engram_with_claude" "Engram+Claude"
+    kill_processes "engram.api.consolidated_server" "Engram Memory Server"
+    kill_processes "hermes.*database_manager" "Hermes Database"
+    
+    # Kill Hephaestus UI by process name
+    kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
+    
+    # Release all ports used by Tekton components
+    ensure_ports_available
+    
+    # Kill any Python processes related to Tekton
+    echo -e "${YELLOW}Checking for any remaining Tekton Python processes...${RESET}"
+    if pgrep -f "$TEKTON_DIR.*python" >/dev/null; then
+        echo -e "${YELLOW}Killing remaining Python processes in Tekton directory...${RESET}"
+        pkill -f "$TEKTON_DIR.*python"
         sleep 1
-    fi
-fi
-
-# Verify ports are free
-echo -e "${YELLOW}Verifying ports are released...${RESET}"
-if lsof -ti :8080 >/dev/null 2>&1; then
-    echo -e "${RED}Warning: Port 8080 is still in use${RESET}"
-else
-    echo -e "${GREEN}✓ Port 8080 is free${RESET}"
-fi
-
-if lsof -ti :8081 >/dev/null 2>&1; then
-    echo -e "${RED}Warning: Port 8081 is still in use${RESET}"
-else
-    echo -e "${GREEN}✓ Port 8081 is free${RESET}"
-fi
-
-# Kill any Python processes related to Tekton
-echo -e "${YELLOW}Checking for any remaining Tekton Python processes...${RESET}"
-if pgrep -f "$SCRIPT_DIR.*python" >/dev/null; then
-    echo -e "${YELLOW}Killing remaining Python processes in Tekton directory...${RESET}"
-    pkill -f "$SCRIPT_DIR.*python"
-    sleep 1
-    if pgrep -f "$SCRIPT_DIR.*python" >/dev/null; then
-        echo -e "${RED}Some Python processes could not be killed. You may want to check them manually:${RESET}"
-        ps aux | grep "$SCRIPT_DIR.*python" | grep -v grep
+        if pgrep -f "$TEKTON_DIR.*python" >/dev/null; then
+            echo -e "${RED}Some Python processes could not be killed. You may want to check them manually:${RESET}"
+            ps aux | grep "$TEKTON_DIR.*python" | grep -v grep
+        else
+            echo -e "${GREEN}✓ All remaining Python processes killed${RESET}"
+        fi
     else
-        echo -e "${GREEN}✓ All remaining Python processes killed${RESET}"
+        echo -e "${GREEN}No remaining Tekton Python processes found${RESET}"
     fi
-else
-    echo -e "${GREEN}No remaining Tekton Python processes found${RESET}"
-fi
-
-# Kill any Node.js processes related to Hephaestus UI if running
-if pgrep -f "node.*$SCRIPT_DIR/Hephaestus" >/dev/null; then
-    echo -e "${YELLOW}Killing Hephaestus UI Node.js processes...${RESET}"
-    pkill -f "node.*$SCRIPT_DIR/Hephaestus"
-    sleep 1
-    if ! pgrep -f "node.*$SCRIPT_DIR/Hephaestus" >/dev/null; then
-        echo -e "${GREEN}✓ Successfully killed Hephaestus UI Node.js processes${RESET}"
-    else
-        echo -e "${RED}Failed to kill some Hephaestus UI Node.js processes${RESET}"
+    
+    # Kill any Node.js processes related to Hephaestus UI if running
+    if pgrep -f "node.*$TEKTON_DIR/Hephaestus" >/dev/null; then
+        echo -e "${YELLOW}Killing Hephaestus UI Node.js processes...${RESET}"
+        pkill -f "node.*$TEKTON_DIR/Hephaestus"
+        sleep 1
+        if ! pgrep -f "node.*$TEKTON_DIR/Hephaestus" >/dev/null; then
+            echo -e "${GREEN}✓ Successfully killed Hephaestus UI Node.js processes${RESET}"
+        else
+            echo -e "${RED}Failed to kill some Hephaestus UI Node.js processes${RESET}"
+        fi
     fi
+    
+    echo ""
+    echo -e "${GREEN}${BOLD}Tekton shutdown complete.${RESET}"
 fi
-
-echo ""
-echo -e "${GREEN}${BOLD}Tekton shutdown complete.${RESET}"
