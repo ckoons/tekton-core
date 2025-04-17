@@ -80,7 +80,7 @@ This document provides a summary of the work done to stabilize and fix the Tekto
 
 ## Test Results
 
-Core components have been successfully tested and now launch reliably:
+All core components have been successfully tested and now launch reliably:
 
 1. **Engram Memory System**
    - Successfully responds to health checks at http://localhost:8000/health
@@ -91,6 +91,28 @@ Core components have been successfully tested and now launch reliably:
    - API server accessible at http://localhost:8100/api/health
    - Service registry functionality working
    - Database services operational
+
+3. **Ergon Agent System**
+   - API server accessible at http://localhost:8200
+   - Agent creation and management functionality available
+   - Successfully integrated with other components
+
+4. **Hephaestus UI**
+   - Web interface accessible at http://localhost:8080
+   - WebSocket server running on port 8081
+   - UI components load correctly and display system information
+
+## Port Assignments
+
+To avoid conflicts, we have standardized the following port assignments for Tekton components:
+
+| Component      | Port(s)            | Purpose                                    |
+|----------------|--------------------|--------------------------------------------|
+| Hephaestus UI  | 8080, 8081         | HTTP server (8080) and WebSocket (8081)    |
+| Engram         | 8000               | Memory system API                          |
+| Hermes         | 8100, 8101         | Service registry (8100) and Database (8101)|
+| Ergon          | 8200               | Agent system API                           |
+| Other components| TBD               | Will use unique port numbers               |
 
 ## Future Improvements
 

@@ -712,19 +712,25 @@ sys.path.insert(0, '$ERGON_DIR')
 try:
     # Start Ergon server in a separate process
     subprocess.Popen(
-        [sys.executable, '-c', f'''
+        [sys.executable, '-c', '''
 import sys, asyncio
-sys.path.insert(0, '{ERGON_DIR}')
-from ergon.core.server import start_server
+sys.path.insert(0, sys.argv[1])
 import os
 
-async def run():
-    await start_server()
-
-asyncio.run(run())
-'''],
-        stdout=open(f'{HOME}/.tekton/logs/ergon.log', 'w'),
-        stderr=open(f'{HOME}/.tekton/logs/ergon.log', 'w'),
+try:
+    # Try to import the API app
+    from ergon.api.app import app
+    import uvicorn
+    
+    # Run the server
+    uvicorn.run(app, host='127.0.0.1', port=8200)
+except ImportError as e:
+    print(f'Error importing Ergon modules: {e}')
+except Exception as e:
+    print(f'Error running Ergon server: {e}')
+''', '$ERGON_DIR'],
+        stdout=open(os.path.expanduser('$HOME/.tekton/logs/ergon.log'), 'w'),
+        stderr=open(os.path.expanduser('$HOME/.tekton/logs/ergon.log'), 'w'),
         close_fds=True
     )
     print('${GREEN}Ergon server started successfully${RESET}')
