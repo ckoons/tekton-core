@@ -164,6 +164,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     kill_processes "engram_with_ollama" "Engram+Ollama"
     kill_processes "engram_with_claude" "Engram+Claude"
     kill_processes "engram.api.consolidated_server" "Engram Memory Server"
+    kill_processes "hermes/api/app.py" "Hermes API Server"
     kill_processes "hermes.*database_manager" "Hermes Database"
     
     # Kill Hephaestus UI by process name

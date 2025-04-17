@@ -504,14 +504,39 @@ launch_hermes() {
     HERMES_PY_DIR="$HERMES_DIR"
     HOME_PY_DIR="$HOME"
     
-    # Launch the database manager
+    # Launch the Hermes API server
     python3 -c "
 import sys, os, subprocess, asyncio
 sys.path.insert(0, '$HERMES_DIR')
 
-# Start in a separate process
-subprocess.Popen(
-    [sys.executable, '-c', '''
+# Set environment variables for the API server
+env = os.environ.copy()
+env['PORT'] = '8100'  # API server port
+env['HOST'] = '127.0.0.1'
+env['HERMES_DATA_DIR'] = '$HOME_PY_DIR/.tekton/data/hermes'
+env['DB_MCP_PORT'] = '8101'  # Database MCP port
+env['DB_MCP_HOST'] = '127.0.0.1'
+
+# Find the API script
+api_path = os.path.join('$HERMES_DIR', 'hermes', 'api', 'app.py')
+
+if os.path.exists(api_path):
+    # Start the Hermes API server in a separate process
+    api_process = subprocess.Popen(
+        [sys.executable, api_path],
+        env=env,
+        stdout=open('$HOME_PY_DIR/.tekton/logs/hermes_api.log', 'w'),
+        stderr=open('$HOME_PY_DIR/.tekton/logs/hermes_api.log', 'w'),
+        close_fds=True
+    )
+    print('${GREEN}Hermes API server started successfully${RESET}')
+else:
+    # Fallback to separate components if API server script not found
+    print('${YELLOW}Hermes API server script not found, falling back to separate components${RESET}')
+    
+    # Start database manager in a separate process
+    subprocess.Popen(
+        [sys.executable, '-c', '''
 import sys, asyncio, os
 sys.path.insert(0, \"$HERMES_PY_DIR\")
 from hermes.core.database.manager import DatabaseManager
@@ -566,14 +591,14 @@ async def run():
 
 asyncio.run(run())
 '''],
-    stdout=open(\"$HOME_PY_DIR/.tekton/logs/hermes_db.log\", 'w'),
-    stderr=open(\"$HOME_PY_DIR/.tekton/logs/hermes_db.log\", 'w'),
-    close_fds=True
-)
+        stdout=open(\"$HOME_PY_DIR/.tekton/logs/hermes_db.log\", 'w'),
+        stderr=open(\"$HOME_PY_DIR/.tekton/logs/hermes_db.log\", 'w'),
+        close_fds=True
+    )
 
-# Start service registry in a separate process
-subprocess.Popen(
-    [sys.executable, '-c', '''
+    # Start service registry in a separate process
+    subprocess.Popen(
+        [sys.executable, '-c', '''
 import sys, asyncio, os
 sys.path.insert(0, \"$HERMES_PY_DIR\")
 from hermes.core.service_discovery import ServiceRegistry
@@ -588,12 +613,12 @@ async def run():
 
 asyncio.run(run())
 '''],
-    stdout=open(\"$HOME_PY_DIR/.tekton/logs/hermes_registry.log\", 'w'),
-    stderr=open(\"$HOME_PY_DIR/.tekton/logs/hermes_registry.log\", 'w'),
-    close_fds=True
-)
-
-print('${GREEN}Hermes services started successfully${RESET}')
+        stdout=open(\"$HOME_PY_DIR/.tekton/logs/hermes_registry.log\", 'w'),
+        stderr=open(\"$HOME_PY_DIR/.tekton/logs/hermes_registry.log\", 'w'),
+        close_fds=True
+    )
+    
+    print('${GREEN}Hermes services started successfully${RESET}')
 " &
     
     # Give services time to start
@@ -603,6 +628,27 @@ print('${GREEN}Hermes services started successfully${RESET}')
     # Wait a bit longer to let processes start
     sleep 5
     
+    # First check if the API server is running
+    if pgrep -f "hermes/api/app.py" > /dev/null; then
+        echo -e "${GREEN}Hermes API server is running${RESET}"
+        API_RUNNING=true
+        
+        # Try to verify the API is responding
+        if curl -s "http://localhost:8100/api/health" > /dev/null 2>&1; then
+            echo -e "${GREEN}Hermes API is responding to health checks${RESET}"
+        else
+            echo -e "${YELLOW}Hermes API processes are running but not responding yet${RESET}"
+        fi
+        
+        # If the API is running, we're good to go
+        echo -e "${GREEN}Hermes services started successfully${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Hermes API server not running, checking individual components${RESET}"
+        API_RUNNING=false
+    fi
+    
+    # Fall back to checking individual components
     # Check for database manager process
     if pgrep -f "hermes.*database.manager" > /dev/null; then
         echo -e "${GREEN}Hermes Database Manager is running${RESET}"
@@ -628,8 +674,17 @@ print('${GREEN}Hermes services started successfully${RESET}')
     else
         echo -e "${RED}Failed to start any Hermes services${RESET}"
         echo -e "${YELLOW}Checking logs...${RESET}"
+        
+        # Check API logs first if available
+        if [ -f "$HOME/.tekton/logs/hermes_api.log" ]; then
+            echo -e "${YELLOW}Hermes API log:${RESET}"
+            cat "$HOME/.tekton/logs/hermes_api.log"
+        fi
+        
+        # Then check individual component logs
         cat "$HOME/.tekton/logs/hermes_db.log" 2>/dev/null || echo "No database log available"
         cat "$HOME/.tekton/logs/hermes_registry.log" 2>/dev/null || echo "No registry log available"
+        
         return 1
     fi
 }
