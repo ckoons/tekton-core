@@ -1088,10 +1088,12 @@ launch_synthesis() {
             echo -e "${GREEN}Using existing Synthesis server script...${RESET}"
         else
             echo -e "${YELLOW}Creating new Synthesis server script...${RESET}"
-            # Write server script to a file
+            # Write server script to a file with proper event loop handling
             cat > "$SCRIPT_FILE" << 'EOFPYTHON'
 import sys, asyncio, os
 import logging
+import threading
+import signal
 
 # Get Synthesis directory from argument
 synthesis_dir = sys.argv[1]
@@ -1112,105 +1114,157 @@ logging.basicConfig(
 )
 logger = logging.getLogger("synthesis")
 
-async def start_execution_engine(host="127.0.0.1", port=5005):
-    """Start the Synthesis execution engine API server."""
+# Flag to signal shutdown
+shutdown_event = asyncio.Event()
+
+async def register_with_hermes():
+    """Register Synthesis with Hermes service registry."""
     try:
-        # We'll use FastAPI if available, else fallback to a simple server
-        try:
-            import uvicorn
-            from fastapi import FastAPI
+        from synthesis.scripts.register_with_hermes import register_with_hermes
+        hermes_url = os.environ.get("HERMES_URL", "http://localhost:8100/api")
+        logger.info(f"Registering with Hermes at {hermes_url}")
+        
+        # Register and get result
+        result = await register_with_hermes(hermes_url=hermes_url)
+        if result:
+            logger.info("Successfully registered with Hermes")
+        else:
+            logger.warning("Failed to register with Hermes, but continuing")
+    except Exception as e:
+        logger.warning(f"Failed to register with Hermes: {e}")
+
+async def start_fastapi_server(host="127.0.0.1", port=5005):
+    """Start the FastAPI server with uvicorn without using asyncio.run()."""
+    try:
+        # Import FastAPI and uvicorn
+        from fastapi import FastAPI
+        import uvicorn
+        from uvicorn.config import Config
+        from uvicorn.server import Server
+        
+        # Import execution engine
+        from synthesis.core.execution_engine import ExecutionEngine
+        from synthesis.core.phase_manager import PhaseManager
+        
+        # Create FastAPI app
+        app = FastAPI(title="Synthesis API", description="Execution Engine API")
+        
+        # Initialize components
+        engine = ExecutionEngine()
+        phase_manager = PhaseManager()
+        
+        # Add routes
+        @app.get("/")
+        async def root():
+            return {"status": "ok", "service": "Synthesis Execution Engine"}
             
-            # Import execution engine
-            from synthesis.core.execution_engine import ExecutionEngine
-            from synthesis.core.phase_manager import PhaseManager
-            
-            # Create FastAPI app
-            app = FastAPI(title="Synthesis API", description="Execution Engine API")
-            
-            # Initialize components
-            engine = ExecutionEngine()
-            phase_manager = PhaseManager()
-            
-            # Add routes
-            @app.get("/")
-            async def root():
-                return {"status": "ok", "service": "Synthesis Execution Engine"}
-                
-            @app.get("/health")
-            async def health():
-                return {"status": "healthy"}
-            
-            # Start server
-            logger.info(f"Starting Synthesis API on {host}:{port}")
-            # We need to use uvicorn's sync version to avoid event loop issues
-            import uvicorn
-            uvicorn.run(app, host=host, port=port)
-            
-        except ImportError:
-            # Fallback to a simple server
-            logger.warning("FastAPI not available, using simple server")
-            
-            import asyncio
-            import json
-            from http.server import HTTPServer, BaseHTTPRequestHandler
-            
-            class SynthesisHandler(BaseHTTPRequestHandler):
-                def do_GET(self):
-                    if self.path == "/" or self.path == "/health":
-                        self.send_response(200)
-                        self.send_header("Content-type", "application/json")
-                        self.end_headers()
-                        response = {"status": "ok", "service": "Synthesis Execution Engine"}
-                        self.wfile.write(json.dumps(response).encode())
-                    else:
-                        self.send_response(404)
-                        self.end_headers()
-            
-            # Start simple server
-            logger.info(f"Starting simple Synthesis server on {host}:{port}")
+        @app.get("/health")
+        async def health():
+            return {"status": "healthy"}
+        
+        # Configure uvicorn
+        config = Config(app=app, host=host, port=port, log_level="info")
+        server = Server(config=config)
+        
+        # Start server directly (avoiding asyncio.run())
+        logger.info(f"Starting Synthesis API server on {host}:{port}")
+        await server.serve()
+        
+        return server
+    except ImportError:
+        # Fallback to a simple server
+        logger.warning("FastAPI not available, using simple HTTP server")
+        
+        # Create a simple HTTP server in a separate thread
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+        import json
+        import threading
+        
+        class SynthesisHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/" or self.path == "/health":
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    response = {"status": "ok", "service": "Synthesis Execution Engine"}
+                    self.wfile.write(json.dumps(response).encode())
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+        
+        def run_http_server():
             server = HTTPServer((host, port), SynthesisHandler)
+            logger.info(f"Starting simple HTTP server on {host}:{port}")
+            
+            # Allow keyboard interrupt to stop the server
+            def handler(signum, frame):
+                logger.info("Shutting down HTTP server")
+                server.shutdown()
+            
+            signal.signal(signal.SIGINT, handler)
+            signal.signal(signal.SIGTERM, handler)
+            
             server.serve_forever()
+        
+        # Start the HTTP server in a separate thread
+        server_thread = threading.Thread(target=run_http_server)
+        server_thread.daemon = True
+        server_thread.start()
+        
+        # Wait for shutdown signal
+        while not shutdown_event.is_set():
+            await asyncio.sleep(1)
             
     except Exception as e:
         logger.error(f"Error starting Synthesis execution engine: {e}")
         raise
 
-# First register with Hermes if available
-try:
-    # Register with Hermes if available (in a separate thread to avoid async/sync issues)
-    import threading
-    def register_thread():
-        logger.info("Attempting to register with Hermes in separate thread")
-        try:
-            from synthesis.scripts.register_with_hermes import register_with_hermes
-            hermes_url = os.environ.get("HERMES_URL", "http://localhost:8100/api")
-            
-            # Create event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(register_with_hermes(hermes_url=hermes_url))
-            loop.close()
-        except Exception as e:
-            logger.warning(f"Failed to register with Hermes: {e}")
-    
-    # Start registration in a separate thread
-    reg_thread = threading.Thread(target=register_thread)
-    reg_thread.daemon = True
-    reg_thread.start()
-except Exception as e:
-    logger.error(f"Error in Hermes registration: {e}")
+async def main():
+    """Main entry point for the Synthesis server."""
+    try:
+        # Register with Hermes first
+        await register_with_hermes()
+        
+        # Initialize engine components
+        logger.info("Initializing Synthesis execution engine")
+        from synthesis.core.execution_engine import ExecutionEngine
+        engine = ExecutionEngine()
+        logger.info("Synthesis Execution Engine initialized (max concurrent: 5)")
+        
+        # Start the API server
+        logger.info("Starting Synthesis API on 127.0.0.1:5005")
+        await start_fastapi_server(host="127.0.0.1", port=5005)
+        
+    except Exception as e:
+        logger.error(f"Error starting Synthesis: {e}")
+        raise
 
-# Then start the execution engine separately
-try:
-    # Create proper event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    # Run the execution engine in the event loop
-    loop.run_until_complete(start_execution_engine())
-except Exception as e:
-    logger.error(f"Error starting execution engine: {e}")
-    raise
+# Setup signal handlers
+def signal_handler():
+    loop = asyncio.get_event_loop()
+    loop.stop()
+    logger.info("Synthesis server shutdown complete")
+
+# Start the main loop
+if __name__ == "__main__":
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Set up signal handlers
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, signal_handler)
+        
+        # Run the main coroutine
+        loop.create_task(main())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, shutting down")
+    except Exception as e:
+        logger.error(f"Error in main loop: {e}")
+    finally:
+        logger.info("Closing event loop")
+        loop.close()
 EOFPYTHON
         fi
         
