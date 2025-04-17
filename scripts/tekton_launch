@@ -22,10 +22,10 @@ RESET="\033[0m"
 
 # Find Tekton root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$SCRIPT_DIR"
+TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Source the tekton_kill script to use its functions
-source "$SCRIPT_DIR/scripts/tekton_kill"
+source "$SCRIPT_DIR/tekton_kill"
 
 # Clean up any existing components and ensure ports are available
 echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
@@ -424,16 +424,20 @@ launch_engram() {
             fi
         fi
         
+        # Force fallback mode to avoid vector database issues
+        export ENGRAM_USE_FALLBACK=1
+        echo -e "${YELLOW}Setting ENGRAM_USE_FALLBACK=1 to use file-based storage${RESET}"
+        
         # Start the service
-        "$ENGRAM_STARTUP" --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1 &
+        "$ENGRAM_STARTUP" --fallback --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1 &
         ENGRAM_PID=$!
         
         echo -e "${GREEN}Started Engram memory service with PID: $ENGRAM_PID${RESET}"
         
         # Wait for service to be ready
         echo -e "${BLUE}Waiting for Engram service to be ready...${RESET}"
-        for i in {1..15}; do  # Increased timeout
-            sleep 2  # Longer sleep
+        for i in {1..30}; do  # Extended timeout (60 seconds)
+            sleep 2  # 2 second sleep
             if ! ps -p $ENGRAM_PID > /dev/null; then
                 echo -e "${RED}Memory service failed to start${RESET}"
                 cat "$HOME/.tekton/logs/engram.log"
