@@ -59,6 +59,7 @@ PROMETHEUS_DIR="${TEKTON_DIR}/Prometheus"
 HARMONIA_DIR="${TEKTON_DIR}/Harmonia"
 SOPHIA_DIR="${TEKTON_DIR}/Sophia"
 TELOS_DIR="${TEKTON_DIR}/Telos"
+SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
 
 # Function to display usage information
 show_usage() {
@@ -143,6 +144,14 @@ detect_components() {
     echo -e "${BLUE}Detecting Tekton components...${RESET}"
     
     local components=()
+    
+    # Check for Synthesis
+    if [ -d "$SYNTHESIS_DIR" ] && [ -f "$SYNTHESIS_DIR/synthesis/core/execution_engine.py" ]; then
+        components+=("synthesis")
+        echo -e "${GREEN}✓ Synthesis (Execution Engine)${RESET}"
+    else
+        echo -e "${YELLOW}⚠ Synthesis not found or incomplete${RESET}"
+    fi
     
     # Check for Hephaestus
     if [ -d "$HEPHAESTUS_DIR" ] && [ -f "$HEPHAESTUS_DIR/hephaestus/ui/main.py" ]; then
@@ -314,6 +323,13 @@ select_components() {
     if [[ " ${all_components[*]} " == *" sophia "* ]]; then
         if prompt_yes_no "Launch Sophia (Machine Learning)?" "n"; then
             selected_components+=("sophia")
+        fi
+    fi
+    
+    # Ask about Synthesis (Execution Engine)
+    if [[ " ${all_components[*]} " == *" synthesis "* ]]; then
+        if prompt_yes_no "Launch Synthesis (Execution Engine)?" "n"; then
+            selected_components+=("synthesis")
         fi
     fi
     
@@ -1035,6 +1051,210 @@ except Exception as e:
     fi
 }
 
+# Launch Synthesis component
+launch_synthesis() {
+    echo -e "${BLUE}${BOLD}Launching Synthesis Execution Engine...${RESET}"
+    
+    # Check if Synthesis is already running
+    if is_running "synthesis.core"; then
+        echo -e "${GREEN}Synthesis services are already running${RESET}"
+        return 0
+    fi
+    
+    # Verify port is free before launching
+    echo -e "${YELLOW}Checking if Synthesis port 5005 is available...${RESET}"
+    release_port "5005" "Synthesis Engine"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Port 5005 still in use. Cannot start Synthesis Execution Engine.${RESET}"
+        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
+        return 1
+    else
+        echo -e "${GREEN}Port 5005 is available. Proceeding with launch.${RESET}"
+    fi
+    
+    # Check if Synthesis is implemented
+    if [ -d "$SYNTHESIS_DIR/synthesis" ] && [ -f "$SYNTHESIS_DIR/synthesis/core/execution_engine.py" ]; then
+        # Set up Python path
+        export PYTHONPATH="$SYNTHESIS_DIR:$PYTHONPATH"
+        
+        # Create log directory if it doesn't exist
+        mkdir -p "$HOME/.tekton/logs"
+        
+        # Create a server script file to avoid triple-quote issues
+        SCRIPT_FILE="$HOME/.tekton/synthesis_server.py"
+        
+        # Check if the script file already exists - if it does, don't overwrite it
+        if [ -f "$SCRIPT_FILE" ]; then
+            echo -e "${GREEN}Using existing Synthesis server script...${RESET}"
+        else
+            echo -e "${YELLOW}Creating new Synthesis server script...${RESET}"
+            # Write server script to a file
+            cat > "$SCRIPT_FILE" << 'EOFPYTHON'
+import sys, asyncio, os
+import logging
+
+# Get Synthesis directory from argument
+synthesis_dir = sys.argv[1]
+sys.path.insert(0, synthesis_dir)
+
+# Configure logging
+log_dir = os.path.expanduser("~/.tekton/logs")
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "synthesis.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(log_file)
+    ]
+)
+logger = logging.getLogger("synthesis")
+
+async def start_execution_engine(host="127.0.0.1", port=5005):
+    """Start the Synthesis execution engine API server."""
+    try:
+        # We'll use FastAPI if available, else fallback to a simple server
+        try:
+            import uvicorn
+            from fastapi import FastAPI
+            
+            # Import execution engine
+            from synthesis.core.execution_engine import ExecutionEngine
+            from synthesis.core.phase_manager import PhaseManager
+            
+            # Create FastAPI app
+            app = FastAPI(title="Synthesis API", description="Execution Engine API")
+            
+            # Initialize components
+            engine = ExecutionEngine()
+            phase_manager = PhaseManager()
+            
+            # Add routes
+            @app.get("/")
+            async def root():
+                return {"status": "ok", "service": "Synthesis Execution Engine"}
+                
+            @app.get("/health")
+            async def health():
+                return {"status": "healthy"}
+            
+            # Start server
+            logger.info(f"Starting Synthesis API on {host}:{port}")
+            # We need to use uvicorn's sync version to avoid event loop issues
+            import uvicorn
+            uvicorn.run(app, host=host, port=port)
+            
+        except ImportError:
+            # Fallback to a simple server
+            logger.warning("FastAPI not available, using simple server")
+            
+            import asyncio
+            import json
+            from http.server import HTTPServer, BaseHTTPRequestHandler
+            
+            class SynthesisHandler(BaseHTTPRequestHandler):
+                def do_GET(self):
+                    if self.path == "/" or self.path == "/health":
+                        self.send_response(200)
+                        self.send_header("Content-type", "application/json")
+                        self.end_headers()
+                        response = {"status": "ok", "service": "Synthesis Execution Engine"}
+                        self.wfile.write(json.dumps(response).encode())
+                    else:
+                        self.send_response(404)
+                        self.end_headers()
+            
+            # Start simple server
+            logger.info(f"Starting simple Synthesis server on {host}:{port}")
+            server = HTTPServer((host, port), SynthesisHandler)
+            server.serve_forever()
+            
+    except Exception as e:
+        logger.error(f"Error starting Synthesis execution engine: {e}")
+        raise
+
+# First register with Hermes if available
+try:
+    # Register with Hermes if available (in a separate thread to avoid async/sync issues)
+    import threading
+    def register_thread():
+        logger.info("Attempting to register with Hermes in separate thread")
+        try:
+            from synthesis.scripts.register_with_hermes import register_with_hermes
+            hermes_url = os.environ.get("HERMES_URL", "http://localhost:8100/api")
+            
+            # Create event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(register_with_hermes(hermes_url=hermes_url))
+            loop.close()
+        except Exception as e:
+            logger.warning(f"Failed to register with Hermes: {e}")
+    
+    # Start registration in a separate thread
+    reg_thread = threading.Thread(target=register_thread)
+    reg_thread.daemon = True
+    reg_thread.start()
+except Exception as e:
+    logger.error(f"Error in Hermes registration: {e}")
+
+# Then start the execution engine separately
+try:
+    # Create proper event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Run the execution engine in the event loop
+    loop.run_until_complete(start_execution_engine())
+except Exception as e:
+    logger.error(f"Error starting execution engine: {e}")
+    raise
+EOFPYTHON
+        fi
+        
+        # Make the script executable
+        chmod +x "$SCRIPT_FILE"
+        
+        # Launch the Synthesis server script
+        echo -e "${YELLOW}Starting Synthesis server script...${RESET}"
+        python3 "$SCRIPT_FILE" "$SYNTHESIS_DIR" > "$HOME/.tekton/logs/synthesis.log" 2>&1 &
+        SYNTHESIS_PID=$!
+        
+        echo -e "${GREEN}Synthesis server started with PID: $SYNTHESIS_PID${RESET}"
+        
+        # Wait a moment for the server to start
+        sleep 3
+        
+        # Check if process is still running
+        if ! ps -p $SYNTHESIS_PID > /dev/null; then
+            echo -e "${RED}Synthesis server failed to start${RESET}"
+            cat "$HOME/.tekton/logs/synthesis.log"
+            echo -e "${YELLOW}Continuing despite Synthesis startup failure${RESET}"
+        else
+            echo -e "${GREEN}Synthesis execution engine started successfully${RESET}"
+        fi
+        
+        # Give services time to start
+        sleep 3
+        
+        # Verify the service is running
+        if curl -s http://localhost:5005/health > /dev/null 2>&1; then
+            echo -e "${GREEN}Synthesis API is responding on port 5005${RESET}"
+        else
+            echo -e "${YELLOW}Synthesis API may not be fully ready, but continuing...${RESET}"
+        fi
+        
+        echo -e "${GREEN}Synthesis execution engine initialized${RESET}"
+        return 0
+    else
+        echo -e "${YELLOW}Synthesis execution engine is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Synthesis launch${RESET}"
+        return 0
+    fi
+}
+
 # Launch Telos component
 launch_telos() {
     echo -e "${BLUE}${BOLD}Launching Telos User Interface...${RESET}"
@@ -1267,7 +1487,7 @@ for comp in "${COMPONENTS[@]}"; do
     fi
 done
 
-# Third: high-level components (Athena, Sophia, Telos)
+# Third: high-level components (Athena, Sophia, Telos, Synthesis)
 for comp in "${COMPONENTS[@]}"; do
     if [ "$comp" = "athena" ]; then
         launch_athena
@@ -1275,6 +1495,8 @@ for comp in "${COMPONENTS[@]}"; do
         launch_sophia
     elif [ "$comp" = "telos" ]; then
         launch_telos
+    elif [ "$comp" = "synthesis" ]; then
+        launch_synthesis
     fi
 done
 

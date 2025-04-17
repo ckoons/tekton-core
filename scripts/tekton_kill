@@ -129,6 +129,9 @@ ensure_ports_available() {
     # Release Ergon ports
     release_port "8200" "Ergon Agent System" || result=1
     
+    # Release Synthesis ports
+    release_port "5005" "Synthesis Engine" || result=1
+    
     # Check results
     if [ $result -eq 0 ]; then
         echo -e "${GREEN}All Tekton ports are available${RESET}"
