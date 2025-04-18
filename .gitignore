@@ -39,3 +39,8 @@ logs/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Tekton specific
+CLAUDE.md
+**/CLAUDE.md
+MetaData/
