@@ -168,6 +168,23 @@ The launch script supports various options:
 - `--non-interactive`: Run in non-interactive mode
 - `--launch-all`: Launch all available components (equivalent to --components all)
 
+### Port Assignments
+
+Tekton components use specific ports that need to be available for proper operation:
+
+| Component      | Port(s)                           | Description                            |
+|----------------|-----------------------------------|----------------------------------------|
+| Hephaestus UI  | 8080 (HTTP), 8081 (WebSocket)     | User interface and WebSocket server    |
+| Engram         | 8000                              | Memory system                          |
+| Hermes         | 8100 (Registry), 8101 (Database)  | Service registry and database services |
+| Ergon          | 8200                              | Agent system                           |
+| Synthesis      | 5005                              | Execution engine                       |
+
+The launch script manages these ports automatically:
+- When launching Hermes, all Tekton processes are terminated to ensure a clean environment
+- When launching individual components, only processes using that component's specific ports are terminated
+- This allows Hermes to dynamically manage component lifecycle while preventing port conflicts
+
 Convenient symlinks are also available in ~/utils:
 - `~/utils/tekton-launch`
 - `~/utils/tekton-kill`

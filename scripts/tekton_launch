@@ -1,7 +1,7 @@
 #!/bin/bash
 # tekton_launch - Unified script to launch all Tekton components in the correct order
 # Created: April 11, 2025
-# Updated: April 17, 2025 - Added tekton_kill integration for clean port handling
+# Updated: April 19, 2025 - Modified to use targeted port-specific process management
 
 # ============================
 # Port Assignments by Component
@@ -27,16 +27,28 @@ TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 # Ensure we're in the correct directory context
 cd "$TEKTON_DIR"
 
-# Source the tekton_kill script to use its functions
-source "$SCRIPT_DIR/tekton_kill"
+# We'll conditionally source the tekton_kill script only if we're launching Hermes
+LAUNCHING_HERMES=false
 
-# Clean up any existing components and ensure ports are available
-echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
-ensure_ports_available
-if [ $? -ne 0 ]; then
-    echo -e "${YELLOW}Warning: Could not free all required ports. Attempting to continue...${RESET}"
-fi
-echo ""
+# Function to check if we're launching Hermes (called after parsing arguments)
+check_if_launching_hermes() {
+    # Check if launch-all is specified
+    if [ "$LAUNCH_ALL" = true ]; then
+        LAUNCHING_HERMES=true
+        return
+    fi
+
+    # Check if "hermes" or "all" is in the components list
+    for comp in "${COMPONENTS[@]}"; do
+        if [ "$comp" = "hermes" ] || [ "$comp" = "all" ]; then
+            LAUNCHING_HERMES=true
+            return
+        fi
+    done
+}
+
+# The sourcing and port check will be done after processing arguments
+# This placeholder will be replaced with the actual call in the main execution
 
 # Default values
 MODEL_TYPE="claude" 
@@ -93,6 +105,50 @@ show_usage() {
 is_running() {
     pgrep -f "$1" >/dev/null
     return $?
+}
+
+# Function to check if a port is in use
+is_port_used() {
+    lsof -ti :"$1" >/dev/null 2>&1
+    return $?
+}
+
+# Function to release a specific port by killing the process using it
+# This is a simplified version of the function in tekton_kill
+release_component_port() {
+    local port="$1"
+    local description="$2"
+    
+    if is_port_used "$port"; then
+        echo -e "${YELLOW}Port $port ($description) is in use - releasing it...${RESET}"
+        local PIDS=$(lsof -ti :"$port" 2>/dev/null)
+        
+        if [ -n "$PIDS" ]; then
+            echo -e "${YELLOW}Killing process (PID: $PIDS) using port $port...${RESET}"
+            
+            # Try graceful shutdown first
+            kill $PIDS 2>/dev/null || true
+            sleep 1
+            
+            # Check if still in use
+            if is_port_used "$port"; then
+                echo -e "${YELLOW}Port $port still in use, using SIGKILL...${RESET}"
+                kill -9 $(lsof -ti :"$port" 2>/dev/null) 2>/dev/null || true
+            fi
+            
+            sleep 1
+            if is_port_used "$port"; then
+                echo -e "${RED}Warning: Port $port could not be released${RESET}"
+                return 1
+            else
+                echo -e "${GREEN}✓ Port $port successfully released${RESET}"
+                return 0
+            fi
+        fi
+    else
+        echo -e "${GREEN}Port $port is already free${RESET}"
+        return 0
+    fi
 }
 
 # Function to prompt user for input with default value
@@ -359,21 +415,27 @@ launch_hephaestus() {
         # Verify ports are free before launching
         echo -e "${YELLOW}Checking if Hephaestus ports are available...${RESET}"
         
-        # Release Hephaestus ports using the common function from tekton_kill
-        release_port "8080" "Hephaestus HTTP"
-        HTTP_PORT_RESULT=$?
-        
-        release_port "8081" "Hephaestus WebSocket"
-        WS_PORT_RESULT=$?
-        
-        # Verify ports are now free
-        if [ $HTTP_PORT_RESULT -ne 0 ] || [ $WS_PORT_RESULT -ne 0 ]; then
-            echo -e "${RED}Error: Ports 8080 or 8081 still in use. Cannot start Hephaestus UI.${RESET}"
-            echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
-            return 1
-        else
-            echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+        # Use targeted port management - only release the specific ports needed by this component
+        # If Hermes is launching, the full tekton_kill script will handle this
+        if [ "$LAUNCHING_HERMES" = false ]; then
+            # Release HTTP port if it's in use
+            release_component_port "8080" "Hephaestus HTTP"
+            HTTP_PORT_RESULT=$?
+            
+            # Release WebSocket port if it's in use
+            release_component_port "8081" "Hephaestus WebSocket"
+            WS_PORT_RESULT=$?
+            
+            # Verify ports are now free
+            if [ $HTTP_PORT_RESULT -ne 0 ] || [ $WS_PORT_RESULT -ne 0 ]; then
+                echo -e "${RED}Error: Ports 8080 or 8081 could not be released. Cannot start Hephaestus UI.${RESET}"
+                echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+                return 1
+            fi
         fi
+        
+        # By this point the ports should be available - either through tekton_kill or release_component_port
+        echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
         
         # Set up Python path
         export PYTHONPATH="$TEKTON_DIR:$PYTHONPATH"
@@ -414,14 +476,21 @@ launch_engram() {
     
     # Verify port is free before launching
     echo -e "${YELLOW}Checking if Engram port 8000 is available...${RESET}"
-    release_port "8000" "Engram Memory"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Port 8000 still in use. Cannot start Engram Memory Service.${RESET}"
-        echo -e "${YELLOW}Try running ./scripts/tekton_kill first to clear all processes.${RESET}"
-        return 1
-    else
-        echo -e "${GREEN}Port 8000 is available. Proceeding with launch.${RESET}"
+    
+    # Use targeted port management - only release the specific port needed by this component
+    # If Hermes is launching, the full tekton_kill script will handle this
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release the port if it's in use
+        release_component_port "8000" "Engram Memory"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Port 8000 could not be released. Cannot start Engram Memory Service.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        fi
     fi
+    
+    # By this point the port should be available - either through tekton_kill or release_component_port
+    echo -e "${GREEN}Port 8000 is available. Proceeding with launch.${RESET}"
     
     # Find the consolidated server script
     ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
@@ -533,20 +602,45 @@ launch_hermes() {
     # Verify ports are free before launching
     echo -e "${YELLOW}Checking if Hermes ports are available...${RESET}"
     
-    # Release Hermes ports using the common function from tekton_kill
-    release_port "8100" "Hermes Service Registry"
-    SERVICE_REGISTRY_PORT_RESULT=$?
-    
-    release_port "8101" "Hermes Database"
-    DATABASE_PORT_RESULT=$?
-    
-    # Verify ports are now free
-    if [ $SERVICE_REGISTRY_PORT_RESULT -ne 0 ] || [ $DATABASE_PORT_RESULT -ne 0 ]; then
-        echo -e "${RED}Error: Hermes ports still in use. Cannot start Hermes services.${RESET}"
-        echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
-        return 1
+    # For Hermes, we use the full tekton_kill script which has already been sourced
+    # If not sourced, something went wrong as LAUNCHING_HERMES should be true here
+    if type release_port >/dev/null 2>&1; then
+        # Release Hermes ports using the common function from tekton_kill
+        release_port "8100" "Hermes Service Registry"
+        SERVICE_REGISTRY_PORT_RESULT=$?
+        
+        release_port "8101" "Hermes Database"
+        DATABASE_PORT_RESULT=$?
+        
+        # Verify ports are now free
+        if [ $SERVICE_REGISTRY_PORT_RESULT -ne 0 ] || [ $DATABASE_PORT_RESULT -ne 0 ]; then
+            echo -e "${RED}Error: Hermes ports still in use. Cannot start Hermes services.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        else
+            echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+        fi
     else
-        echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+        # Fallback if the release_port function is not available
+        # This should not happen if LAUNCHING_HERMES is true
+        echo -e "${YELLOW}Warning: Using fallback port checking for Hermes${RESET}"
+        
+        # Release the Service Registry port if it's in use
+        release_component_port "8100" "Hermes Service Registry"
+        SERVICE_REGISTRY_PORT_RESULT=$?
+        
+        # Release the Database port if it's in use
+        release_component_port "8101" "Hermes Database"
+        DATABASE_PORT_RESULT=$?
+        
+        # Verify ports are now free
+        if [ $SERVICE_REGISTRY_PORT_RESULT -ne 0 ] || [ $DATABASE_PORT_RESULT -ne 0 ]; then
+            echo -e "${RED}Error: Hermes ports could not be released. Cannot start Hermes services.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        else
+            echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+        fi
     fi
     
     # Set up Python path
@@ -771,6 +865,24 @@ launch_ergon() {
         echo -e "${GREEN}Ergon services are already running${RESET}"
         return 0
     fi
+    
+    # Verify port is free before launching
+    echo -e "${YELLOW}Checking if Ergon port 8200 is available...${RESET}"
+    
+    # Use targeted port management - only release the specific port needed by this component
+    # If Hermes is launching, the full tekton_kill script will handle this
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release the port if it's in use
+        release_component_port "8200" "Ergon Agent System"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Port 8200 could not be released. Cannot start Ergon Agent System.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        fi
+    fi
+    
+    # By this point the port should be available - either through tekton_kill or release_component_port
+    echo -e "${GREEN}Port 8200 is available. Proceeding with launch.${RESET}"
     
     # Check if Ergon is implemented
     if [ -d "$ERGON_DIR/ergon" ] && [ -f "$ERGON_DIR/ergon/__init__.py" ]; then
@@ -1120,14 +1232,21 @@ launch_synthesis() {
     
     # Verify port is free before launching
     echo -e "${YELLOW}Checking if Synthesis port 5005 is available...${RESET}"
-    release_port "5005" "Synthesis Engine"
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Port 5005 still in use. Cannot start Synthesis Execution Engine.${RESET}"
-        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
-        return 1
-    else
-        echo -e "${GREEN}Port 5005 is available. Proceeding with launch.${RESET}"
+    
+    # Use targeted port management - only release the specific port needed by this component
+    # If Hermes is launching, the full tekton_kill script will handle this
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release the port if it's in use
+        release_component_port "5005" "Synthesis Engine"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Port 5005 could not be released. Cannot start Synthesis Execution Engine.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        fi
     fi
+    
+    # By this point the port should be available - either through tekton_kill or release_component_port
+    echo -e "${GREEN}Port 5005 is available. Proceeding with launch.${RESET}"
     
     # Check if Synthesis is implemented
     if [ -d "$SYNTHESIS_DIR/synthesis" ] && [ -f "$SYNTHESIS_DIR/synthesis/core/execution_engine.py" ]; then
@@ -1559,6 +1678,28 @@ echo ""
 mkdir -p "$HOME/.tekton/data"
 mkdir -p "$HOME/.tekton/logs"
 echo -e "${GREEN}Ensured data directories exist in $HOME/.tekton${RESET}"
+
+# Check if we're launching Hermes after parsing all arguments
+check_if_launching_hermes
+
+# Only source the kill script and clean up if we're launching Hermes
+if [ "$LAUNCHING_HERMES" = true ]; then
+    echo -e "${YELLOW}Hermes will be launched - cleaning up existing environment...${RESET}"
+    # Source the tekton_kill script to use its functions
+    source "$SCRIPT_DIR/tekton_kill"
+    
+    # Clean up any existing components and ensure ports are available
+    echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
+    ensure_ports_available
+    if [ $? -ne 0 ]; then
+        echo -e "${YELLOW}Warning: Could not free all required ports. Attempting to continue...${RESET}"
+    fi
+    echo ""
+else
+    echo -e "${GREEN}Hermes is not being launched - preserving existing environment${RESET}"
+    echo -e "${YELLOW}Note: Some ports may already be in use by other Tekton components${RESET}"
+    echo ""
+fi
 
 # Detect available components
 AVAILABLE_COMPONENTS=($(detect_components))
