@@ -26,9 +26,53 @@ else
     TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
 
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
+
 # Header
 echo -e "${BLUE}${BOLD}=== Tekton System Status ===${RESET}"
 echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
+
+# Check for Hermes lifecycle management mode
+echo ""
+echo -e "${BLUE}${BOLD}Lifecycle Management Status:${RESET}"
+if is_running "hermes.*database.manager" || is_running "hermes/api/app.py" || is_running "hermes.*service_discovery"; then
+    echo -e "${GREEN}✓ Hermes is running and may be managing component lifecycle${RESET}"
+    
+    # Check for specific components
+    COMPONENTS_RUNNING=""
+    if is_running "hermes.*database.manager"; then
+        COMPONENTS_RUNNING="$COMPONENTS_RUNNING Database Manager"
+    fi
+    if is_running "hermes/api/app.py"; then
+        COMPONENTS_RUNNING="$COMPONENTS_RUNNING API Server"
+    fi
+    if is_running "hermes.*service_discovery"; then
+        COMPONENTS_RUNNING="$COMPONENTS_RUNNING Service Registry"
+    fi
+    echo -e "${GREEN}✓ Running Hermes components:${RESET} $COMPONENTS_RUNNING"
+    
+    # Check if Hermes API is responding and if it's in lifecycle management mode
+    if curl -s "http://localhost:8100/api/health" > /dev/null 2>&1; then
+        # Try to get the lifecycle management status
+        LIFECYCLE_STATUS=$(curl -s "http://localhost:8100/api/lifecycle/status" 2>/dev/null)
+        if [[ "$LIFECYCLE_STATUS" == *"enabled"* ]]; then
+            echo -e "${GREEN}✓ Hermes lifecycle management is ENABLED${RESET}"
+            if [[ "$LIFECYCLE_STATUS" == *"auto_launch"* ]]; then
+                echo -e "${GREEN}✓ Hermes auto-launch is ENABLED${RESET}"
+            else
+                echo -e "${YELLOW}⚠ Hermes auto-launch is DISABLED${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}⚠ Hermes is running but lifecycle management is DISABLED${RESET}"
+        fi
+    else
+        echo -e "${YELLOW}⚠ Hermes API is not responding at http://localhost:8100${RESET}"
+    fi
+else
+    echo -e "${RED}✗ Hermes is not running - no lifecycle management available${RESET}"
+    echo -e "${YELLOW}⚠ Components will need to be launched and managed individually${RESET}"
+fi
 echo ""
 
 # Check Hermes service registry if available
@@ -101,7 +145,9 @@ components=(
     "engram_with_claude:Engram with Claude"
     "engram_with_ollama:Engram with Ollama"
     "ollama_bridge.py:Ollama Bridge"
-    "hermes.*database_manager:Hermes Database Manager"
+    "hermes.*database.manager:Hermes Database Manager"
+    "hermes/api/app.py:Hermes API Server"
+    "hermes.*service_discovery:Hermes Service Registry"
     "prometheus.core:Prometheus Planning Engine"
     "rhetor.core:Rhetor Communication Engine"
     "telos.core:Telos User Interface"

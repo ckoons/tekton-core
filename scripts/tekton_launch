@@ -24,6 +24,9 @@ RESET="\033[0m"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
+
 # Source the tekton_kill script to use its functions
 source "$SCRIPT_DIR/tekton_kill"
 
@@ -65,13 +68,14 @@ SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
 show_usage() {
     echo "Tekton - Unified launcher for all Tekton components"
     echo ""
-    echo "Usage: launch-tekton.sh [OPTIONS]"
+    echo "Usage: tekton-launch [OPTIONS]"
     echo ""
     echo "Options:"
     echo "  --components COMP        Comma-separated list of components to launch:"
     echo "                           all: All available components"
     echo "                           Individual: engram,hermes,ergon,rhetor,athena,prometheus,"
     echo "                                       harmonia,sophia,telos,hephaestus"
+    echo "  --launch-all             Launch all available components (equivalent to --components all)"
     echo "  --model-type TYPE        Type of model to launch: claude, ollama (default: claude)"
     echo "  --model MODEL            Specific model to use (defaults depend on model type)"
     echo "  --client-id ID           Client ID for Engram (default: tekton)"
@@ -80,9 +84,9 @@ show_usage() {
     echo "  --help                   Show this help message"
     echo ""
     echo "Examples:"
-    echo "  Launch all components:                 launch-tekton.sh --components all"
-    echo "  Launch selected components:            launch-tekton.sh --components engram,hermes,ergon"
-    echo "  Launch with Ollama and custom model:   launch-tekton.sh --model-type ollama --model llama3"
+    echo "  Launch all components:                 tekton-launch --launch-all"
+    echo "  Launch selected components:            tekton-launch --components engram,hermes,ergon"
+    echo "  Launch with Ollama and custom model:   tekton-launch --model-type ollama --model llama3"
 }
 
 # Function to check if a process is running
@@ -413,7 +417,7 @@ launch_engram() {
     release_port "8000" "Engram Memory"
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Port 8000 still in use. Cannot start Engram Memory Service.${RESET}"
-        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
+        echo -e "${YELLOW}Try running ./scripts/tekton_kill first to clear all processes.${RESET}"
         return 1
     else
         echo -e "${GREEN}Port 8000 is available. Proceeding with launch.${RESET}"
@@ -422,7 +426,22 @@ launch_engram() {
     # Find the consolidated server script
     ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
     
+    # Double-check the directory structure
+    if [ ! -d "$ENGRAM_DIR" ]; then
+        echo -e "${RED}Error: Engram directory not found at $ENGRAM_DIR${RESET}"
+        echo -e "${YELLOW}Make sure you're running this script from the Tekton directory${RESET}"
+        return 1
+    fi
+    
+    # Check if the Python module contains the necessary files
+    if [ ! -d "$ENGRAM_DIR/engram" ]; then
+        echo -e "${YELLOW}Warning: Engram Python module directory not found${RESET}"
+    fi
+    
+    # Check if the startup script exists
     if [ -x "$ENGRAM_STARTUP" ]; then
+        echo -e "${GREEN}Found Engram startup script at: $ENGRAM_STARTUP${RESET}"
+        
         # Create data directory
         mkdir -p "$HOME/.tekton/data"
         mkdir -p "$HOME/.tekton/logs"
@@ -445,7 +464,7 @@ launch_engram() {
         echo -e "${YELLOW}Setting ENGRAM_USE_FALLBACK=1 to use file-based storage${RESET}"
         
         # Start the service
-        "$ENGRAM_STARTUP" --fallback --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1 &
+        (cd "$TEKTON_DIR" && "$ENGRAM_STARTUP" --fallback --data-dir "$HOME/.tekton/data" > "$HOME/.tekton/logs/engram.log" 2>&1) &
         ENGRAM_PID=$!
         
         echo -e "${GREEN}Started Engram memory service with PID: $ENGRAM_PID${RESET}"
@@ -456,6 +475,7 @@ launch_engram() {
             sleep 2  # 2 second sleep
             if ! ps -p $ENGRAM_PID > /dev/null; then
                 echo -e "${RED}Memory service failed to start${RESET}"
+                echo -e "${RED}Engram log:${RESET}"
                 cat "$HOME/.tekton/logs/engram.log"
                 return 1
             fi
@@ -474,13 +494,35 @@ launch_engram() {
         return 0
     else
         echo -e "${RED}Engram consolidated server script not found at $ENGRAM_STARTUP${RESET}"
+        echo -e "${YELLOW}Checking for alternative script locations...${RESET}"
+        
+        # Check for alternative script locations
+        local ALTERNATIVE_PATHS=(
+            "$ENGRAM_DIR/engram_consolidated"
+            "$ENGRAM_DIR/scripts/engram_consolidated"
+            "$ENGRAM_DIR/bin/engram_consolidated"
+        )
+        
+        for alt_path in "${ALTERNATIVE_PATHS[@]}"; do
+            if [ -x "$alt_path" ]; then
+                echo -e "${GREEN}Found alternative Engram script at: $alt_path${RESET}"
+                ENGRAM_STARTUP="$alt_path"
+                # Re-run this function with the updated path
+                launch_engram
+                return $?
+            fi
+        done
+        
+        echo -e "${RED}No Engram startup script found in alternative locations${RESET}"
+        echo -e "${YELLOW}Available files in Engram directory:${RESET}"
+        find "$ENGRAM_DIR" -type f -name "*engram*" -perm -u+x | head -5
         return 1
     fi
 }
 
 # Launch Hermes component
 launch_hermes() {
-    echo -e "${BLUE}${BOLD}Launching Hermes Database & Messaging...${RESET}"
+    echo -e "${BLUE}${BOLD}Launching Hermes Database & Messaging as Lifecycle Manager...${RESET}"
     
     # Check if Hermes is already running
     if is_running "hermes.*database_manager"; then
@@ -501,7 +543,7 @@ launch_hermes() {
     # Verify ports are now free
     if [ $SERVICE_REGISTRY_PORT_RESULT -ne 0 ] || [ $DATABASE_PORT_RESULT -ne 0 ]; then
         echo -e "${RED}Error: Hermes ports still in use. Cannot start Hermes services.${RESET}"
-        echo -e "${YELLOW}Try running ./tekton_kill first to clear all processes.${RESET}"
+        echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
         return 1
     else
         echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
@@ -519,8 +561,9 @@ launch_hermes() {
     # Prepare environment variables for Python script
     HERMES_PY_DIR="$HERMES_DIR"
     HOME_PY_DIR="$HOME"
+    COMPONENT_MGMT="true"  # Enable component lifecycle management
     
-    # Launch the Hermes API server
+    # Launch the Hermes API server with enhanced lifecycle management
     python3 -c "
 import sys, os, subprocess, asyncio
 sys.path.insert(0, '$HERMES_DIR')
@@ -532,6 +575,8 @@ env['HOST'] = '127.0.0.1'
 env['HERMES_DATA_DIR'] = '$HOME_PY_DIR/.tekton/data/hermes'
 env['DB_MCP_PORT'] = '8101'  # Database MCP port
 env['DB_MCP_HOST'] = '127.0.0.1'
+env['HERMES_COMPONENT_MANAGER'] = 'true'  # Enable component lifecycle management
+env['HERMES_AUTO_LAUNCH'] = 'true'  # Enable auto-launching of registered components
 
 # Find the API script
 api_path = os.path.join('$HERMES_DIR', 'hermes', 'api', 'app.py')
@@ -545,7 +590,7 @@ if os.path.exists(api_path):
         stderr=open('$HOME_PY_DIR/.tekton/logs/hermes_api.log', 'w'),
         close_fds=True
     )
-    print('${GREEN}Hermes API server started successfully${RESET}')
+    print('${GREEN}Hermes API server started successfully in lifecycle management mode${RESET}')
 else:
     # Fallback to separate components if API server script not found
     print('${YELLOW}Hermes API server script not found, falling back to separate components${RESET}')
@@ -612,7 +657,7 @@ asyncio.run(run())
         close_fds=True
     )
 
-    # Start service registry in a separate process
+    # Start enhanced service registry with lifecycle management in a separate process
     subprocess.Popen(
         [sys.executable, '-c', '''
 import sys, asyncio, os
@@ -620,10 +665,21 @@ sys.path.insert(0, \"$HERMES_PY_DIR\")
 from hermes.core.service_discovery import ServiceRegistry
 
 async def run():
-    # The ServiceRegistry doesn't accept a port parameter in the constructor
-    registry = ServiceRegistry(check_interval=30, timeout=10)
+    # Create registry with component lifecycle management
+    enable_lifecycle = os.environ.get('HERMES_COMPONENT_MANAGER', 'false').lower() == 'true'
+    auto_launch = os.environ.get('HERMES_AUTO_LAUNCH', 'false').lower() == 'true'
+    
+    registry = ServiceRegistry(
+        check_interval=30, 
+        timeout=10,
+        enable_lifecycle_management=enable_lifecycle,
+        auto_launch_components=auto_launch
+    )
+    
     # The start method is synchronous, not async
     registry.start()
+    print(f\"Service registry started with lifecycle management: {enable_lifecycle}, auto-launch: {auto_launch}\")
+    
     while True:
         await asyncio.sleep(1)
 
@@ -634,7 +690,7 @@ asyncio.run(run())
         close_fds=True
     )
     
-    print('${GREEN}Hermes services started successfully${RESET}')
+    print('${GREEN}Hermes services started successfully with lifecycle management${RESET}')
 " &
     
     # Give services time to start
@@ -652,6 +708,7 @@ asyncio.run(run())
         # Try to verify the API is responding
         if curl -s "http://localhost:8100/api/health" > /dev/null 2>&1; then
             echo -e "${GREEN}Hermes API is responding to health checks${RESET}"
+            echo -e "${GREEN}Hermes is now ready to manage component lifecycle${RESET}"
         else
             echo -e "${YELLOW}Hermes API processes are running but not responding yet${RESET}"
         fi
@@ -1382,11 +1439,19 @@ launch_ai_model() {
             # Set model via env var
             export ANTHROPIC_API_MODEL="$MODEL"
             
-            # Launch Claude
-            echo -e "${GREEN}Starting Claude with model: $MODEL${RESET}"
-            echo -e "${YELLOW}To exit Claude, press Ctrl+D${RESET}"
-            echo -e "${BLUE}-----------------------------------------------${RESET}"
-            claude --allowedTools='Bash(*),Edit,View,Replace,BatchTool,GlobTool,GrepTool,LS,ReadNotebook,NotebookEditCell,WebFetchTool'
+            # Check if Claude CLI is installed
+            if command -v claude &> /dev/null; then
+                # Launch Claude
+                echo -e "${GREEN}Starting Claude with model: $MODEL${RESET}"
+                echo -e "${YELLOW}To exit Claude, press Ctrl+D${RESET}"
+                echo -e "${BLUE}-----------------------------------------------${RESET}"
+                claude --allowedTools='Bash(*),Edit,View,Replace,BatchTool,GlobTool,GrepTool,LS,ReadNotebook,NotebookEditCell,WebFetchTool'
+            else
+                echo -e "${RED}Claude CLI not found in PATH${RESET}"
+                echo -e "${YELLOW}To install Claude CLI, follow instructions at:${RESET}"
+                echo -e "${YELLOW}https://github.com/anthropics/anthropic-cli${RESET}"
+                return 1
+            fi
             ;;
             
         "ollama")
@@ -1402,7 +1467,25 @@ launch_ai_model() {
             # Verify the bridge file exists
             if [ ! -f "$OLLAMA_BRIDGE" ]; then
                 echo -e "${RED}Error: Ollama bridge script not found at $OLLAMA_BRIDGE${RESET}"
-                return 1
+                
+                # Check for alternative locations
+                ALT_BRIDGES=(
+                    "$ENGRAM_DIR/ollama/bridge/ollama_bridge.py"
+                    "$ENGRAM_DIR/bridge/ollama_bridge.py"
+                )
+                
+                for alt_bridge in "${ALT_BRIDGES[@]}"; do
+                    if [ -f "$alt_bridge" ]; then
+                        echo -e "${GREEN}Found alternative Ollama bridge at: $alt_bridge${RESET}"
+                        OLLAMA_BRIDGE="$alt_bridge"
+                        break
+                    fi
+                done
+                
+                if [ ! -f "$OLLAMA_BRIDGE" ]; then
+                    echo -e "${RED}No Ollama bridge script found in alternative locations${RESET}"
+                    return 1
+                fi
             fi
             
             # Add paths to PYTHONPATH
@@ -1431,6 +1514,10 @@ while [[ $# -gt 0 ]]; do
       IFS=',' read -r -a COMPONENTS <<< "$2"
       shift 2
       ;;
+    --launch-all)
+      LAUNCH_ALL=true
+      shift
+      ;;
     --model-type)
       MODEL_TYPE="$2"
       shift 2
@@ -1457,7 +1544,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown option: $1"
-      echo "Try 'launch-tekton.sh --help' for more information."
+      echo "Try 'tekton-launch --help' for more information."
       exit 1
       ;;
   esac
@@ -1476,8 +1563,26 @@ echo -e "${GREEN}Ensured data directories exist in $HOME/.tekton${RESET}"
 # Detect available components
 AVAILABLE_COMPONENTS=($(detect_components))
 
+# If launch-all is specified, set all available components
+if [ "$LAUNCH_ALL" = true ]; then
+    COMPONENTS=("${AVAILABLE_COMPONENTS[@]}")
+    echo -e "${GREEN}Launch-all option specified. All available components will be launched.${RESET}"
+    
+    # Always ensure hermes is first in the list when launching all
+    if [[ " ${COMPONENTS[*]} " == *" hermes "* ]]; then
+        # Remove hermes from its current position
+        NEW_COMPONENTS=()
+        for comp in "${COMPONENTS[@]}"; do
+            if [ "$comp" != "hermes" ]; then
+                NEW_COMPONENTS+=("$comp")
+            fi
+        done
+        # Add hermes as the first component
+        COMPONENTS=("hermes" "${NEW_COMPONENTS[@]}")
+    fi
+    
 # If no components specified, check if we're in interactive mode
-if [ ${#COMPONENTS[@]} -eq 0 ]; then
+elif [ ${#COMPONENTS[@]} -eq 0 ]; then
     if [ "$INTERACTIVE" = true ]; then
         # Ask user to select components
         COMPONENTS=($(select_components "${AVAILABLE_COMPONENTS[@]}"))
@@ -1487,10 +1592,23 @@ if [ ${#COMPONENTS[@]} -eq 0 ]; then
     fi
 fi
 
-# Special case for "all" components
+# Special case for "all" in components list
 if [[ " ${COMPONENTS[*]} " == *" all "* ]]; then
     COMPONENTS=("${AVAILABLE_COMPONENTS[@]}")
     LAUNCH_ALL=true
+    
+    # Always ensure hermes is first in the list when launching all
+    if [[ " ${COMPONENTS[*]} " == *" hermes "* ]]; then
+        # Remove hermes from its current position
+        NEW_COMPONENTS=()
+        for comp in "${COMPONENTS[@]}"; do
+            if [ "$comp" != "hermes" ]; then
+                NEW_COMPONENTS+=("$comp")
+            fi
+        done
+        # Add hermes as the first component
+        COMPONENTS=("hermes" "${NEW_COMPONENTS[@]}")
+    fi
 fi
 
 # If UI is explicitly disabled, remove hephaestus from components
@@ -1519,17 +1637,46 @@ done
 echo ""
 
 # Launch components in the correct dependency order
-# First: core infrastructure (Engram, Hermes)
+# Always launch Hermes first if it's in the components list as it will manage other components
+HERMES_LAUNCHED=false
+OTHER_COMPONENTS=()
+
+# First check if Hermes is in the component list
 for comp in "${COMPONENTS[@]}"; do
+    if [ "$comp" = "hermes" ]; then
+        echo -e "${BLUE}${BOLD}Launching Hermes first as lifecycle manager...${RESET}"
+        launch_hermes
+        if [ $? -eq 0 ]; then
+            HERMES_LAUNCHED=true
+            # Give Hermes time to initialize before launching other components
+            echo -e "${YELLOW}Waiting for Hermes to fully initialize...${RESET}"
+            sleep 5
+        else
+            echo -e "${RED}Hermes failed to launch. Components may not be properly managed.${RESET}"
+        fi
+    else
+        OTHER_COMPONENTS+=("$comp")
+    fi
+done
+
+# If Hermes is launched, register other components with it
+if [ "$HERMES_LAUNCHED" = true ]; then
+    echo -e "${BLUE}${BOLD}Hermes will manage component lifecycle for:${RESET}"
+    for comp in "${OTHER_COMPONENTS[@]}"; do
+        echo -e "${GREEN}• $comp${RESET}"
+    done
+    echo ""
+fi
+
+# First: core infrastructure (Engram)
+for comp in "${OTHER_COMPONENTS[@]}"; do
     if [ "$comp" = "engram" ]; then
         launch_engram
-    elif [ "$comp" = "hermes" ]; then
-        launch_hermes
     fi
 done
 
 # Second: mid-level components (Ergon, Rhetor, Prometheus, Harmonia)
-for comp in "${COMPONENTS[@]}"; do
+for comp in "${OTHER_COMPONENTS[@]}"; do
     if [ "$comp" = "ergon" ]; then
         launch_ergon
     elif [ "$comp" = "rhetor" ]; then
@@ -1542,7 +1689,7 @@ for comp in "${COMPONENTS[@]}"; do
 done
 
 # Third: high-level components (Athena, Sophia, Telos, Synthesis)
-for comp in "${COMPONENTS[@]}"; do
+for comp in "${OTHER_COMPONENTS[@]}"; do
     if [ "$comp" = "athena" ]; then
         launch_athena
     elif [ "$comp" = "sophia" ]; then

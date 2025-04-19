@@ -144,19 +144,19 @@ Tekton provides unified scripts to launch, stop, and monitor all components in t
 
 ```bash
 # Launch all available Tekton components
-./launch-tekton.sh --components all
+./scripts/tekton_launch --components all
 
 # Launch specific components
-./launch-tekton.sh --components engram,hermes,ergon
+./scripts/tekton_launch --components engram,hermes,ergon
 
 # Launch with interactive component selection
-./launch-tekton.sh
+./scripts/tekton_launch
 
 # Stop all running Tekton components
-./kill-tekton.sh
+./scripts/tekton_kill
 
 # Check status of Tekton components and system resources
-./tekton-status.sh
+./scripts/tekton_status
 ```
 
 The launch script supports various options:
@@ -166,8 +166,12 @@ The launch script supports various options:
 - `--client-id`: Client ID for Engram
 - `--no-ui`: Don't launch the Hephaestus UI
 - `--non-interactive`: Run in non-interactive mode
+- `--launch-all`: Launch all available components (equivalent to --components all)
 
-All scripts are located in the `scripts` directory, with convenient symlinks in the root directory for common operations.
+Convenient symlinks are also available in ~/utils:
+- `~/utils/tekton-launch`
+- `~/utils/tekton-kill`
+- `~/utils/tekton-status`
 
 ### Managing Requirements
 
