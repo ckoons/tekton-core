@@ -10,6 +10,7 @@
 # Engram:              8000 (Memory server)
 # Hermes:              8100 (Service registry), 8101 (Database)
 # Ergon:               8200 (Agent system)
+# LLM Adapter:         8300 (HTTP server), 8301 (WebSocket server)
 # Other components may use additional ports as needed
 
 # ANSI color codes for terminal output
@@ -138,6 +139,10 @@ ensure_ports_available() {
     # Release Ergon ports
     release_port "8200" "Ergon Agent System" || result=1
     
+    # Release LLM Adapter ports
+    release_port "8300" "LLM Adapter HTTP" || result=1
+    release_port "8301" "LLM Adapter WebSocket" || result=1
+    
     # Release Synthesis ports
     release_port "5005" "Synthesis Engine" || result=1
     
@@ -212,6 +217,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         kill_processes "harmonia.core" "Harmonia (Workflow)"
         kill_processes "telos.core" "Telos (User Interface)"
         kill_processes "rhetor.core" "Rhetor (Context Manager)"
+        kill_processes "llm_adapter" "LLM Adapter"
         kill_processes "ergon.core" "Ergon (Agent System)"
         kill_processes "engram_with_ollama" "Engram+Ollama"
         kill_processes "engram_with_claude" "Engram+Claude"
@@ -271,7 +277,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     
     # Final sweep for any remaining Tekton component processes
-    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis hephaestus; do
+    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis hephaestus llm_adapter; do
         if pgrep -f "$component" >/dev/null; then
             echo -e "${YELLOW}Killing remaining $component processes...${RESET}"
             pkill -9 -f "$component"

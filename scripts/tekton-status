@@ -134,6 +134,7 @@ COMPONENTS=(
     "telos.core:Telos User Interface"
     "harmonia.core:Harmonia Workflow Engine"
     "athena.core:Athena Knowledge Graph"
+    "llm_adapter:LLM Adapter"
     "Hephaestus/ui/server/server.py:Hephaestus UI Server"
 )
 
@@ -217,6 +218,27 @@ if is_port_used 8200; then
     echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
 else
     echo -e "${GREEN}Port 8200 (Ergon Agent System): Available${RESET}"
+fi
+
+# LLM Adapter ports
+if is_port_used 8300; then
+    process_info=$(get_port_process 8300)
+    pid=$(echo "$process_info" | cut -f1)
+    process=$(echo "$process_info" | cut -f2-)
+    echo -e "${YELLOW}Port 8300 (LLM Adapter HTTP): In use by PID $pid${RESET}"
+    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
+else
+    echo -e "${GREEN}Port 8300 (LLM Adapter HTTP): Available${RESET}"
+fi
+
+if is_port_used 8301; then
+    process_info=$(get_port_process 8301)
+    pid=$(echo "$process_info" | cut -f1)
+    process=$(echo "$process_info" | cut -f2-)
+    echo -e "${YELLOW}Port 8301 (LLM Adapter WebSocket): In use by PID $pid${RESET}"
+    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
+else
+    echo -e "${GREEN}Port 8301 (LLM Adapter WebSocket): Available${RESET}"
 fi
 
 # Synthesis port

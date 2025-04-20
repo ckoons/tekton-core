@@ -178,6 +178,7 @@ Tekton components use specific ports that need to be available for proper operat
 | Engram         | 8000                              | Memory system                          |
 | Hermes         | 8100 (Registry), 8101 (Database)  | Service registry and database services |
 | Ergon          | 8200                              | Agent system                           |
+| LLM Adapter    | 8300 (HTTP), 8301 (WebSocket)     | Terminal-to-LLM communication          |
 | Synthesis      | 5005                              | Execution engine                       |
 
 The launch script manages these ports automatically:
