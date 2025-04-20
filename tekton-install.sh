@@ -67,12 +67,12 @@ chmod +x "$HOME_BIN/tekton"
 
 # Create symbolic links for component scripts
 echo -e "${BLUE}Setting up component commands...${NC}"
-ln -sf "$SCRIPT_DIR/scripts/tekton_launch" "$HOME_BIN/tekton-launch"
-ln -sf "$SCRIPT_DIR/scripts/tekton_status" "$HOME_BIN/tekton-status"
-ln -sf "$SCRIPT_DIR/scripts/tekton_kill" "$HOME_BIN/tekton-kill"
-chmod +x "$SCRIPT_DIR/scripts/tekton_launch"
-chmod +x "$SCRIPT_DIR/scripts/tekton_status"
-chmod +x "$SCRIPT_DIR/scripts/tekton_kill"
+ln -sf "$SCRIPT_DIR/scripts/tekton-launch" "$HOME_BIN/tekton-launch"
+ln -sf "$SCRIPT_DIR/scripts/tekton-status" "$HOME_BIN/tekton-status"
+ln -sf "$SCRIPT_DIR/scripts/tekton-kill" "$HOME_BIN/tekton-kill"
+chmod +x "$SCRIPT_DIR/scripts/tekton-launch"
+chmod +x "$SCRIPT_DIR/scripts/tekton-status"
+chmod +x "$SCRIPT_DIR/scripts/tekton-kill"
 
 echo -e "${GREEN}Tekton installation complete!${NC}"
 echo -e "Run 'tekton --help' to get started"

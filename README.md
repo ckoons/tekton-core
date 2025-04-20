@@ -144,19 +144,19 @@ Tekton provides unified scripts to launch, stop, and monitor all components in t
 
 ```bash
 # Launch all available Tekton components
-./scripts/tekton_launch --components all
+./scripts/tekton-launch --components all
 
 # Launch specific components
-./scripts/tekton_launch --components engram,hermes,ergon
+./scripts/tekton-launch --components engram,hermes,ergon
 
 # Launch with interactive component selection
-./scripts/tekton_launch
+./scripts/tekton-launch
 
 # Stop all running Tekton components
-./scripts/tekton_kill
+./scripts/tekton-kill
 
 # Check status of Tekton components and system resources
-./scripts/tekton_status
+./scripts/tekton-status
 ```
 
 The launch script supports various options:

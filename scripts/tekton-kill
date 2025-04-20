@@ -1,5 +1,5 @@
 #!/bin/bash
-# tekton_kill - Master script to stop all Tekton components and AI services
+# tekton-kill - Master script to stop all Tekton components and AI services
 # Created: April 11, 2025
 # Updated: April 19, 2025 - Enhanced Hermes database process detection and termination
 

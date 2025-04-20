@@ -1,5 +1,5 @@
-#\!/bin/bash
-# tekton_status - Script to show the status of Tekton components
+#!/bin/bash
+# tekton-status - Script to show the status of Tekton components
 # Created: April 1, 2025
 # Updated: April 19, 2025 - Enhanced port status reporting
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# tekton_launch - Unified script to launch all Tekton components in the correct order
+# tekton-launch - Unified script to launch all Tekton components in the correct order
 # Created: April 11, 2025
 # Updated: April 19, 2025 - Modified to use targeted port-specific process management
 
@@ -27,7 +27,7 @@ TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 # Ensure we're in the correct directory context
 cd "$TEKTON_DIR"
 
-# We'll conditionally source the tekton_kill script only if we're launching Hermes
+# We'll conditionally source the tekton-kill script only if we're launching Hermes
 LAUNCHING_HERMES=false
 
 # Function to check if we're launching Hermes (called after parsing arguments)
@@ -1685,8 +1685,8 @@ check_if_launching_hermes
 # Only source the kill script and clean up if we're launching Hermes
 if [ "$LAUNCHING_HERMES" = true ]; then
     echo -e "${YELLOW}Hermes will be launched - cleaning up existing environment...${RESET}"
-    # Source the tekton_kill script to use its functions
-    source "$SCRIPT_DIR/tekton_kill"
+    # Source the tekton-kill script to use its functions
+    source "$SCRIPT_DIR/tekton-kill"
     
     # Clean up any existing components and ensure ports are available
     echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
@@ -1910,4 +1910,4 @@ if [[ " ${COMPONENTS[*]} " == *" hephaestus "* ]]; then
     echo -e "${GREEN}Tekton UI is available at: http://localhost:8080${RESET}"
 fi
 
-echo -e "${YELLOW}To stop all Tekton components, run: ./kill-tekton.sh${RESET}"
+echo -e "${YELLOW}To stop all Tekton components, run: ./scripts/tekton-kill${RESET}"
