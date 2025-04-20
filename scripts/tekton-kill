@@ -22,7 +22,13 @@ RESET="\033[0m"
 
 # Find Tekton root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+fi
 
 # Ensure we're in the correct directory context
 cd "$TEKTON_DIR"

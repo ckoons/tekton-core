@@ -22,7 +22,13 @@ RESET="\033[0m"
 
 # Find Tekton root directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+fi
 
 # Ensure we're in the correct directory context
 cd "$TEKTON_DIR"
@@ -1686,7 +1692,14 @@ check_if_launching_hermes
 if [ "$LAUNCHING_HERMES" = true ]; then
     echo -e "${YELLOW}Hermes will be launched - cleaning up existing environment...${RESET}"
     # Source the tekton-kill script to use its functions
-    source "$SCRIPT_DIR/tekton-kill"
+    if [ -f "$SCRIPT_DIR/tekton-kill" ]; then
+        source "$SCRIPT_DIR/tekton-kill"
+    elif [ -f "$TEKTON_DIR/scripts/tekton-kill" ]; then
+        source "$TEKTON_DIR/scripts/tekton-kill"
+    else
+        echo -e "${RED}Error: Could not find tekton-kill script${RESET}"
+        exit 1
+    fi
     
     # Clean up any existing components and ensure ports are available
     echo -e "${BLUE}${BOLD}Ensuring a clean environment before launch...${RESET}"
