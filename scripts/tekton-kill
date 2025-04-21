@@ -146,6 +146,10 @@ ensure_ports_available() {
     # Release Synthesis ports
     release_port "5005" "Synthesis Engine" || result=1
     
+    # Release Terma ports
+    release_port "8765" "Terma API" || result=1
+    release_port "8766" "Terma UI" || result=1
+    
     # Check results
     if [ $result -eq 0 ]; then
         echo -e "${GREEN}All Tekton ports are available${RESET}"
@@ -217,6 +221,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         kill_processes "harmonia.core" "Harmonia (Workflow)"
         kill_processes "telos.core" "Telos (User Interface)"
         kill_processes "rhetor.core" "Rhetor (Context Manager)"
+        
+        # Standard process check for Terma
+        kill_processes "terma.api.app" "Terma Terminal System"
+        kill_processes "terma.api.ui_server" "Terma UI Server"
         kill_processes "llm_adapter" "LLM Adapter"
         kill_processes "ergon.core" "Ergon (Agent System)"
         kill_processes "engram_with_ollama" "Engram+Ollama"

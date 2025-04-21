@@ -136,6 +136,8 @@ COMPONENTS=(
     "athena.core:Athena Knowledge Graph"
     "llm_adapter:LLM Adapter"
     "Hephaestus/ui/server/server.py:Hephaestus UI Server"
+    "terma.api.app:Terma API Server"
+    "terma.api.ui_server:Terma UI Server"
 )
 
 # Check each component
@@ -143,7 +145,25 @@ for component in "${COMPONENTS[@]}"; do
     pattern=$(echo "$component" | cut -d ":" -f1)
     name=$(echo "$component" | cut -d ":" -f2)
     
-    if is_running "$pattern"; then
+    # Special case for Terma components - check by port
+    if [[ "$name" == "Terma API Server" ]]; then
+        if is_port_used 8765; then
+            echo -e "${GREEN}✓ $name is running${RESET}"
+            pid=$(lsof -ti :8765 2>/dev/null)
+            echo "  PID: $pid"
+        else
+            echo -e "${RED}✗ $name is not running${RESET}"
+        fi
+    elif [[ "$name" == "Terma UI Server" ]]; then
+        if is_port_used 8766; then
+            echo -e "${GREEN}✓ $name is running${RESET}"
+            pid=$(lsof -ti :8766 2>/dev/null)
+            echo "  PID: $pid"
+        else
+            echo -e "${RED}✗ $name is not running${RESET}"
+        fi
+    # Normal process check for all other components
+    elif is_running "$pattern"; then
         echo -e "${GREEN}✓ $name is running${RESET}"
         # Get PIDs
         PIDS=$(pgrep -f "$pattern")
@@ -250,6 +270,27 @@ if is_port_used 5005; then
     echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
 else
     echo -e "${GREEN}Port 5005 (Synthesis Engine): Available${RESET}"
+fi
+
+# Terma ports
+if is_port_used 8765; then
+    process_info=$(get_port_process 8765)
+    pid=$(echo "$process_info" | cut -f1)
+    process=$(echo "$process_info" | cut -f2-)
+    echo -e "${YELLOW}Port 8765 (Terma API): In use by PID $pid${RESET}"
+    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
+else
+    echo -e "${GREEN}Port 8765 (Terma API): Available${RESET}"
+fi
+
+if is_port_used 8766; then
+    process_info=$(get_port_process 8766)
+    pid=$(echo "$process_info" | cut -f1)
+    process=$(echo "$process_info" | cut -f2-)
+    echo -e "${YELLOW}Port 8766 (Terma UI): In use by PID $pid${RESET}"
+    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
+else
+    echo -e "${GREEN}Port 8766 (Terma UI): Available${RESET}"
 fi
 
 echo ""

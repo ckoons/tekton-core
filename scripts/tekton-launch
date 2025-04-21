@@ -81,6 +81,7 @@ HARMONIA_DIR="${TEKTON_DIR}/Harmonia"
 SOPHIA_DIR="${TEKTON_DIR}/Sophia"
 TELOS_DIR="${TEKTON_DIR}/Telos"
 SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
+TERMA_DIR="${TEKTON_DIR}/Terma"
 
 # Function to display usage information
 show_usage() {
@@ -396,6 +397,13 @@ select_components() {
     if [[ " ${all_components[*]} " == *" synthesis "* ]]; then
         if prompt_yes_no "Launch Synthesis (Execution Engine)?" "n"; then
             selected_components+=("synthesis")
+        fi
+    fi
+    
+    # Ask about Terma (Terminal)
+    if [[ " ${all_components[*]} " == *" terma "* ]]; then
+        if prompt_yes_no "Launch Terma (Terminal System)?" "n"; then
+            selected_components+=("terma")
         fi
     fi
     
@@ -1548,6 +1556,99 @@ except Exception as e:
     fi
 }
 
+# Launch Terma component
+launch_terma() {
+    echo -e "${BLUE}${BOLD}Launching Terma Terminal System...${RESET}"
+    
+    # Check if Terma is already running
+    if is_running "terma.api"; then
+        echo -e "${GREEN}Terma services are already running${RESET}"
+        return 0
+    fi
+    
+    # Verify ports are free before launching
+    echo -e "${YELLOW}Checking if Terma ports are available...${RESET}"
+    
+    # Use targeted port management - only release the specific ports needed by this component
+    # If Hermes is launching, the full tekton_kill script will handle this
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release HTTP port if it's in use
+        release_component_port "8765" "Terma API"
+        HTTP_PORT_RESULT=$?
+        
+        # Release WebSocket port if it's in use
+        release_component_port "8766" "Terma UI"
+        WS_PORT_RESULT=$?
+        
+        # Verify ports are now free
+        if [ $HTTP_PORT_RESULT -ne 0 ] || [ $WS_PORT_RESULT -ne 0 ]; then
+            echo -e "${RED}Error: Ports 8765 or 8766 could not be released. Cannot start Terma Terminal System.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        fi
+    fi
+    
+    # By this point the ports should be available - either through tekton_kill or release_component_port
+    echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+    
+    # Check if Terma is implemented
+    if [ -d "$TERMA_DIR/terma" ] && [ -f "$TERMA_DIR/terma/core/terminal.py" ]; then
+        # Set up Python path
+        export PYTHONPATH="$TERMA_DIR:$PYTHONPATH"
+        
+        # Create log directory if it doesn't exist
+        mkdir -p "$HOME/.tekton/logs"
+        
+        # Launch API server with correct function call
+        python3 -c "
+import sys, asyncio
+sys.path.insert(0, '$TERMA_DIR')
+
+async def main():
+    from terma.api.app import start_server
+    await start_server(host='127.0.0.1', port=8765)
+
+asyncio.run(main())
+" > "$HOME/.tekton/logs/terma.log" 2>&1 &
+        API_PID=$!
+        echo -e "${GREEN}Terma API server launched with PID $API_PID${RESET}"
+        
+        # Launch UI server with correct function call
+        python3 -c "
+import sys, asyncio
+sys.path.insert(0, '$TERMA_DIR')
+
+async def main():
+    from terma.api.ui_server import start_ui_server
+    await start_ui_server(host='127.0.0.1', port=8766)
+
+asyncio.run(main())
+" > "$HOME/.tekton/logs/terma_ui.log" 2>&1 &
+        UI_PID=$!
+        echo -e "${GREEN}Terma UI server launched with PID $UI_PID${RESET}"
+        
+        # Give services time to start
+        sleep 3
+        
+        # Verify the API service is running
+        if curl -s http://localhost:8765/health > /dev/null 2>&1; then
+            echo -e "${GREEN}Terma API is responding on port 8765${RESET}"
+            echo -e "${GREEN}Terma Terminal UI available at: http://localhost:8766/terminal${RESET}"
+            echo -e "${GREEN}Terma terminal system initialized${RESET}"
+            return 0
+        else
+            echo -e "${YELLOW}Terma API not responding yet, but process may still be starting...${RESET}"
+            echo -e "${YELLOW}Check logs at: $HOME/.tekton/logs/terma.log${RESET}"
+            echo -e "${YELLOW}Once started, terminal will be available at: http://localhost:8766/terminal${RESET}"
+            return 0
+        fi
+    else
+        echo -e "${YELLOW}Terma terminal system is not fully implemented${RESET}"
+        echo -e "${YELLOW}Skipping Terma launch${RESET}"
+        return 0
+    fi
+}
+
 # Launch AI model (Claude or Ollama)
 launch_ai_model() {
     echo -e "${BLUE}${BOLD}Launching $MODEL_TYPE model: $MODEL${RESET}"
@@ -1842,7 +1943,7 @@ for comp in "${OTHER_COMPONENTS[@]}"; do
     fi
 done
 
-# Third: high-level components (Athena, Sophia, Telos, Synthesis)
+# Third: high-level components (Athena, Sophia, Telos, Synthesis, Terma)
 for comp in "${OTHER_COMPONENTS[@]}"; do
     if [ "$comp" = "athena" ]; then
         launch_athena
@@ -1852,6 +1953,8 @@ for comp in "${OTHER_COMPONENTS[@]}"; do
         launch_telos
     elif [ "$comp" = "synthesis" ]; then
         launch_synthesis
+    elif [ "$comp" = "terma" ]; then
+        launch_terma
     fi
 done
 
