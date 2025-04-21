@@ -29,7 +29,7 @@ echo -e "${BLUE}Setting up tekton-core...${NC}"
 bash "$SCRIPT_DIR/component-setup.sh" tekton-core
 
 # Components to setup
-COMPONENTS=(Hermes Engram Athena Ergon Rhetor Telos Harmonia Sophia Synthesis)
+COMPONENTS=(Hermes Engram Athena Ergon Rhetor Telos Harmonia Sophia Synthesis Terma)
 
 # Setup each component
 for component in "${COMPONENTS[@]}"; do

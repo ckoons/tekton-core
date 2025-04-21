@@ -45,3 +45,7 @@
 [submodule "Hermes"]
 	path = Hermes
 	url = https://github.com/ckoons/Hermes.git
+
+[submodule "Terma"]
+	path = Terma
+	url = https://github.com/ckoons/Terma.git

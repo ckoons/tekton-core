@@ -38,7 +38,7 @@ EOF
 )
 
 # List of project directories
-PROJECTS=("Athena" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Prometheus" "Rhetor" "Sophia" "Synthesis" "Telos")
+PROJECTS=("Athena" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Prometheus" "Rhetor" "Sophia" "Synthesis" "Telos" "Terma")
 
 # Track which projects were changed
 CHANGED=false
