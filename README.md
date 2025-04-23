@@ -52,6 +52,8 @@ Tekton integrates with:
 - **Sophia**: For Machine Learning, self improvement of Tekton and all component operations
 - **Telos**: For User communication, requirements development & analysis, evaluation and goals
 - **Hermes**: For centralized coordination, database services, and component registration
+- **Terma**: Terminal interface with integrated LLM assistance
+- **LLM Adapter**: Unified interface for all LLM providers and models
 - **Local Models**: Deepseek Coder, CodeLlama, etc.
 - **Remote APIs**: Claude, GPT, etc.
 
@@ -307,6 +309,37 @@ for tool, score in image_tools:
 ```
 
 For more detailed examples, see the [MCP Tool Registration documentation](/Ergon/ergon/core/repository/mcp/README.md).
+
+## Documentation & Resources
+
+### Implementation Documentation
+
+Tekton uses a structured documentation approach to ensure consistency and accessibility:
+
+- **MetaData/Implementation**: Contains comprehensive implementation documents for all components
+  - [TektonCoreImplementation.md](/MetaData/Implementation/TektonCoreImplementation.md): Core system implementation
+  - [HermesImplementation.md](/MetaData/Implementation/HermesImplementation.md): Message bus implementation
+  - [EngramImplementation.md](/MetaData/Implementation/EngramImplementation.md): Memory system implementation
+  - [TermaImplementation.md](/MetaData/Implementation/TermaImplementation.md): Terminal system implementation
+  - [TermaIntegrationPoints.md](/MetaData/Implementation/TermaIntegrationPoints.md): Terminal integration details
+
+### UI & Development Resources
+
+- [UI Styling Guide](/Hephaestus/UI_STYLING_GUIDE.md): Best practices for consistent UI development
+- [Hephaestus Development Status](/Hephaestus/DEVELOPMENT_STATUS.md): Current UI development status
+- [TEKTON_STATUS.md](/TEKTON_STATUS.md): Overall project status and roadmap
+- [Terma Phase 4 Planning](/Terma/PHASE4_PLANNING.md): Next steps for the Terma terminal component
+
+### Component Documentation
+
+Each component maintains its own documentation hierarchy:
+
+1. **Core Documentation**: Architecture, API references, integration guides
+2. **Implementation Documentation**: Comprehensive implementation details
+3. **User Guides**: Installation, usage examples, configuration
+4. **Status Documents**: Progress reports, planning documents
+
+This structure ensures that both human developers and AI assistants can quickly find relevant information for development tasks.
 
 ## License
 

@@ -49,6 +49,16 @@ get_port_process() {
     fi
 }
 
+# Export standardized ports as environment variables for all components
+export HEPHAESTUS_HTTP_PORT=8080
+export HEPHAESTUS_WS_PORT=8081
+export ENGRAM_PORT=8000
+export HERMES_REGISTRY_PORT=8100
+export HERMES_DB_PORT=8101
+export ERGON_PORT=8200
+export TERMA_API_PORT=8765
+export TERMA_WS_PORT=8767
+
 # Display banner
 echo -e "${BLUE}${BOLD}=== Tekton System Status ===${RESET}"
 echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
@@ -136,8 +146,8 @@ COMPONENTS=(
     "athena.core:Athena Knowledge Graph"
     "llm_adapter:LLM Adapter"
     "Hephaestus/ui/server/server.py:Hephaestus UI Server"
-    "terma.api.app:Terma API Server"
-    "terma.api.ui_server:Terma UI Server"
+    "terma.api.app:Terma API Server ($TERMA_API_PORT)"
+    "terma.api.ui_server:Terma WebSocket Server ($TERMA_WS_PORT)"
 )
 
 # Check each component
@@ -145,22 +155,22 @@ for component in "${COMPONENTS[@]}"; do
     pattern=$(echo "$component" | cut -d ":" -f1)
     name=$(echo "$component" | cut -d ":" -f2)
     
-    # Special case for Terma components - check by port
+    # Special case for Terma components - check by port using environment variables
     if [[ "$name" == "Terma API Server" ]]; then
-        if is_port_used 8765; then
-            echo -e "${GREEN}✓ $name is running${RESET}"
-            pid=$(lsof -ti :8765 2>/dev/null)
+        if is_port_used $TERMA_API_PORT; then
+            echo -e "${GREEN}✓ $name is running on port $TERMA_API_PORT${RESET}"
+            pid=$(lsof -ti :$TERMA_API_PORT 2>/dev/null)
             echo "  PID: $pid"
         else
-            echo -e "${RED}✗ $name is not running${RESET}"
+            echo -e "${RED}✗ $name is not running (port $TERMA_API_PORT)${RESET}"
         fi
     elif [[ "$name" == "Terma UI Server" ]]; then
-        if is_port_used 8766; then
-            echo -e "${GREEN}✓ $name is running${RESET}"
-            pid=$(lsof -ti :8766 2>/dev/null)
+        if is_port_used $TERMA_WS_PORT; then
+            echo -e "${GREEN}✓ $name is running on port $TERMA_WS_PORT${RESET}"
+            pid=$(lsof -ti :$TERMA_WS_PORT 2>/dev/null)
             echo "  PID: $pid"
         else
-            echo -e "${RED}✗ $name is not running${RESET}"
+            echo -e "${RED}✗ $name is not running (port $TERMA_WS_PORT)${RESET}"
         fi
     # Normal process check for all other components
     elif is_running "$pattern"; then
@@ -272,25 +282,25 @@ else
     echo -e "${GREEN}Port 5005 (Synthesis Engine): Available${RESET}"
 fi
 
-# Terma ports
-if is_port_used 8765; then
-    process_info=$(get_port_process 8765)
+# Terma ports - use environment variables
+if is_port_used $TERMA_API_PORT; then
+    process_info=$(get_port_process $TERMA_API_PORT)
     pid=$(echo "$process_info" | cut -f1)
     process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8765 (Terma API): In use by PID $pid${RESET}"
+    echo -e "${YELLOW}Port $TERMA_API_PORT (Terma API): In use by PID $pid${RESET}"
     echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
 else
-    echo -e "${GREEN}Port 8765 (Terma API): Available${RESET}"
+    echo -e "${GREEN}Port $TERMA_API_PORT (Terma API): Available${RESET}"
 fi
 
-if is_port_used 8766; then
-    process_info=$(get_port_process 8766)
+if is_port_used $TERMA_WS_PORT; then
+    process_info=$(get_port_process $TERMA_WS_PORT)
     pid=$(echo "$process_info" | cut -f1)
     process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8766 (Terma UI): In use by PID $pid${RESET}"
+    echo -e "${YELLOW}Port $TERMA_WS_PORT (Terma WebSocket): In use by PID $pid${RESET}"
     echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
 else
-    echo -e "${GREEN}Port 8766 (Terma UI): Available${RESET}"
+    echo -e "${GREEN}Port $TERMA_WS_PORT (Terma WebSocket): Available${RESET}"
 fi
 
 echo ""

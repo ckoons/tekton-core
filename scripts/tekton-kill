@@ -11,7 +11,18 @@
 # Hermes:              8100 (Service registry), 8101 (Database)
 # Ergon:               8200 (Agent system)
 # LLM Adapter:         8300 (HTTP server), 8301 (WebSocket server)
+# Terma:               8765 (API server), 8767 (WebSocket server)
 # Other components may use additional ports as needed
+
+# Export standardized ports as environment variables for all components
+export HEPHAESTUS_HTTP_PORT=8080
+export HEPHAESTUS_WS_PORT=8081
+export ENGRAM_PORT=8000
+export HERMES_REGISTRY_PORT=8100
+export HERMES_DB_PORT=8101
+export ERGON_PORT=8200
+export TERMA_API_PORT=8765
+export TERMA_WS_PORT=8767
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -146,9 +157,9 @@ ensure_ports_available() {
     # Release Synthesis ports
     release_port "5005" "Synthesis Engine" || result=1
     
-    # Release Terma ports
-    release_port "8765" "Terma API" || result=1
-    release_port "8766" "Terma UI" || result=1
+    # Release Terma ports - use environment variables
+    release_port "$TERMA_API_PORT" "Terma API" || result=1
+    release_port "$TERMA_WS_PORT" "Terma WebSocket" || result=1
     
     # Check results
     if [ $result -eq 0 ]; then

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from .llm_client import LLMClient
-from .config import HTTP_PORT
+from .config import HTTP_PORT, DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +49,42 @@ async def root():
         "name": "Tekton LLM Adapter",
         "version": "0.1.0",
         "status": "running",
-        "endpoints": ["/message", "/stream"],
+        "endpoints": ["/message", "/stream", "/health"],
         "claude_available": llm_client.has_claude
+    }
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "claude_available": llm_client.has_claude,
+        "providers": list(llm_client.get_available_providers().keys())
+    }
+
+@app.get("/providers")
+async def providers():
+    """Get available LLM providers and models"""
+    return {
+        "providers": llm_client.get_available_providers(),
+        "current_provider": "anthropic" if llm_client.has_claude else "simulated",
+        "current_model": DEFAULT_MODEL if llm_client.has_claude else "simulated-standard"
+    }
+
+class ProviderModelRequest(BaseModel):
+    provider_id: str
+    model_id: str
+
+@app.post("/provider")
+async def set_provider(request: ProviderModelRequest):
+    """Set the active provider and model"""
+    # This is a placeholder - in a more complete implementation,
+    # we would actually change the provider and model here
+    return {
+        "success": True,
+        "provider": request.provider_id,
+        "model": request.model_id
     }
 
 @app.post("/message")

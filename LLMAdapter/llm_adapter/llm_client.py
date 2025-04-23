@@ -35,6 +35,45 @@ class LLMClient:
         """Get system prompt for the given context"""
         return SYSTEM_PROMPTS.get(context_id, SYSTEM_PROMPTS["default"])
     
+    def get_available_providers(self) -> Dict[str, Any]:
+        """Get available LLM providers and models"""
+        providers = {}
+        
+        # Add Claude provider if available
+        if self.has_claude:
+            providers["anthropic"] = {
+                "name": "Anthropic Claude",
+                "available": True,
+                "models": [
+                    {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet"},
+                    {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
+                    {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku"}
+                ]
+            }
+        else:
+            # Add Claude as unavailable
+            providers["anthropic"] = {
+                "name": "Anthropic Claude",
+                "available": False,
+                "models": [
+                    {"id": "claude-3-sonnet-20240229", "name": "Claude 3 Sonnet"},
+                    {"id": "claude-3-opus-20240229", "name": "Claude 3 Opus"},
+                    {"id": "claude-3-haiku-20240307", "name": "Claude 3 Haiku"}
+                ]
+            }
+        
+        # Add simulated provider (always available)
+        providers["simulated"] = {
+            "name": "Simulated LLM",
+            "available": True,
+            "models": [
+                {"id": "simulated-fast", "name": "Fast Simulation"},
+                {"id": "simulated-standard", "name": "Standard Simulation"}
+            ]
+        }
+        
+        return providers
+    
     async def complete(
         self, 
         message: str, 

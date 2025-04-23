@@ -40,6 +40,27 @@ Tekton is an intelligent orchestration system that coordinates multiple AI model
 5. Reduce dependency on costly remote API calls
 6. Provide a unified interface for AI-assisted development
 
+### LLM Architecture
+
+Tekton employs a layered LLM integration architecture to provide unified, flexible access to various AI models:
+
+1. **LLM Adapter Layer**: Serves as the centralized interface for all LLM interactions through:
+   - HTTP API (port 8300): Synchronous requests for immediate responses
+   - WebSocket API (port 8301): Asynchronous streaming for real-time interactions
+   - Model-agnostic interface supporting multiple providers and models
+
+2. **Component Integration**: Components like Terma connect to the LLM Adapter through:
+   - Provider/model selection with a unified dropdown interface
+   - Automatic adapter detection and connection
+   - Graceful fallback when the adapter is unavailable
+
+3. **Startup Management**: The `tekton-launch` script automatically:
+   - Checks for LLM Adapter availability before launching components
+   - Starts the adapter if not running, regardless of component selection
+   - Ensures correct port configuration and availability
+
+This architecture ensures consistent LLM access across all Tekton components while allowing easy switching between different AI models based on task requirements.
+
 ## Architecture Principles
 
 - **Local First**: Prefer local resources when appropriate
