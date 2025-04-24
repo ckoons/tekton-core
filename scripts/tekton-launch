@@ -75,7 +75,7 @@ LAUNCH_UI=true
 LAUNCH_ALL=false
 INTERACTIVE=true
 COMPONENTS=()
-DEFAULT_COMPONENTS=("engram" "hermes" "llm_adapter")
+DEFAULT_COMPONENTS=("engram" "hermes" "rhetor")
 
 # Save the original working directory
 ORIGINAL_DIR="$(pwd)"
@@ -969,36 +969,76 @@ except Exception as e:
 
 # Launch Rhetor component
 launch_rhetor() {
-    echo -e "${BLUE}${BOLD}Launching Rhetor Communication System...${RESET}"
+    echo -e "${BLUE}${BOLD}Launching Rhetor LLM Management System...${RESET}"
     
     # Check if Rhetor is already running
-    if is_running "rhetor.core"; then
+    if is_running "rhetor.api.app" || is_port_used "8300"; then
         echo -e "${GREEN}Rhetor services are already running${RESET}"
         return 0
     fi
     
+    # Verify ports are free before launching
+    echo -e "${YELLOW}Checking if Rhetor ports are available...${RESET}"
+    
+    # Use targeted port management - only release the specific ports needed by this component
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release HTTP port if it's in use
+        release_component_port "8300" "Rhetor HTTP"
+        HTTP_PORT_RESULT=$?
+        
+        # No need to release port 8301 separately since Rhetor uses a single port
+        
+        # Verify ports are now free
+        if [ $HTTP_PORT_RESULT -ne 0 ]; then
+            echo -e "${RED}Error: Port 8300 could not be released. Cannot start Rhetor.${RESET}"
+            echo -e "${YELLOW}Try running tekton-kill first to clear all processes.${RESET}"
+            return 1
+        fi
+    fi
+    
+    # By this point the ports should be available
+    echo -e "${GREEN}Ports are available. Proceeding with launch.${RESET}"
+    
     # Check if Rhetor is implemented
-    if [ -d "$RHETOR_DIR/rhetor" ] && [ -f "$RHETOR_DIR/rhetor/__init__.py" ]; then
+    if [ -d "$RHETOR_DIR/rhetor" ] && [ -f "$RHETOR_DIR/rhetor/api/app.py" ]; then
         # Set up Python path
         export PYTHONPATH="$RHETOR_DIR:$PYTHONPATH"
         
-        # Launch Rhetor server if the startup module exists
-        if [ -f "$RHETOR_DIR/rhetor/core/server.py" ]; then
+        # Create log directory if it doesn't exist
+        mkdir -p "$HOME/.tekton/logs"
+        
+        # Check if necessary environment variables are set
+        if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo -e "${YELLOW}Warning: ANTHROPIC_API_KEY is not set. Rhetor will use simulated responses.${RESET}"
+        fi
+        
+        # Check if run_rhetor.sh exists and is executable
+        if [ -x "$RHETOR_DIR/run_rhetor.sh" ]; then
+            echo -e "${BLUE}Using run_rhetor.sh script...${RESET}"
+            (cd "$RHETOR_DIR" && ./run_rhetor.sh > "$HOME/.tekton/logs/rhetor.log" 2>&1) &
+            RHETOR_PID=$!
+        else
+            # Launch Rhetor API server directly
+            echo -e "${BLUE}Launching Rhetor API server directly...${RESET}"
             python3 -c "
-import sys, os, subprocess
+import sys, os, subprocess, asyncio
 sys.path.insert(0, '$RHETOR_DIR')
 
 try:
-    # Start Rhetor server in a separate process
+    # Start Rhetor API server in a separate process
     subprocess.Popen(
         [sys.executable, '-c', f'''
 import sys, asyncio
 sys.path.insert(0, '{RHETOR_DIR}')
-from rhetor.core.server import start_server
+from rhetor.api.app import start_server
 import os
 
 async def run():
-    await start_server()
+    await start_server(
+        host='0.0.0.0',
+        port=8300,
+        log_level='info'
+    )
 
 asyncio.run(run())
 '''],
@@ -1010,17 +1050,55 @@ asyncio.run(run())
 except Exception as e:
     print(f'${RED}Error starting Rhetor server: {e}${RESET}')
 " &
-            
-            # Give services time to start
-            sleep 2
         fi
         
-        echo -e "${GREEN}Rhetor communication system initialized${RESET}"
+        # Wait for server to start
+        echo -e "${YELLOW}Waiting for Rhetor to start...${RESET}"
+        for i in {1..10}; do
+            if curl -s "http://localhost:8300/health" > /dev/null 2>&1; then
+                echo -e "${GREEN}✓ Rhetor is running${RESET}"
+                break
+            fi
+            sleep 1
+            echo -n "."
+        done
+        
+        # Try to register with Hermes if it's running
+        if is_port_used "8100"; then
+            echo -e "${YELLOW}Registering Rhetor with Hermes...${RESET}"
+            python3 -c "
+import sys, asyncio
+sys.path.insert(0, '$RHETOR_DIR')
+
+async def register():
+    try:
+        from rhetor.utils.hermes_helper import register_with_hermes
+        success = await register_with_hermes()
+        if success:
+            print('${GREEN}Successfully registered Rhetor with Hermes${RESET}')
+        else:
+            print('${YELLOW}Failed to register Rhetor with Hermes${RESET}')
+    except Exception as e:
+        print(f'${RED}Error registering with Hermes: {e}${RESET}')
+
+asyncio.run(register())
+"
+        fi
+        
+        echo -e "${GREEN}Rhetor LLM management system initialized${RESET}"
         return 0
     else
-        echo -e "${YELLOW}Rhetor component is not yet fully implemented${RESET}"
-        echo -e "${YELLOW}Skipping Rhetor launch${RESET}"
-        return 0
+        echo -e "${YELLOW}Rhetor component is not fully implemented${RESET}"
+        echo -e "${YELLOW}Falling back to LLM Adapter...${RESET}"
+        
+        # Try to launch LLM Adapter as fallback
+        if [ -d "$LLM_ADAPTER_DIR" ] && [ -f "$LLM_ADAPTER_DIR/run_adapter.sh" ]; then
+            launch_llm_adapter
+            return $?
+        else
+            echo -e "${RED}Neither Rhetor nor LLM Adapter is available${RESET}"
+            return 1
+        fi
     fi
 }
 
@@ -1574,14 +1652,25 @@ except Exception as e:
     fi
 }
 
-# Launch LLM Adapter component
+# Launch LLM Adapter component (checking for Rhetor first)
 launch_llm_adapter() {
-    echo -e "${BLUE}${BOLD}Launching LLM Adapter...${RESET}"
+    echo -e "${BLUE}${BOLD}Launching LLM Management System...${RESET}"
 
-    if is_llm_adapter_running; then
-        echo -e "${GREEN}LLM Adapter is already running${RESET}"
+    # First check if Rhetor is running or available
+    if is_running "rhetor.api.app" || is_port_used "8300"; then
+        echo -e "${GREEN}Rhetor or LLM service is already running on port 8300${RESET}"
         return 0
     fi
+    
+    # Check if Rhetor is implemented
+    if [ -d "$RHETOR_DIR/rhetor" ] && [ -f "$RHETOR_DIR/rhetor/api/app.py" ]; then
+        echo -e "${YELLOW}Rhetor is available but not running. Launching Rhetor instead of LLM Adapter...${RESET}"
+        launch_rhetor
+        return $?
+    fi
+    
+    # If Rhetor is not available, fall back to LLM Adapter
+    echo -e "${YELLOW}Rhetor not available or not fully implemented, falling back to LLM Adapter${RESET}"
 
     # Release ports if needed
     release_component_port "8300" "LLM Adapter HTTP"

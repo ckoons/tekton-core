@@ -140,6 +140,7 @@ COMPONENTS=(
     "hermes/api/app.py:Hermes API Server"
     "hermes.*service_discovery:Hermes Service Registry"
     "prometheus.core:Prometheus Planning Engine"
+    "rhetor.api.app:Rhetor LLM Manager"
     "rhetor.core:Rhetor Communication Engine"
     "telos.core:Telos User Interface"
     "harmonia.core:Harmonia Workflow Engine"
@@ -250,17 +251,23 @@ else
     echo -e "${GREEN}Port 8200 (Ergon Agent System): Available${RESET}"
 fi
 
-# LLM Adapter ports
+# Rhetor/LLM Adapter ports
 if is_port_used 8300; then
     process_info=$(get_port_process 8300)
     pid=$(echo "$process_info" | cut -f1)
     process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8300 (LLM Adapter HTTP): In use by PID $pid${RESET}"
+    
+    if [[ "$process" == *"rhetor"* ]]; then
+        echo -e "${YELLOW}Port 8300 (Rhetor API): In use by PID $pid${RESET}"
+    else
+        echo -e "${YELLOW}Port 8300 (LLM Adapter HTTP): In use by PID $pid${RESET}"
+    fi
     echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
 else
-    echo -e "${GREEN}Port 8300 (LLM Adapter HTTP): Available${RESET}"
+    echo -e "${GREEN}Port 8300 (Rhetor/LLM API): Available${RESET}"
 fi
 
+# Check for LLM Adapter WebSocket port (not used by Rhetor)
 if is_port_used 8301; then
     process_info=$(get_port_process 8301)
     pid=$(echo "$process_info" | cut -f1)

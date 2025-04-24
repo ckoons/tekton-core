@@ -150,9 +150,19 @@ ensure_ports_available() {
     # Release Ergon ports
     release_port "8200" "Ergon Agent System" || result=1
     
-    # Release LLM Adapter ports
-    release_port "8300" "LLM Adapter HTTP" || result=1
-    release_port "8301" "LLM Adapter WebSocket" || result=1
+    # Release Rhetor/LLM Adapter ports
+    if is_port_used "8300"; then
+        local process=$(ps -p $(lsof -ti :8300 2>/dev/null) -o command= 2>/dev/null)
+        if [[ "$process" == *"rhetor"* ]]; then
+            release_port "8300" "Rhetor API" || result=1
+        else
+            release_port "8300" "LLM Adapter HTTP" || result=1
+            # Only try to release WebSocket port if LLM Adapter is running
+            release_port "8301" "LLM Adapter WebSocket" || result=1
+        fi
+    else
+        echo -e "${GREEN}Port 8300 (Rhetor/LLM API) is already free${RESET}"
+    fi
     
     # Release Synthesis ports
     release_port "5005" "Synthesis Engine" || result=1
@@ -231,7 +241,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         kill_processes "prometheus.core" "Prometheus (Planning)"
         kill_processes "harmonia.core" "Harmonia (Workflow)"
         kill_processes "telos.core" "Telos (User Interface)"
-        kill_processes "rhetor.core" "Rhetor (Context Manager)"
+        
+        # Kill Rhetor processes with comprehensive pattern matching
+        kill_processes "rhetor.api.app" "Rhetor LLM Manager"
+        kill_processes "rhetor.core" "Rhetor Communication Engine"
         
         # Standard process check for Terma
         kill_processes "terma.api.app" "Terma Terminal System"
