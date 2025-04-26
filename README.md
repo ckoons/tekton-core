@@ -66,6 +66,13 @@ Tekton is built on several foundational principles:
 - Components don't need to handle service management themselves
 - Resource allocation is coordinated across the ecosystem
 
+### Single Port Architecture
+- Each component uses a single port for all operations (REST API, WebSocket, events)
+- Path-based routing simplifies networking and deployment 
+- Standardized patterns for all communication channels
+- Reduces port conflicts and networking complexity
+- Simplifies firewall configuration and container deployments
+
 ### Automatic Discovery and Registration
 - Components register with Hermes to announce their capabilities
 - Components automatically discover available services without manual configuration
@@ -172,20 +179,29 @@ The launch script supports various options:
 
 ### Port Assignments
 
-Tekton components use specific ports that need to be available for proper operation:
+Tekton components use a single port per component for all operations:
 
-| Component      | Port(s)                           | Description                            |
-|----------------|-----------------------------------|----------------------------------------|
-| Hephaestus UI  | 8080 (HTTP), 8081 (WebSocket)     | User interface and WebSocket server    |
-| Engram         | 8000                              | Memory system                          |
-| Hermes         | 8100 (Registry), 8101 (Database)  | Service registry and database services |
-| Ergon          | 8200                              | Agent system                           |
-| LLM Adapter    | 8300 (HTTP), 8301 (WebSocket)     | Terminal-to-LLM communication          |
-| Synthesis      | 5005                              | Execution engine                       |
+| Component      | Port      | Description                                       |
+|----------------|-----------|---------------------------------------------------|
+| Hephaestus UI  | 8080      | User interface (HTTP, WebSocket, Events)          |
+| Engram         | 8000      | Memory system (REST API, WebSocket, Events)       |
+| Hermes         | 8100      | Service registry and database (REST, Events)      |
+| Ergon          | 8200      | Agent system (REST API, WebSocket, Events)        |
+| LLM Adapter    | 8300      | LLM communication (REST API, WebSocket)           |
+| Synthesis      | 5005      | Execution engine (REST API, WebSocket, Events)    |
+| Rhetor         | 8400      | LLM management (REST API, WebSocket, Events)      |
+| Athena         | 8500      | Knowledge graph (REST API, Events)                |
+| Prometheus     | 8600      | Planning system (REST API, Events)                |
+| Telos          | 8700      | Requirements system (REST API, Events)            |
+
+**Single Port Architecture**: Each component consolidates all communication (REST API, WebSocket connections, and event-based messaging) on a single port using path-based routing:
+- REST API endpoints use `/api/v1/...` paths
+- WebSocket connections use `/ws` paths
+- Event handling uses `/events` paths
 
 The launch script manages these ports automatically:
 - When launching Hermes, all Tekton processes are terminated to ensure a clean environment
-- When launching individual components, only processes using that component's specific ports are terminated
+- When launching individual components, only processes using that component's specific port are terminated
 - This allows Hermes to dynamically manage component lifecycle while preventing port conflicts
 
 Convenient symlinks are also available in ~/utils:
