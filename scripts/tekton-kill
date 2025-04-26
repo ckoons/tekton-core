@@ -4,25 +4,40 @@
 # Updated: April 19, 2025 - Enhanced Hermes database process detection and termination
 
 # ============================
-# Port Assignments by Component
+# Single Port Architecture by Component (Logical Sequence)
 # ============================
-# Hephaestus UI:       8080 (HTTP server), 8081 (WebSocket server)
-# Engram:              8000 (Memory server)
-# Hermes:              8100 (Service registry), 8101 (Database)
-# Ergon:               8200 (Agent system)
-# LLM Adapter:         8300 (HTTP server), 8301 (WebSocket server)
-# Terma:               8765 (API server), 8767 (WebSocket server)
-# Other components may use additional ports as needed
+# Component Name        Port   Description
+# -------------------------------------------------------------------------
+# Hephaestus UI:        8080   (HTTP, WebSocket, Events via path routing) - Standard web UI port
+# Engram:               8000   (Memory system - HTTP, WebSocket, Events)
+# Hermes:               8001   (Service registry, Database, Events)
+# Ergon:                8002   (Agent system - HTTP, WebSocket, Events)
+# Rhetor:               8003   (LLM management - HTTP, WebSocket, Events)
+# Terma:                8004   (Terminal - HTTP, WebSocket, Events)
+# Athena:               8005   (Knowledge graph - HTTP, Events)
+# Prometheus:           8006   (Planning system - HTTP, Events)
+# Harmonia:             8007   (Workflow system - HTTP, Events)
+# Telos:                8008   (Requirements system - HTTP, Events)
+# Synthesis:            8009   (Execution engine - HTTP, WebSocket, Events)
+# Tekton Core:          8010   (Core orchestration - HTTP, Events)
+#
+# NOTE: Previous port assignments have been consolidated into a logical sequence
+# for easier management. Only Hephaestus UI retains its conventional 8080 port.
 
 # Export standardized ports as environment variables for all components
-export HEPHAESTUS_HTTP_PORT=8080
-export HEPHAESTUS_WS_PORT=8081
+# All components should reference these variables, not hardcoded port numbers
+export HEPHAESTUS_PORT=8080  # UI uses standard web port
 export ENGRAM_PORT=8000
-export HERMES_REGISTRY_PORT=8100
-export HERMES_DB_PORT=8101
-export ERGON_PORT=8200
-export TERMA_API_PORT=8765
-export TERMA_WS_PORT=8767
+export HERMES_PORT=8001
+export ERGON_PORT=8002
+export RHETOR_PORT=8003
+export TERMA_PORT=8004
+export ATHENA_PORT=8005
+export PROMETHEUS_PORT=8006
+export HARMONIA_PORT=8007
+export TELOS_PORT=8008
+export SYNTHESIS_PORT=8009
+export TEKTON_CORE_PORT=8010
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"
@@ -136,40 +151,41 @@ kill_processes() {
 ensure_ports_available() {
     local result=0
     
-    # Release Hephaestus ports
-    release_port "8080" "Hephaestus HTTP" || result=1
-    release_port "8081" "Hephaestus WebSocket" || result=1
+    # Release Tekton Core port
+    release_port "$TEKTON_CORE_PORT" "Tekton Core" || result=1
     
-    # Release Engram ports
-    release_port "8000" "Engram Memory" || result=1
+    # Release Hephaestus port
+    release_port "$HEPHAESTUS_PORT" "Hephaestus" || result=1
     
-    # Release Hermes ports
-    release_port "8100" "Hermes Service Registry" || result=1
-    release_port "8101" "Hermes Database" || result=1
+    # Release Engram port
+    release_port "$ENGRAM_PORT" "Engram Memory" || result=1
     
-    # Release Ergon ports
-    release_port "8200" "Ergon Agent System" || result=1
+    # Release Hermes port
+    release_port "$HERMES_PORT" "Hermes" || result=1
     
-    # Release Rhetor/LLM Adapter ports
-    if is_port_used "8300"; then
-        local process=$(ps -p $(lsof -ti :8300 2>/dev/null) -o command= 2>/dev/null)
-        if [[ "$process" == *"rhetor"* ]]; then
-            release_port "8300" "Rhetor API" || result=1
-        else
-            release_port "8300" "LLM Adapter HTTP" || result=1
-            # Only try to release WebSocket port if LLM Adapter is running
-            release_port "8301" "LLM Adapter WebSocket" || result=1
-        fi
-    else
-        echo -e "${GREEN}Port 8300 (Rhetor/LLM API) is already free${RESET}"
-    fi
+    # Release Ergon port
+    release_port "$ERGON_PORT" "Ergon Agent System" || result=1
     
-    # Release Synthesis ports
-    release_port "5005" "Synthesis Engine" || result=1
+    # Release Rhetor port
+    release_port "$RHETOR_PORT" "Rhetor LLM Management" || result=1
     
-    # Release Terma ports - use environment variables
-    release_port "$TERMA_API_PORT" "Terma API" || result=1
-    release_port "$TERMA_WS_PORT" "Terma WebSocket" || result=1
+    # Release Terma port
+    release_port "$TERMA_PORT" "Terma Terminal" || result=1
+    
+    # Release Athena port
+    release_port "$ATHENA_PORT" "Athena Knowledge Graph" || result=1
+    
+    # Release Prometheus port
+    release_port "$PROMETHEUS_PORT" "Prometheus Planning" || result=1
+    
+    # Release Harmonia port
+    release_port "$HARMONIA_PORT" "Harmonia Workflow" || result=1
+    
+    # Release Telos port
+    release_port "$TELOS_PORT" "Telos Requirements" || result=1
+    
+    # Release Synthesis port
+    release_port "$SYNTHESIS_PORT" "Synthesis Engine" || result=1
     
     # Check results
     if [ $result -eq 0 ]; then

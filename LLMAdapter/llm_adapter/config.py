@@ -14,8 +14,10 @@ DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "claude-3-sonnet-20240229")
 
 # Server configuration
 HOST = os.environ.get("HOST", "localhost")
-HTTP_PORT = int(os.environ.get("HTTP_PORT", 8300))
-WS_PORT = int(os.environ.get("WS_PORT", 8301))
+# Use Single Port Architecture with environment variables
+RHETOR_PORT = int(os.environ.get("RHETOR_PORT", 8003))
+HTTP_PORT = int(os.environ.get("HTTP_PORT", RHETOR_PORT))
+WS_PORT = HTTP_PORT  # Use same port for both HTTP and WebSocket in Single Port Architecture
 
 # Context-specific system prompts
 SYSTEM_PROMPTS = {

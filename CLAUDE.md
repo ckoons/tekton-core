@@ -1,33 +1,34 @@
 # Tekton Development Notes
 
-## Hephaestus UI Development Progress (April 15, 2025)
+## Single Port Architecture Implementation (April 26, 2025)
 
-We've completely redesigned the Hephaestus UI component for Tekton with a focus on simplicity and maintainability. Recent UI improvements include:
+We've implemented a new Single Port Architecture for all Tekton components, rationalizing the port assignments and simplifying cross-component communication. Key updates include:
 
-1. **Visual Enhancements:**
-   - Fixed image display issues with proper path management
-   - Adjusted font sizes for better readability (especially in navigation)
-   - Improved spacing and alignment in the header area
-   - Created a consistent style for long component names
+1. **Port Standardization:**
+   - Assigned sequential ports (8000-8010) to all components except Hephaestus UI
+   - Kept Hephaestus UI on port 8080 following web development conventions
+   - Created consistent environment variables for all ports
+   - Updated all launch, status, and kill scripts to use the new port assignments
 
-2. **Technical Improvements:**
-   - Implemented browser cache management with server headers
-   - Modified server.py to properly serve images from the Tekton root
-   - Created a dedicated local images directory for UI components
-   - Added a comprehensive UI styling guide
+2. **Component Updates:**
+   - Modified Hephaestus UI to use environment variables for port connections
+   - Updated LLM Adapter and Rhetor to follow the Single Port Architecture pattern
+   - Implemented path-based routing for different types of requests (HTTP, WebSocket, Events)
+   - Created client-side environment variables for frontend components
 
 3. **New Documentation:**
-   - Created [UI_STYLING_GUIDE.md](./Hephaestus/UI_STYLING_GUIDE.md) with best practices
-   - Added guidance for browser cache management
-   - Documented image path handling and fallback strategies
-   - Created recommendations for handling text in navigation elements
+   - Created [port_assignments.md](./config/port_assignments.md) with the new port scheme
+   - Added [SINGLE_PORT_ARCHITECTURE.md](./docs/SINGLE_PORT_ARCHITECTURE.md) detailing the design pattern
+   - Documented port usage patterns and URL construction
+   - Added comprehensive implementation guidelines for future components
 
-The next development session should focus on:
-- Implementing a terminal-like interface for the Ergon and AWT-Team tabs
-- Creating UIs for other Tekton components (Tekton dashboard, Prometheus, Telos)
-- Enhancing the UI with animations, drag-and-drop, and a consistent color system
+Future architecture work should focus on:
+- Standardizing API endpoints across components
+- Creating a unified authentication and authorization model
+- Implementing graceful degradation for unavailable components
+- Adding automatic service discovery for dynamic port allocation
 
-Detailed instructions for the next development session are available in the [DEVELOPMENT_STATUS.md](./Hephaestus/DEVELOPMENT_STATUS.md) file.
+Details about the Single Port Architecture are available in the [SINGLE_PORT_ARCHITECTURE.md](./docs/SINGLE_PORT_ARCHITECTURE.md) document.
 
 ## Project Overview
 
@@ -45,8 +46,8 @@ Tekton is an intelligent orchestration system that coordinates multiple AI model
 Tekton employs a layered LLM integration architecture to provide unified, flexible access to various AI models:
 
 1. **LLM Adapter Layer**: Serves as the centralized interface for all LLM interactions through:
-   - HTTP API (port 8300): Synchronous requests for immediate responses
-   - WebSocket API (port 8301): Asynchronous streaming for real-time interactions
+   - HTTP API: Synchronous requests for immediate responses via `/api/` endpoints
+   - WebSocket API: Asynchronous streaming for real-time interactions via `/ws` endpoint
    - Model-agnostic interface supporting multiple providers and models
 
 2. **Component Integration**: Components like Terma connect to the LLM Adapter through:

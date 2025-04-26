@@ -4,24 +4,40 @@
 # Updated: April 19, 2025 - Modified to use targeted port-specific process management
 
 # ============================
-# Port Assignments by Component
+# Single Port Architecture by Component (Logical Sequence)
 # ============================
-# Hephaestus UI:       8080 (HTTP server), 8081 (WebSocket server)
-# Engram:              8000 (Memory server)
-# Hermes:              8100 (Service registry), 8101 (Database)
-# Ergon:               8200 (Agent system)
-# Terma:               8765 (API server), 8767 (WebSocket server)
-# Other components may use additional ports as needed
+# Component Name        Port   Description
+# -------------------------------------------------------------------------
+# Hephaestus UI:        8080   (HTTP, WebSocket, Events via path routing) - Standard web UI port
+# Engram:               8000   (Memory system - HTTP, WebSocket, Events)
+# Hermes:               8001   (Service registry, Database, Events)
+# Ergon:                8002   (Agent system - HTTP, WebSocket, Events)
+# Rhetor:               8003   (LLM management - HTTP, WebSocket, Events)
+# Terma:                8004   (Terminal - HTTP, WebSocket, Events)
+# Athena:               8005   (Knowledge graph - HTTP, Events)
+# Prometheus:           8006   (Planning system - HTTP, Events)
+# Harmonia:             8007   (Workflow system - HTTP, Events)
+# Telos:                8008   (Requirements system - HTTP, Events)
+# Synthesis:            8009   (Execution engine - HTTP, WebSocket, Events)
+# Tekton Core:          8010   (Core orchestration - HTTP, Events)
+#
+# NOTE: Previous port assignments have been consolidated into a logical sequence
+# for easier management. Only Hephaestus UI retains its conventional 8080 port.
 
 # Export standardized ports as environment variables for all components
-export HEPHAESTUS_HTTP_PORT=8080
-export HEPHAESTUS_WS_PORT=8081
+# All components should reference these variables, not hardcoded port numbers
+export HEPHAESTUS_PORT=8080  # UI uses standard web port
 export ENGRAM_PORT=8000
-export HERMES_REGISTRY_PORT=8100
-export HERMES_DB_PORT=8101
-export ERGON_PORT=8200
-export TERMA_API_PORT=8765
-export TERMA_WS_PORT=8767
+export HERMES_PORT=8001
+export ERGON_PORT=8002
+export RHETOR_PORT=8003
+export TERMA_PORT=8004
+export ATHENA_PORT=8005
+export PROMETHEUS_PORT=8006
+export HARMONIA_PORT=8007
+export TELOS_PORT=8008
+export SYNTHESIS_PORT=8009
+export TEKTON_CORE_PORT=8010
 
 # ANSI color codes for terminal output
 BLUE="\033[94m"

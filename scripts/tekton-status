@@ -50,14 +50,19 @@ get_port_process() {
 }
 
 # Export standardized ports as environment variables for all components
-export HEPHAESTUS_HTTP_PORT=8080
-export HEPHAESTUS_WS_PORT=8081
+# All components should reference these variables, not hardcoded port numbers
+export HEPHAESTUS_PORT=8080  # UI uses standard web port
 export ENGRAM_PORT=8000
-export HERMES_REGISTRY_PORT=8100
-export HERMES_DB_PORT=8101
-export ERGON_PORT=8200
-export TERMA_API_PORT=8765
-export TERMA_WS_PORT=8767
+export HERMES_PORT=8001
+export ERGON_PORT=8002
+export RHETOR_PORT=8003
+export TERMA_PORT=8004
+export ATHENA_PORT=8005
+export PROMETHEUS_PORT=8006
+export HARMONIA_PORT=8007
+export TELOS_PORT=8008
+export SYNTHESIS_PORT=8009
+export TEKTON_CORE_PORT=8010
 
 # Display banner
 echo -e "${BLUE}${BOLD}=== Tekton System Status ===${RESET}"
@@ -187,128 +192,37 @@ done
 echo ""
 echo -e "${BLUE}${BOLD}Port Status:${RESET}"
 
-# Check Hephaestus UI ports
-if is_port_used 8080; then
-    process_info=$(get_port_process 8080)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8080 (Hephaestus HTTP): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8080 (Hephaestus HTTP): Available${RESET}"
-fi
+# Check component ports using environment variables
+declare -a PORT_INFO=(
+    "$TEKTON_CORE_PORT:Tekton Core"
+    "$HEPHAESTUS_PORT:Hephaestus"
+    "$ENGRAM_PORT:Engram Memory"
+    "$HERMES_PORT:Hermes"
+    "$ERGON_PORT:Ergon Agent System"
+    "$RHETOR_PORT:Rhetor LLM Management"
+    "$TERMA_PORT:Terma Terminal"
+    "$ATHENA_PORT:Athena Knowledge Graph"
+    "$PROMETHEUS_PORT:Prometheus Planning"
+    "$HARMONIA_PORT:Harmonia Workflow"
+    "$TELOS_PORT:Telos Requirements"
+    "$SYNTHESIS_PORT:Synthesis Engine"
+)
 
-if is_port_used 8081; then
-    process_info=$(get_port_process 8081)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8081 (Hephaestus WebSocket): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8081 (Hephaestus WebSocket): Available${RESET}"
-fi
-
-# Engram port
-if is_port_used 8000; then
-    process_info=$(get_port_process 8000)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8000 (Engram Memory): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8000 (Engram Memory): Available${RESET}"
-fi
-
-# Hermes ports
-if is_port_used 8100; then
-    process_info=$(get_port_process 8100)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8100 (Hermes Service Registry): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8100 (Hermes Service Registry): Available${RESET}"
-fi
-
-if is_port_used 8101; then
-    process_info=$(get_port_process 8101)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8101 (Hermes Database): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8101 (Hermes Database): Available${RESET}"
-fi
-
-# Ergon port
-if is_port_used 8200; then
-    process_info=$(get_port_process 8200)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8200 (Ergon Agent System): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8200 (Ergon Agent System): Available${RESET}"
-fi
-
-# Rhetor/LLM Adapter ports
-if is_port_used 8300; then
-    process_info=$(get_port_process 8300)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
+# Check each port
+for port_item in "${PORT_INFO[@]}"; do
+    port="${port_item%%:*}"
+    description="${port_item#*:}"
     
-    if [[ "$process" == *"rhetor"* ]]; then
-        echo -e "${YELLOW}Port 8300 (Rhetor API): In use by PID $pid${RESET}"
+    if is_port_used "$port"; then
+        process_info=$(get_port_process "$port")
+        pid=$(echo "$process_info" | cut -f1)
+        process=$(echo "$process_info" | cut -f2-)
+        echo -e "${YELLOW}Port $port ($description): In use by PID $pid${RESET}"
+        echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
     else
-        echo -e "${YELLOW}Port 8300 (LLM Adapter HTTP): In use by PID $pid${RESET}"
+        echo -e "${GREEN}Port $port ($description): Available${RESET}"
     fi
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8300 (Rhetor/LLM API): Available${RESET}"
-fi
-
-# Check for LLM Adapter WebSocket port (not used by Rhetor)
-if is_port_used 8301; then
-    process_info=$(get_port_process 8301)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8301 (LLM Adapter WebSocket): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8301 (LLM Adapter WebSocket): Available${RESET}"
-fi
-
-# Synthesis port
-if is_port_used 5005; then
-    process_info=$(get_port_process 5005)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 5005 (Synthesis Engine): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 5005 (Synthesis Engine): Available${RESET}"
-fi
-
-# Terma ports - use environment variables
-if is_port_used $TERMA_API_PORT; then
-    process_info=$(get_port_process $TERMA_API_PORT)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port $TERMA_API_PORT (Terma API): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port $TERMA_API_PORT (Terma API): Available${RESET}"
-fi
-
-if is_port_used $TERMA_WS_PORT; then
-    process_info=$(get_port_process $TERMA_WS_PORT)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port $TERMA_WS_PORT (Terma WebSocket): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port $TERMA_WS_PORT (Terma WebSocket): Available${RESET}"
-fi
+done
 
 echo ""
 echo -e "${BLUE}${BOLD}UI Services:${RESET}"

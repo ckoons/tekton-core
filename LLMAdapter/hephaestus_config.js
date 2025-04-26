@@ -7,11 +7,11 @@
 
 // LLM Adapter connection configuration
 const LLM_ADAPTER_CONFIG = {
-    // HTTP endpoints
-    httpUrl: 'http://localhost:8300',
+    // HTTP endpoints - Use environment variable with fallback
+    httpUrl: `http://localhost:${window.RHETOR_PORT || 8003}`,
     
-    // WebSocket endpoint
-    wsUrl: 'ws://localhost:8301',
+    // WebSocket endpoint - Use environment variable with fallback
+    wsUrl: `ws://localhost:${window.RHETOR_PORT || 8003}/ws`,
     
     // Whether to use streaming responses (recommended)
     useStreaming: true,
