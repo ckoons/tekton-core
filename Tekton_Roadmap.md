@@ -1,6 +1,6 @@
 # Tekton Development Roadmap
 
-**Last Updated:** April 26, 2025
+**Last Updated:** April 27, 2025
 
 ## Roadmap Overview
 
@@ -111,22 +111,52 @@ This document outlines the development roadmap for the Tekton project, including
 - ✅ Create shadow DOM UI component
 - ✅ Add comprehensive testing
 
+### Phase 12: Athena Knowledge Graph (Completed - April 27, 2025)
+
+- ✅ Implement knowledge graph storage with Neo4j
+- ✅ Create entity extraction and management capabilities
+- ✅ Add relationship inference and management
+- ✅ Implement graph visualization with D3.js
+- ✅ Create query interface for knowledge retrieval
+- ✅ Add integration with Engram memory system
+- ✅ Integrate with Rhetor LLM adapter for knowledge extraction and inference
+- ✅ Implement LLM-powered knowledge chat interface in Hephaestus component
+- ✅ Follow Single Port Architecture pattern for API endpoints
+- ✅ Create comprehensive entity and relationship models
+
 ## Current Development Focus
 
-### Phase 11.5: Unified LLM Adapter Integration (In Progress)
+### Phase 13: LLM Integration Standardization (In Progress)
 
-- 🟡 Retrofit Hermes with Rhetor LLM adapter integration
-- 🟡 Implement Hermes chat GUI interface in Hephaestus component
-- 🟡 Connect Engram to Rhetor LLM adapter API
-- 🟡 Create Engram chat interface with memory integration
-- 🟡 Update Ergon to use the Rhetor LLM adapter exclusively
-- 🟡 Enhance Ergon chat UI with additional capabilities
-- 🟡 Add chat interface to Telos component UI
-- 🟡 Implement standardized LLM response handling across components
-- 🟡 Create consistent UI patterns for chat interfaces
-- 🟡 Add comprehensive documentation for LLM integration patterns
+- 🟡 Implement plan outlined in [LLM_INTEGRATION_PLAN_v2.md](./MetaData/LLM_INTEGRATION_PLAN_v2.md)
+- 🟡 Create `tekton-llm-client` shared library package
+- 🟡 Implement standardized clients for HTTP and WebSocket communication
+- 🟡 Create JavaScript client for frontend components
+- 🟡 Refactor LLMAdapter to use Rhetor
+- 🟡 Update Terma, Hermes, Engram, Telos, and Ergon to use shared library
+- 🟡 Replace Prometheus/Epimetheus LLM code with shared library
+- 🟡 Implement comprehensive testing for LLM integration
+- 🟡 Create migration guides and documentation
+- 🟡 Standardize environment variables for LLM configuration
 
-### Phase 12: Prometheus Planning System (Planned - May 12, 2025)
+## Upcoming Development
+
+### Phase 14: Shared Component Utilities (Planned - May 24, 2025)
+
+- ⭕ Implement shared HTTP client utility (`tekton_http.py`)
+- ⭕ Create unified configuration management (`tekton_config.py`)
+- ⭕ Standardize logging setup (`tekton_logging.py`)
+- ⭕ Implement WebSocket management utility (`tekton_websocket.py`)
+- ⭕ Create standardized Hermes registration (`tekton_registration.py`)
+- ⭕ Implement consistent error handling (`tekton_errors.py`)
+- ⭕ Create component lifecycle management (`tekton_lifecycle.py`)
+- ⭕ Standardize authentication handling (`tekton_auth.py`)
+- ⭕ Implement context management utility (`tekton_context.py`)
+- ⭕ Create CLI argument parsing utility (`tekton_cli.py`)
+- ⭕ Update documentation with shared utility patterns
+- ⭕ Create migration guides for existing components
+
+### Phase 15: Prometheus Planning System (Planned - June 7, 2025)
 
 - ⭕ Create planning engine with requirement-based planning
 - ⭕ Implement task breakdown and estimation
@@ -134,12 +164,10 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Create resource allocation suggestions
 - ⭕ Implement project tracking and progress monitoring
 - ⭕ Add retrospective analysis capabilities
-- ⭕ Integrate with Rhetor LLM adapter for AI-powered planning
+- ⭕ Integrate with `tekton-llm-client` for AI-powered planning
 - ⭕ Implement LLM chat interface in Hephaestus component
 
-## Upcoming Development
-
-### Phase 13: Engram Memory UI (Planned - May 10, 2025)
+### Phase 16: Engram Memory UI (Planned - June 21, 2025)
 
 - ⭕ Create memory browsing interface
 - ⭕ Implement memory search and filtering
@@ -148,18 +176,7 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Implement memory context management
 - ⭕ Add persistent memory preferences
 
-### Phase 14: Athena Knowledge Graph (Planned - May 24, 2025)
-
-- ⭕ Implement knowledge graph storage
-- ⭕ Create entity extraction capabilities
-- ⭕ Add relationship inference
-- ⭕ Implement graph visualization
-- ⭕ Create query interface
-- ⭕ Add integration with memory system
-- ⭕ Integrate with Rhetor LLM adapter for knowledge extraction and inference
-- ⭕ Implement LLM-powered knowledge chat interface in Hephaestus component
-
-### Phase 15: Sophia Machine Learning (Planned - June 7, 2025)
+### Phase 17: Sophia Machine Learning (Planned - July 5, 2025)
 
 - ⭕ Create ML model registry
 - ⭕ Implement data preparation utilities
@@ -167,10 +184,10 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Create model evaluation tools
 - ⭕ Implement inference services
 - ⭕ Add visualization of model performance
-- ⭕ Integrate with Rhetor LLM adapter for model selection assistance
+- ⭕ Integrate with `tekton-llm-client` for model selection assistance
 - ⭕ Implement LLM chat interface for ML guidance in Hephaestus component
 
-### Phase 16: Codex Integration (Planned - June 21, 2025)
+### Phase 18: Codex Integration (Planned - July 19, 2025)
 
 - ⭕ Create code generation interface
 - ⭕ Implement code review capabilities
@@ -178,10 +195,10 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Create code search and navigation
 - ⭕ Implement version control integration
 - ⭕ Add project structure visualization
-- ⭕ Integrate with Rhetor LLM adapter for code generation and analysis
+- ⭕ Integrate with `tekton-llm-client` for code generation and analysis
 - ⭕ Implement coding assistant chat interface in Hephaestus component
 
-### Phase 17: Harmonia Workflow Orchestration (Planned - July 5, 2025)
+### Phase 19: Harmonia Workflow Orchestration (Planned - August 2, 2025)
 
 - ⭕ Create workflow definition interface
 - ⭕ Implement workflow execution engine
@@ -189,10 +206,10 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Create workflow templates
 - ⭕ Implement error handling and recovery
 - ⭕ Add integration with external systems
-- ⭕ Integrate with Rhetor LLM adapter for workflow optimization and debugging
+- ⭕ Integrate with `tekton-llm-client` for workflow optimization and debugging
 - ⭕ Implement workflow assistant chat interface in Hephaestus component
 
-### Phase 18: Integration and Optimization (Planned - July 19, 2025)
+### Phase 20: Integration and Optimization (Planned - August 16, 2025)
 
 - ⭕ Create end-to-end testing suite
 - ⭕ Implement performance optimizations
@@ -200,15 +217,15 @@ This document outlines the development roadmap for the Tekton project, including
 - ⭕ Create user onboarding flows
 - ⭕ Implement automated deployment
 - ⭕ Add monitoring and alerting
-- ⭕ Ensure consistent Rhetor LLM adapter integration across all components
+- ⭕ Ensure consistent `tekton-llm-client` integration across all components
 - ⭕ Standardize chat interfaces in all Hephaestus components
 - ⭕ Optimize LLM prompt patterns and caching strategies
 
 ## Project Status
 
-- **Completed Phases:** 11/19 (58%)
-- **Current Phase:** 11.5/19 (In Progress)
-- **Remaining Phases:** 7/19
+- **Completed Phases:** 12/20 (60%)
+- **Current Phase:** 13/20 (In Progress)
+- **Remaining Phases:** 7/20
 
 ## Notes and Considerations
 
@@ -216,9 +233,10 @@ This document outlines the development roadmap for the Tekton project, including
 - Integration between components is ongoing throughout all phases
 - Documentation and testing are continuous processes
 - Performance optimization is addressed throughout development
-- All Tekton components must utilize the Rhetor LLM adapter for AI capabilities
+- All Tekton components must utilize the standardized `tekton-llm-client` for AI capabilities
 - Every component must implement a standardized LLM chat interface in its Hephaestus GUI tab
-- Component-specific LLM integration should follow patterns in the LLM Integration Guide
+- Component-specific implementations should leverage shared utilities to reduce duplication
+- All new components must follow the Single Port Architecture pattern
 
 ## Resources
 
@@ -227,3 +245,5 @@ This document outlines the development roadmap for the Tekton project, including
 - [component_registry.json](./Hephaestus/ui/server/component_registry.json) - Component registry
 - [telos_api_reference.md](./docs/telos_api_reference.md) - Telos API reference
 - [llm_integration_guide.md](./docs/llm_integration_guide.md) - LLM Adapter Integration Guide
+- [LLM_INTEGRATION_PLAN_v2.md](./MetaData/LLM_INTEGRATION_PLAN_v2.md) - Plan for standardizing LLM integration
+- [SharedUtilities.md](./MetaData/Implementation/SharedUtilities.md) - Shared utilities implementation plan
