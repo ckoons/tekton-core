@@ -55,7 +55,7 @@ This document outlines the required deliverables for the Sophia component implem
 - [ ] `setup.py` (Package configuration)
 - [ ] `setup.sh` (Installation script)
 - [ ] `register_with_hermes.py` (Hermes registration script)
-- [ ] `run_sophia.sh` (Launch script)
+- [x] Launch capability via standard `tekton-launch` script
 - [ ] `requirements.txt` (Dependencies)
 
 ## UI Component
