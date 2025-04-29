@@ -1,278 +1,346 @@
 # Sophia Architecture
 
-This document describes the architecture of Sophia, Tekton's machine learning and continuous improvement component. Sophia is designed to systematically measure AI intelligence, analyze system performance, and drive continuous self-improvement through data-driven recommendations.
+This document describes the architecture, components, and design principles of Sophia, the machine learning and continuous improvement component of the Tekton ecosystem.
 
-## System Architecture
+## Overview
 
-Sophia follows a modular architecture with clear separation of concerns:
+Sophia serves as the scientific foundation for Tekton, providing metrics collection, analysis, intelligence measurement, and experimentation capabilities that drive continuous learning and improvement. It implements a comprehensive framework for measuring AI capabilities and conducts experiments to validate improvement hypotheses.
+
+## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Sophia Component                        │
-├─────────────┬─────────────┬─────────────────┬──────────────────┤
-│             │             │                 │                  │
-│  ML Engine  │  Metrics    │   Analysis      │ Recommendation   │
-│             │  Engine     │   Engine        │ System           │
-│             │             │                 │                  │
-├─────────────┴─────────────┴─────────────────┴──────────────────┤
-│                                                                │
-│                      Experiment Framework                      │
-│                                                                │
-├────────────────────────────┬─────────────────────────────────┬─┘
-│                            │                                 │
-│      HTTP API Layer        │       WebSocket Layer          │
-│                            │                                 │
-├────────────────────────────┴─────────────────────────────────┤
-│                                                              │
-│                     Integration Hub                          │
-│                                                              │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│              │              │              │                │
-│    Hermes    │    Engram    │  Prometheus  │ Component      │
-│ Integration  │ Integration  │ Integration  │ Adapters       │
-│              │              │              │                │
-└──────────────┴──────────────┴──────────────┴────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                        Sophia Component                           │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────────┐  │
+│  │  API Layer  │   │ WebSocket   │   │ Core Engine Management  │  │
+│  │  (FastAPI)  │◄──┤ Connections │◄──┤ (Dependency Injection)  │  │
+│  └─────┬───────┘   └─────────────┘   └─────────────────────────┘  │
+│        │                                         ▲                │
+│        ▼                                         │                │
+│  ┌──────────────────────────────────────────────┴───────────────┐ │
+│  │                                                               │ │
+│  │  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐ │ │
+│  │  │   Metrics   │   │  Analysis   │   │     Experiment      │ │ │
+│  │  │   Engine    │◄──┤   Engine    │◄──┤     Framework       │ │ │
+│  │  └─────────────┘   └─────────────┘   └─────────────────────┘ │ │
+│  │                                                               │ │
+│  │  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐ │ │
+│  │  │ Intelligence│   │Recommendation│   │      ML Engine      │ │ │
+│  │  │ Measurement │◄──┤   System    │◄──┤                     │ │ │
+│  │  └─────────────┘   └─────────────┘   └─────────────────────┘ │ │
+│  │                                                               │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                                                     │
+│                           Integration Layer                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────┐ │
+│  │   Hermes    │   │   Engram    │   │ Prometheus  │   │ Tekton  │ │
+│  │ Integration │   │ Integration │   │ Integration │   │   LLM   │ │
+│  └─────────────┘   └─────────────┘   └─────────────┘   └─────────┘ │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Core Modules
-
-#### ML Engine
-
-The ML Engine is responsible for:
-- Managing machine learning models
-- Providing model registry and lifecycle management
-- Supporting embedding, classification, and prediction operations
-- Implementing the intelligence measurement framework
-
-#### Metrics Engine
-
-The Metrics Engine is responsible for:
-- Collecting metrics from all Tekton components
-- Standardizing and normalizing metrics
-- Storing historical data
-- Providing real-time monitoring capabilities
-- Supporting various metric types (performance, resource, quality, etc.)
-
-#### Analysis Engine
-
-The Analysis Engine is responsible for:
-- Processing raw metrics data
-- Identifying patterns and correlations
-- Generating insights using statistical models
-- Detecting anomalies and outliers
-- Creating visualizations and reports
-
-#### Recommendation System
-
-The Recommendation System is responsible for:
-- Generating improvement suggestions
-- Prioritizing recommendations by impact
-- Creating implementation plans
-- Tracking recommendation outcomes
-- Communicating recommendations to relevant components
-
-#### Experiment Framework
-
-The Experiment Framework is responsible for:
-- Designing controlled experiments
-- Implementing A/B testing protocols
-- Managing experiment execution
-- Collecting and analyzing results
-- Validating improvement hypotheses
+## Components
 
 ### API Layer
 
-Sophia implements a Single Port Architecture with:
+The API layer provides a uniform interface to Sophia's capabilities, implementing the Single Port Architecture pattern. It consists of:
 
-- **HTTP API**: RESTful endpoints for CRUD operations on metrics, experiments, recommendations, and intelligence reports
-- **WebSocket API**: Real-time updates on metrics, experiments, and recommendations
+- **HTTP API**: RESTful API endpoints implemented with FastAPI, providing CRUD operations for Sophia's core entities.
+- **WebSocket API**: Real-time event streaming and notifications for metrics, experiments, and recommendations.
+- **Client Library**: A Python client library for easy integration with Sophia's API.
 
-### Integration Hub
+### Core Engines
 
-The Integration Hub manages connections with other Tekton components:
+Sophia's functionality is organized into six core engines:
 
-- **Hermes Integration**: Component registration, event subscription, message broadcasting
-- **Engram Integration**: Storing historical metrics, experiment results, knowledge embeddings
-- **Prometheus Integration**: Planning metrics, improvement validation
-- **Component Adapters**: Standardized interfaces for other Tekton components
+1. **Metrics Engine**: Collects, stores, and analyzes metrics from Tekton components.
+2. **Analysis Engine**: Analyzes patterns, trends, and anomalies in metrics data.
+3. **Experiment Framework**: Designs, runs, and analyzes experiments for validating improvements.
+4. **Recommendation System**: Generates and manages improvement recommendations.
+5. **Intelligence Measurement**: Measures AI cognitive capabilities across multiple dimensions.
+6. **ML Engine**: Manages machine learning models for analysis and predictions.
 
-## Data Flow Architecture
+Each engine is implemented as a singleton with asynchronous lifecycle management (initialization, start, and stop methods).
 
-Sophia implements several key data flows:
+### Model Registry
 
-### Metric Collection Flow
+The ML Engine includes a model registry for managing machine learning models:
 
-```
-┌────────────────┐    ┌─────────────┐    ┌────────────────┐
-│                │    │             │    │                │
-│    Tekton      │────▶    Metrics  │────▶     Engram     │
-│  Components    │    │    Engine   │    │   (Storage)    │
-│                │    │             │    │                │
-└────────────────┘    └──────┬──────┘    └────────────────┘
-                             │
-                             ▼
-                      ┌─────────────┐
-                      │             │
-                      │   Analysis  │
-                      │   Engine    │
-                      │             │
-                      └─────────────┘
-```
+- **Registration**: Models can be registered with metadata including type, provider, and capabilities.
+- **Default Models**: Each model type (embedding, classification, etc.) has a default model.
+- **Model Loading**: Models can be loaded into memory and unloaded as needed.
 
-### Analysis and Recommendation Flow
+### Data Models
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
-│             │    │             │    │                 │
-│   Metrics   │────▶   Analysis  │────▶  Recommendation │
-│   Engine    │    │   Engine    │    │     System      │
-│             │    │             │    │                 │
-└─────────────┘    └─────────────┘    └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │                 │
-                                      │     Tekton      │
-                                      │   Components    │
-                                      │                 │
-                                      └─────────────────┘
-```
+Sophia uses Pydantic models for data validation and serialization:
 
-### Experiment Flow
+- **Metrics Models**: Data structures for metrics collection and analysis.
+- **Experiment Models**: Structures for experiment design, execution, and results.
+- **Recommendation Models**: Models for improvement recommendations and verification.
+- **Intelligence Models**: Structures for intelligence measurement across dimensions.
+- **Component Models**: Data models for component registration and analysis.
+- **Research Models**: Structures for research projects and results.
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│                 │    │                 │    │                 │
-│  Recommendation │────▶   Experiment    │────▶     Tekton      │
-│     System      │    │    Framework    │    │   Components    │
-│                 │    │                 │    │                 │
-└─────────────────┘    └─────────────────┘    └────────┬────────┘
-                                                       │
-                                                       ▼
-                                              ┌─────────────────┐
-                                              │                 │
-                                              │     Metrics     │
-                                              │     Engine      │
-                                              │                 │
-                                              └────────┬────────┘
-                                                       │
-                                                       ▼
-                                              ┌─────────────────┐
-                                              │                 │
-                                              │     Analysis    │
-                                              │     Engine      │
-                                              │                 │
-                                              └─────────────────┘
-```
+### Integration Layer
 
-### Intelligence Measurement Flow
+Sophia integrates with other Tekton components through:
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│                 │    │                 │    │                 │
-│     Tekton      │────▶   Intelligence  │────▶     Report      │
-│   Components    │    │   Measurement   │    │   Generation    │
-│                 │    │                 │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+- **Hermes Integration**: Registration with the Hermes service registry.
+- **Engram Integration**: Leveraging Engram for persistent memory.
+- **Prometheus Integration**: Integration with the planning component.
+- **Tekton LLM Integration**: Access to language models for analysis.
 
-## Component Interaction
+## Intelligence Dimensions Framework
 
-Sophia interacts with other Tekton components through:
+Sophia implements a comprehensive framework for measuring AI intelligence across 10 dimensions:
 
-1. **Direct Integration**: Components call Sophia's client to submit metrics and receive recommendations
-2. **Event System**: Sophia subscribes to component events through Hermes
-3. **Real-time Updates**: Components subscribe to Sophia's WebSocket for real-time updates
-4. **Data Storage**: Sophia uses Engram for persistent storage of metrics and reports
-5. **Planning Integration**: Sophia exchanges data with Prometheus for planning and improvement
+1. **Language Processing**: Understanding, interpreting, and generating human language.
+2. **Reasoning**: Making inferences, deductions, and logical arguments.
+3. **Knowledge**: Factual information and domain expertise.
+4. **Learning**: Acquiring new information and adapting from experience.
+5. **Creativity**: Generating novel, valuable, and surprising outputs.
+6. **Planning**: Formulating goals and strategies to achieve them.
+7. **Problem Solving**: Identifying, analyzing, and resolving challenges.
+8. **Adaptation**: Adjusting behavior based on changing conditions.
+9. **Collaboration**: Working effectively with other agents or humans.
+10. **Metacognition**: Awareness and control of one's own thought processes.
 
-## Intelligence Measurement Architecture
+Each dimension is measured through multiple metrics and can be used to create intelligence profiles for components or the entire ecosystem.
 
-Sophia measures AI intelligence across multiple dimensions:
+## Experiment Framework
 
-```
-┌──────────────────────────────────────────────────────┐
-│            Intelligence Measurement Framework        │
-├──────────┬──────────┬──────────┬──────────┬─────────┤
-│          │          │          │          │         │
-│ Reasoning │Creativity│Knowledge │ Learning │Collabor-│
-│ Metrics  │ Metrics  │ Metrics  │ Metrics  │ ation   │
-│          │          │          │          │ Metrics │
-└──────────┴──────────┴──────────┴──────────┴─────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────┐
-│                 Analysis & Scoring                   │
-└──────────────────────────┬───────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────┐
-│                Intelligence Reports                  │
-└──────────────────────────────────────────────────────┘
-```
+Sophia provides a comprehensive experiment framework supporting multiple experiment types:
 
-## Technical Architecture
+- **A/B Testing**: Compare two variants to determine which performs better.
+- **Multivariate Testing**: Test multiple variables simultaneously.
+- **Canary Deployments**: Gradually roll out changes to a subset of users.
+- **Shadow Mode Testing**: Run a new implementation alongside the current one.
+- **Parameter Tuning**: Find optimal values for configurable parameters.
+- **Before/After Testing**: Compare metrics before and after a change.
+- **Baseline Comparisons**: Compare multiple candidates against a baseline.
 
-### Technologies
+The framework handles experiment design, execution, data collection, and analysis.
 
-Sophia is built with:
+## API Endpoints
 
-- **Python 3.9+** as the primary language
-- **FastAPI** for the HTTP API layer
-- **AsyncIO** for asynchronous operations
-- **WebSockets** for real-time communication
-- **Pydantic** for data validation and serialization
-- **NumPy/SciPy/Pandas** for data analysis
-- **Scikit-learn** for machine learning operations
-- **Matplotlib/Plotly** for visualization
+Sophia provides a comprehensive API following the Single Port Architecture pattern:
 
-### Performance Considerations
+### Metrics API
+- `POST /api/metrics` - Submit a metric
+- `GET /api/metrics` - Query metrics
+- `POST /api/metrics/aggregate` - Aggregate metrics
+- `GET /api/metrics/definitions` - Get metric definitions
 
-- Efficient metric storage with appropriate indexing
-- Caching for frequently accessed metrics and reports
-- Batch processing for large-scale analysis
-- Asynchronous processing to prevent blocking operations
-- Optimized database queries and aggregations
+### Experiments API
+- `POST /api/experiments` - Create an experiment
+- `GET /api/experiments` - Query experiments
+- `GET /api/experiments/{id}` - Get experiment details
+- `PUT /api/experiments/{id}` - Update an experiment
+- `POST /api/experiments/{id}/start` - Start an experiment
+- `POST /api/experiments/{id}/stop` - Stop an experiment
+- `POST /api/experiments/{id}/analyze` - Analyze experiment results
+- `GET /api/experiments/{id}/results` - Get experiment results
 
-### Scalability Architecture
+### Recommendations API
+- `POST /api/recommendations` - Create a recommendation
+- `GET /api/recommendations` - Query recommendations
+- `GET /api/recommendations/{id}` - Get recommendation details
+- `PUT /api/recommendations/{id}` - Update a recommendation
+- `POST /api/recommendations/{id}/status/{status}` - Update recommendation status
+- `POST /api/recommendations/{id}/verify` - Verify recommendation implementation
 
-Sophia is designed to scale with:
+### Intelligence API
+- `POST /api/intelligence/measurements` - Record an intelligence measurement
+- `GET /api/intelligence/measurements` - Query intelligence measurements
+- `GET /api/intelligence/components/{id}/profile` - Get component intelligence profile
+- `POST /api/intelligence/components/compare` - Compare component intelligence profiles
+- `GET /api/intelligence/dimensions` - Get intelligence dimensions
+- `GET /api/intelligence/dimensions/{dimension}` - Get intelligence dimension details
+- `GET /api/intelligence/ecosystem/profile` - Get ecosystem intelligence profile
 
-- Horizontal scaling capabilities for metric collection
-- Load distribution for analysis operations
-- Efficient storage mechanisms for historical data
-- Configurable retention policies for metrics
-- Prioritization mechanisms for high-value analysis
+### Components API
+- `POST /api/components/register` - Register a component
+- `GET /api/components` - Query components
+- `GET /api/components/{id}` - Get component details
+- `PUT /api/components/{id}` - Update a component
+- `GET /api/components/{id}/performance` - Analyze component performance
+- `POST /api/components/interaction` - Analyze component interactions
 
-## Security Architecture
+### Research API
+- `POST /api/research/projects` - Create a research project
+- `GET /api/research/projects` - Query research projects
+- `GET /api/research/projects/{id}` - Get project details
+- `PUT /api/research/projects/{id}` - Update a research project
+
+### WebSocket Connection
+- `/ws` - WebSocket connection for real-time updates
+
+## Implementation Details
+
+### Dependency Injection
+
+Sophia uses FastAPI's dependency injection system to provide access to core engines. Each engine is lazy-loaded when needed and cached as a singleton.
+
+### Asynchronous Design
+
+Sophia is built with a fully asynchronous design using Python's `asyncio` library:
+- All APIs are asynchronous endpoints
+- Core engines use asynchronous initialization, processing, and shutdown
+- WebSocket connections support real-time asynchronous updates
+
+### Error Handling
+
+The API layer implements consistent error handling with appropriate HTTP status codes:
+- `404 Not Found` for resources that don't exist
+- `400 Bad Request` for invalid input parameters
+- `500 Internal Server Error` for unexpected exceptions
+
+### Logging
+
+Sophia implements a structured logging system:
+- Integration with Tekton's shared logging utilities
+- Fallback to standard Python logging when shared utilities are unavailable
+- Consistent log levels and formats across components
+
+### Configuration
+
+Configuration is handled through environment variables with sensible defaults:
+- `SOPHIA_PORT`: Port for the API server (default: 8006)
+- `HERMES_URL`: URL for the Hermes service (default: http://localhost:8000/api)
+- `SOPHIA_API_ENDPOINT`: API endpoint for Sophia (used for registration)
+
+## Integration with Tekton
+
+Sophia integrates with the broader Tekton ecosystem through:
+
+1. **Component Registration**:
+   - Registers as "sophia" component with Hermes
+   - Provides capabilities including "metrics", "experiments", "intelligence", etc.
+   - Specifies API endpoints for all services
+
+2. **Dependency Handling**:
+   - Depends on Hermes for service discovery
+   - Optional dependencies on Engram for memory integration
+   - Optional dependencies on Prometheus for planning integration
+
+3. **LLM Integration**:
+   - Uses shared Tekton LLM client for analysis
+   - Gracefully degrades when LLM services are unavailable
+
+## Security Considerations
 
 Sophia implements several security measures:
 
-- Authentication for all API endpoints
-- Authorization for accessing sensitive metrics
-- Data validation for all inputs
-- Secure storage of sensitive metrics
-- Audit logging for security events
+1. **Input Validation**:
+   - All API inputs are validated using Pydantic models
+   - Strict type checking and format validation
 
-## UI Architecture
+2. **Error Handling**:
+   - Sanitized error messages to prevent information leakage
+   - Appropriate status codes for different types of errors
 
-The Sophia UI component follows a modular design:
+3. **Future Work**:
+   - Authentication and authorization to be implemented
+   - Rate limiting for API endpoints
+   - Audit logging for sensitive operations
 
+## Performance Considerations
+
+Sophia is designed with performance in mind:
+
+1. **Asynchronous Design**:
+   - Non-blocking I/O for all external communications
+   - Efficient handling of multiple concurrent requests
+
+2. **Caching**:
+   - In-memory caching of frequently accessed data
+   - Singleton pattern for core engines to reduce initialization overhead
+
+3. **Lazy Loading**:
+   - Models are loaded only when needed
+   - Dependencies are injected on demand
+
+## Future Enhancements
+
+Planned enhancements for Sophia include:
+
+1. **Advanced ML Models**:
+   - More sophisticated machine learning models for deeper analysis
+   - Integration with specialized embedding and classification models
+
+2. **Computational Spectral Analysis**:
+   - Implementation of CSA research capability for neural network analysis
+   - Catastrophe theory analysis for system stability
+
+3. **UI Integration**:
+   - Comprehensive UI components for Hephaestus integration
+   - Advanced visualization of intelligence profiles and experiment results
+
+4. **System Optimization**:
+   - Performance improvements for high-volume metric processing
+   - Distributed processing for large-scale analysis
+
+5. **Extended Testing**:
+   - Comprehensive test suite for all components
+   - Automated regression testing
+
+## Appendices
+
+### A. API Examples
+
+```python
+# Example: Submit a metric
+await client.submit_metric(
+    metric_id="component.performance.latency",
+    value=42.5,
+    source="my_component",
+    tags=["performance", "latency"]
+)
+
+# Example: Create an experiment
+experiment_id = await client.create_experiment(
+    name="Latency Optimization",
+    description="Testing a new algorithm to reduce latency",
+    experiment_type="a_b_test",
+    target_components=["my_component"],
+    hypothesis="The new algorithm reduces latency by 20%",
+    metrics=["component.performance.latency"],
+    parameters={
+        "control": {"algorithm": "current"},
+        "treatment": {"algorithm": "new"}
+    }
+)
 ```
-┌──────────────────────────────────────────────────┐
-│               Sophia Component UI                │
-├─────────────┬──────────────┬────────────────────┤
-│             │              │                    │
-│  Dashboard  │ Experiments  │ Recommendations    │
-│             │              │                    │
-├─────────────┼──────────────┼────────────────────┤
-│             │              │                    │
-│ Intelligence│  Component   │  Configuration     │
-│  Reports    │  Analysis    │                    │
-│             │              │                    │
-└─────────────┴──────────────┴────────────────────┘
+
+### B. WebSocket Protocol
+
+```javascript
+// Subscribe to experiment updates
+ws.send(JSON.stringify({
+    type: "subscribe",
+    channel: "experiments",
+    filters: {
+        experiment_id: "exp-123456"
+    }
+}));
+
+// Receive notification
+{
+    "type": "experiment_update",
+    "experiment_id": "exp-123456",
+    "status": "running",
+    "timestamp": "2025-04-28T15:30:45Z",
+    "metrics": {
+        "samples_collected": 150,
+        "preliminary_results": {
+            "control": {"avg_latency": 120},
+            "treatment": {"avg_latency": 95}
+        }
+    }
+}
 ```
-
-## Conclusion
-
-Sophia's architecture is designed to provide comprehensive machine learning capabilities and continuous improvement functionality for the Tekton ecosystem. Through its modular design, clear separation of concerns, and standardized interfaces, Sophia can effectively measure AI intelligence, analyze system performance, and drive ongoing enhancement of the entire platform.

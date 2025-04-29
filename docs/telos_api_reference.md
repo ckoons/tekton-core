@@ -1,101 +1,108 @@
 # Telos API Reference
 
-This document provides a comprehensive reference for the Telos API endpoints following the Single Port Architecture pattern.
+This document provides detailed information about the Telos Requirements Management API endpoints, including request parameters, response formats, and examples.
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Base URL](#base-url)
+- [Authentication](#authentication)
+- [Response Format](#response-format)
+- [API Endpoints](#api-endpoints)
+  - [Projects](#projects)
+  - [Requirements](#requirements)
+  - [Traces](#traces)
+  - [Validation](#validation)
+  - [Planning](#planning)
+  - [Export/Import](#exportimport)
+
+## Overview
+
+The Telos API follows a RESTful design pattern and provides endpoints for managing requirements, projects, traces, validation, and planning integration. The API implements Tekton's Single Port Architecture, with all HTTP endpoints accessible via `/api/*` paths.
 
 ## Base URL
 
-All API endpoints are accessible through port 8008:
-
-```
-http://localhost:8008
-```
-
-## Path Structure
-
-The API follows the Single Port Architecture pattern with these path prefixes:
-
-- `/api/*` - RESTful API endpoints
-- `/ws` - WebSocket endpoint for real-time updates
-- `/events` - Server-sent events (future implementation)
+All API endpoints are available under the base URL: `http://localhost:8008/api`
 
 ## Authentication
 
-Authentication is not currently implemented. All endpoints are accessible without authentication.
+The current implementation does not include authentication. Future versions will implement authentication/authorization mechanisms.
+
+## Response Format
+
+All API responses are in JSON format. Successful responses typically include:
+
+- For GET operations: Requested data
+- For POST operations: The created resource or a success response
+- For PUT operations: A success response or the updated resource
+- For DELETE operations: A success response
+
+Error responses follow a standard format:
+
+```json
+{
+  "detail": "Error message describing the issue"
+}
+```
+
+HTTP status codes:
+- **200**: Success
+- **201**: Created successfully
+- **400**: Bad request (invalid input)
+- **404**: Resource not found
+- **500**: Server error
+- **503**: Service unavailable (Requirements manager not initialized)
 
 ## API Endpoints
 
-### Root Endpoints
+### Projects
 
-#### GET /
+#### List All Projects
 
-Get basic information about the Telos API.
-
-**Response**:
-```json
-{
-  "name": "Telos Requirements Manager",
-  "version": "0.1.0",
-  "status": "running",
-  "endpoints": [
-    "/api/projects", "/api/requirements", "/api/traces", 
-    "/api/validation", "/api/export", "/api/import", "/ws", "/events"
-  ],
-  "prometheus_available": true,
-  "project_count": 3
-}
 ```
-
-#### GET /health
-
-Check the health status of the Telos API.
-
-**Response**:
-```json
-{
-  "status": "healthy",
-  "version": "0.1.0",
-  "project_count": 3,
-  "storage_dir": "/path/to/storage",
-  "prometheus_available": true
-}
+GET /api/projects
 ```
-
-### Project Management
-
-#### GET /api/projects
-
-List all projects.
 
 **Response**:
 ```json
 {
   "projects": [
     {
-      "project_id": "project-123",
-      "name": "My Project",
-      "description": "Project description",
-      "created_at": 1650000000,
-      "updated_at": 1650001000,
+      "project_id": "project-1",
+      "name": "Project One",
+      "description": "Description of Project One",
+      "created_at": 1682456789.123,
+      "updated_at": 1682456789.123,
       "requirement_count": 5
     },
-    // More projects...
+    {
+      "project_id": "project-2",
+      "name": "Project Two",
+      "description": "Description of Project Two",
+      "created_at": 1682456800.456,
+      "updated_at": 1682456800.456,
+      "requirement_count": 3
+    }
   ],
   "count": 2
 }
 ```
 
-#### POST /api/projects
+#### Create a Project
 
-Create a new project.
+```
+POST /api/projects
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
   "name": "New Project",
-  "description": "Project description",
+  "description": "Description of New Project",
   "metadata": {
-    "category": "Development",
-    "priority": "High"
+    "priority": "high",
+    "deadline": "2025-12-31",
+    "stakeholders": ["Product", "Engineering"]
   }
 }
 ```
@@ -103,51 +110,69 @@ Create a new project.
 **Response**:
 ```json
 {
-  "project_id": "project-456",
+  "project_id": "new-project-id",
   "name": "New Project",
-  "description": "Project description",
-  "created_at": 1650002000
+  "description": "Description of New Project",
+  "created_at": 1682456900.789
 }
 ```
 
-#### GET /api/projects/{project_id}
+#### Get a Project
 
-Get a specific project with its requirements.
+```
+GET /api/projects/{project_id}
+```
 
 **Response**:
 ```json
 {
-  "project_id": "project-123",
-  "name": "My Project",
-  "description": "Project description",
-  "created_at": 1650000000,
-  "updated_at": 1650001000,
+  "project_id": "project-1",
+  "name": "Project One",
+  "description": "Description of Project One",
+  "created_at": 1682456789.123,
+  "updated_at": 1682456789.123,
+  "metadata": {
+    "priority": "high",
+    "deadline": "2025-12-31",
+    "stakeholders": ["Product", "Engineering"]
+  },
   "requirements": {
     "req-1": {
       "requirement_id": "req-1",
       "title": "User Authentication",
-      "description": "The system shall authenticate users",
-      // More requirement attributes...
+      "status": "new",
+      "priority": "high",
+      "requirement_type": "functional"
     },
-    // More requirements...
+    "req-2": {
+      "requirement_id": "req-2",
+      "title": "User Authorization",
+      "status": "in-progress",
+      "priority": "high",
+      "requirement_type": "functional"
+    }
   },
   "hierarchy": {
-    // Hierarchical structure of requirements
+    "root": ["req-1"],
+    "req-1": ["req-2"]
   }
 }
 ```
 
-#### PUT /api/projects/{project_id}
+#### Update a Project
 
-Update a project.
+```
+PUT /api/projects/{project_id}
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
   "name": "Updated Project Name",
-  "description": "Updated description",
+  "description": "Updated project description",
   "metadata": {
-    "status": "Active"
+    "priority": "medium",
+    "status": "active"
   }
 }
 ```
@@ -155,71 +180,48 @@ Update a project.
 **Response**:
 ```json
 {
-  "project_id": "project-123",
+  "project_id": "project-1",
   "updated": {
     "name": "Updated Project Name",
-    "description": "Updated description",
+    "description": "Updated project description",
     "metadata": {
-      "category": "Development",
-      "priority": "High",
-      "status": "Active"
+      "priority": "medium",
+      "deadline": "2025-12-31",
+      "stakeholders": ["Product", "Engineering"],
+      "status": "active"
     }
   },
-  "updated_at": 1650003000
+  "updated_at": 1682457000.123
 }
 ```
 
-#### DELETE /api/projects/{project_id}
+#### Delete a Project
 
-Delete a project.
+```
+DELETE /api/projects/{project_id}
+```
 
 **Response**:
 ```json
 {
   "success": true,
-  "project_id": "project-123"
+  "project_id": "project-1"
 }
 ```
 
-### Requirement Management
+### Requirements
 
-#### POST /api/projects/{project_id}/requirements
+#### List Requirements
 
-Create a new requirement in a project.
-
-**Request**:
-```json
-{
-  "title": "User Authentication",
-  "description": "The system shall authenticate users with username and password",
-  "requirement_type": "functional",
-  "priority": "high",
-  "status": "new",
-  "tags": ["security", "user"],
-  "parent_id": null,
-  "dependencies": []
-}
 ```
-
-**Response**:
-```json
-{
-  "project_id": "project-123",
-  "requirement_id": "req-1",
-  "title": "User Authentication",
-  "created_at": 1650004000
-}
+GET /api/projects/{project_id}/requirements
 ```
-
-#### GET /api/projects/{project_id}/requirements
-
-List requirements for a project with optional filtering.
 
 **Query Parameters**:
-- `status`: Filter by status
-- `requirement_type`: Filter by type
-- `priority`: Filter by priority
-- `tag`: Filter by tag
+- `status` (optional): Filter by status (new, in-progress, completed, rejected)
+- `requirement_type` (optional): Filter by type (functional, non-functional, constraint)
+- `priority` (optional): Filter by priority (critical, high, medium, low)
+- `tag` (optional): Filter by tag
 
 **Response**:
 ```json
@@ -228,53 +230,110 @@ List requirements for a project with optional filtering.
     {
       "requirement_id": "req-1",
       "title": "User Authentication",
-      "description": "The system shall authenticate users",
+      "description": "The system must authenticate users with username and password.",
       "requirement_type": "functional",
       "priority": "high",
       "status": "new",
-      "tags": ["security", "user"],
-      "created_at": 1650004000,
-      "updated_at": 1650004000
+      "created_at": 1682456789.123,
+      "updated_at": 1682456789.123
     },
-    // More requirements...
+    {
+      "requirement_id": "req-2",
+      "title": "User Authorization",
+      "description": "The system must authorize users based on their roles.",
+      "requirement_type": "functional",
+      "priority": "high",
+      "status": "in-progress",
+      "created_at": 1682456800.456,
+      "updated_at": 1682456800.456
+    }
   ],
-  "count": 5
+  "count": 2
 }
 ```
 
-#### GET /api/projects/{project_id}/requirements/{requirement_id}
+#### Create a Requirement
 
-Get a specific requirement.
+```
+POST /api/projects/{project_id}/requirements
+```
+
+**Request Body**:
+```json
+{
+  "title": "Password Complexity",
+  "description": "Passwords must have at least 8 characters with a mix of uppercase, lowercase, numbers, and special characters.",
+  "requirement_type": "security",
+  "priority": "high",
+  "status": "new",
+  "tags": ["security", "authentication"],
+  "parent_id": "req-1",
+  "dependencies": ["req-2"],
+  "metadata": {
+    "source": "Security Team",
+    "complexity": "medium"
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "project_id": "project-1",
+  "requirement_id": "req-3",
+  "title": "Password Complexity",
+  "created_at": 1682457100.789
+}
+```
+
+#### Get a Requirement
+
+```
+GET /api/projects/{project_id}/requirements/{requirement_id}
+```
 
 **Response**:
 ```json
 {
   "requirement_id": "req-1",
   "title": "User Authentication",
-  "description": "The system shall authenticate users",
+  "description": "The system must authenticate users with username and password.",
   "requirement_type": "functional",
   "priority": "high",
   "status": "new",
-  "tags": ["security", "user"],
+  "created_by": "user-1",
+  "created_at": 1682456789.123,
+  "updated_at": 1682456789.123,
+  "tags": ["security", "user-management"],
   "parent_id": null,
   "dependencies": [],
-  "created_at": 1650004000,
-  "updated_at": 1650004000,
-  "metadata": {}
+  "metadata": {
+    "source": "Product Team",
+    "complexity": "medium"
+  },
+  "history": [
+    {
+      "timestamp": 1682456789.123,
+      "action": "created",
+      "description": "Requirement created"
+    }
+  ]
 }
 ```
 
-#### PUT /api/projects/{project_id}/requirements/{requirement_id}
+#### Update a Requirement
 
-Update a requirement.
+```
+PUT /api/projects/{project_id}/requirements/{requirement_id}
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
-  "title": "Updated Title",
-  "description": "Updated description",
-  "priority": "medium",
-  "status": "in_progress"
+  "title": "User Authentication and Identity",
+  "description": "The system must authenticate users with username, password, and optional 2FA.",
+  "status": "in-progress",
+  "priority": "critical"
 }
 ```
 
@@ -282,35 +341,37 @@ Update a requirement.
 ```json
 {
   "requirement_id": "req-1",
-  "updated": ["title", "description", "priority", "status"],
-  "updated_at": 1650005000
+  "updated": ["title", "description", "status", "priority"],
+  "updated_at": 1682457200.123
 }
 ```
 
-#### DELETE /api/projects/{project_id}/requirements/{requirement_id}
+#### Delete a Requirement
 
-Delete a requirement.
+```
+DELETE /api/projects/{project_id}/requirements/{requirement_id}
+```
 
 **Response**:
 ```json
 {
   "success": true,
-  "project_id": "project-123",
+  "project_id": "project-1",
   "requirement_id": "req-1"
 }
 ```
 
-### Requirement Refinement
+#### Refine a Requirement
 
-#### POST /api/projects/{project_id}/requirements/{requirement_id}/refine
+```
+POST /api/projects/{project_id}/requirements/{requirement_id}/refine
+```
 
-Refine a requirement with feedback.
-
-**Request**:
+**Request Body**:
 ```json
 {
-  "feedback": "Add more detail about authentication methods",
-  "auto_update": true
+  "feedback": "This requirement needs to be more specific about the authentication methods supported.",
+  "auto_update": false
 }
 ```
 
@@ -318,176 +379,324 @@ Refine a requirement with feedback.
 ```json
 {
   "requirement_id": "req-1",
-  "title": "User Authentication",
-  "description": "The system shall authenticate users with username/password and optional two-factor authentication",
-  "suggestions": [
-    "Consider adding details about password requirements",
-    "Add information about account lockout policies"
-  ],
-  "score": 0.85
-}
-```
-
-### Requirement Validation
-
-#### POST /api/projects/{project_id}/validate
-
-Validate a project's requirements against provided criteria.
-
-**Request**:
-```json
-{
-  "criteria": {
-    "check_completeness": true,
-    "check_clarity": true,
-    "check_verifiability": true
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "project_id": "project-123",
-  "validation_date": "2025-04-26T14:30:00.000Z",
-  "results": [
-    {
-      "requirement_id": "req-1",
-      "title": "User Authentication",
-      "issues": [
-        {
-          "type": "verifiability",
-          "message": "Requirement may not be easily verifiable"
-        }
-      ],
-      "passed": false
-    },
-    // More requirement validation results...
-  ],
-  "summary": {
-    "total_requirements": 5,
-    "passed": 3,
-    "failed": 2,
-    "pass_percentage": 60
+  "original": {
+    "requirement_id": "req-1",
+    "title": "User Authentication",
+    "description": "The system must authenticate users with username and password."
   },
-  "criteria": {
-    "check_completeness": true,
-    "check_clarity": true,
-    "check_verifiability": true
-  }
+  "refined": {
+    "requirement_id": "req-1",
+    "title": "User Authentication",
+    "description": "The system must authenticate users with username and password. Additionally, it should support OAuth 2.0 for third-party authentication providers including Google, Microsoft, and Apple ID."
+  },
+  "status": "success",
+  "message": "Refinement successful",
+  "changes": [
+    "Added specific authentication providers",
+    "Added OAuth 2.0 support details"
+  ]
 }
 ```
 
-### Requirement Tracing
+### Traces
 
-#### GET /api/projects/{project_id}/traces
+#### List Traces
 
-List all requirement traces for a project.
+```
+GET /api/projects/{project_id}/traces
+```
+
+**Query Parameters**:
+- `requirement_id` (optional): Filter traces for a specific requirement
 
 **Response**:
 ```json
 {
   "traces": [
     {
-      "trace_id": "trace_1650006000",
+      "trace_id": "trace-1",
       "source_id": "req-1",
       "target_id": "req-2",
-      "trace_type": "depends-on",
-      "description": "Authentication is required before authorization",
-      "created_at": 1650006000
+      "trace_type": "depends_on",
+      "description": "Authentication must be implemented before authorization",
+      "created_at": 1682456900.123
     },
-    // More traces...
+    {
+      "trace_id": "trace-2",
+      "source_id": "req-3",
+      "target_id": "req-1",
+      "trace_type": "refines",
+      "description": "Password complexity refines authentication",
+      "created_at": 1682457000.456
+    }
   ],
-  "count": 3
+  "count": 2
 }
 ```
 
-#### POST /api/projects/{project_id}/traces
+#### Create a Trace
 
-Create a new trace between requirements.
+```
+POST /api/projects/{project_id}/traces
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
-  "source_id": "req-1",
-  "target_id": "req-3",
-  "trace_type": "implements",
-  "description": "Authentication implements security requirements"
+  "source_id": "req-4",
+  "target_id": "req-2",
+  "trace_type": "depends_on",
+  "description": "User profile depends on authorization",
+  "metadata": {
+    "strength": "strong",
+    "reviewer": "security-team"
+  }
 }
 ```
 
 **Response**:
 ```json
 {
-  "trace_id": "trace_1650007000",
-  "source_id": "req-1",
-  "target_id": "req-3"
+  "trace_id": "trace-3",
+  "source_id": "req-4",
+  "target_id": "req-2"
 }
 ```
 
-#### GET /api/projects/{project_id}/traces/{trace_id}
+#### Get a Trace
 
-Get a specific trace.
+```
+GET /api/projects/{project_id}/traces/{trace_id}
+```
 
 **Response**:
 ```json
 {
-  "trace_id": "trace_1650006000",
+  "trace_id": "trace-1",
   "source_id": "req-1",
   "target_id": "req-2",
-  "trace_type": "depends-on",
-  "description": "Authentication is required before authorization",
-  "created_at": 1650006000,
+  "trace_type": "depends_on",
+  "description": "Authentication must be implemented before authorization",
+  "created_at": 1682456900.123,
   "metadata": {}
 }
 ```
 
-#### PUT /api/projects/{project_id}/traces/{trace_id}
+#### Update a Trace
 
-Update a trace.
+```
+PUT /api/projects/{project_id}/traces/{trace_id}
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
-  "trace_type": "precedes",
-  "description": "Updated description"
+  "trace_type": "implements",
+  "description": "Updated description of the trace relationship",
+  "metadata": {
+    "reviewed": true,
+    "reviewer": "security-team"
+  }
 }
 ```
 
 **Response**:
 ```json
 {
-  "trace_id": "trace_1650006000",
+  "trace_id": "trace-1",
   "updated": {
-    "trace_type": "precedes",
-    "description": "Updated description"
+    "trace_type": "implements",
+    "description": "Updated description of the trace relationship",
+    "metadata": {
+      "reviewed": true,
+      "reviewer": "security-team"
+    }
   },
-  "updated_at": 1650008000
+  "updated_at": 1682457300.789
 }
 ```
 
-#### DELETE /api/projects/{project_id}/traces/{trace_id}
+#### Delete a Trace
 
-Delete a trace.
+```
+DELETE /api/projects/{project_id}/traces/{trace_id}
+```
 
 **Response**:
 ```json
 {
   "success": true,
-  "trace_id": "trace_1650006000"
+  "trace_id": "trace-1"
 }
 ```
 
-### Project Export/Import
+### Validation
 
-#### POST /api/projects/{project_id}/export
+#### Validate a Project
 
-Export a project in the specified format.
+```
+POST /api/projects/{project_id}/validate
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
-  "format": "json",
+  "criteria": {
+    "check_completeness": true,
+    "check_verifiability": true,
+    "check_clarity": true,
+    "check_consistency": false,
+    "check_feasibility": false
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "project_id": "project-1",
+  "validation_date": 1682457400.123,
+  "results": [
+    {
+      "requirement_id": "req-1",
+      "title": "User Authentication",
+      "issues": [
+        {
+          "type": "completeness",
+          "message": "Description is too short or missing details",
+          "severity": "warning",
+          "suggestion": "Add more details about authentication methods and security requirements"
+        }
+      ],
+      "passed": false,
+      "score": 0.6
+    },
+    {
+      "requirement_id": "req-2",
+      "title": "User Authorization",
+      "issues": [],
+      "passed": true,
+      "score": 0.9
+    }
+  ],
+  "summary": {
+    "total_requirements": 2,
+    "passed": 1,
+    "failed": 1,
+    "pass_percentage": 50.0,
+    "issues_by_type": {
+      "completeness": 1
+    }
+  },
+  "criteria": {
+    "check_completeness": true,
+    "check_verifiability": true,
+    "check_clarity": true,
+    "check_consistency": false,
+    "check_feasibility": false
+  }
+}
+```
+
+### Planning
+
+#### Analyze Requirements for Planning
+
+```
+POST /api/projects/{project_id}/analyze
+```
+
+**Response**:
+```json
+{
+  "status": "ready",
+  "message": "Requirements are ready for planning",
+  "context": {
+    "project_info": {
+      "name": "Project One",
+      "description": "Description of Project One",
+      "created_at": 1682456789.123,
+      "updated_at": 1682456789.123
+    },
+    "requirements": {
+      "functional": [
+        {
+          "id": "req-1",
+          "title": "User Authentication",
+          "description": "Description...",
+          "status": "new",
+          "priority": "high",
+          "tags": ["security", "user-management"]
+        }
+      ],
+      "non_functional": [],
+      "constraints": []
+    },
+    "dependencies": {
+      "req-2": ["req-1"]
+    },
+    "priorities": {
+      "critical": [],
+      "high": ["req-1", "req-2"],
+      "medium": [],
+      "low": []
+    }
+  },
+  "analysis": {
+    "requirements_ready": 2,
+    "requirements_total": 2,
+    "readiness_percentage": 100.0,
+    "analyses": [
+      {
+        "requirement_id": "req-1",
+        "title": "User Authentication",
+        "ready": true,
+        "score": 0.85,
+        "suggestions": []
+      },
+      {
+        "requirement_id": "req-2",
+        "title": "User Authorization",
+        "ready": true,
+        "score": 0.9,
+        "suggestions": []
+      }
+    ]
+  }
+}
+```
+
+#### Create a Plan
+
+```
+POST /api/projects/{project_id}/plan
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "message": "Plan created successfully",
+  "plan": {
+    "thought_id": "plan-1",
+    "complexity_score": 0.75,
+    "plan": "# Implementation Plan for Project One\n\n## Phase 1: Authentication System\n- Implement user registration\n- Implement username/password authentication\n- Implement password reset flow\n\n## Phase 2: Authorization System\n- Implement role-based access control\n- Implement permission management\n\n## Estimated Timeline\n- Phase 1: 2 weeks\n- Phase 2: 3 weeks"
+  }
+}
+```
+
+### Export/Import
+
+#### Export a Project
+
+```
+POST /api/projects/{project_id}/export
+```
+
+**Request Body**:
+```json
+{
+  "format": "markdown",
   "sections": ["metadata", "requirements", "traces"]
 }
 ```
@@ -495,19 +704,39 @@ Export a project in the specified format.
 **Response**:
 ```json
 {
-  // Full project data
+  "format": "markdown",
+  "content": "# Project One\n\nDescription of Project One\n\n## Project Metadata\n\n- **Project ID:** project-1\n- **Created:** 2023-04-25 12:13:09\n- **Last Updated:** 2023-04-25 12:13:09\n\n## Requirements\n\n### Functional Requirements\n\n#### User Authentication (ID: req-1)\n\nThe system must authenticate users with username and password.\n\n- **Status:** new\n- **Priority:** high\n\n#### User Authorization (ID: req-2)\n\nThe system must authorize users based on their roles.\n\n- **Status:** in-progress\n- **Priority:** high\n\n## Requirement Traces\n\n- **depends_on:** User Authentication → User Authorization\n  - Authentication must be implemented before authorization\n"
 }
 ```
 
-#### POST /api/projects/import
+#### Import a Project
 
-Import a project from external data.
+```
+POST /api/projects/import
+```
 
-**Request**:
+**Request Body**:
 ```json
 {
   "data": {
-    // Project data to import
+    "name": "Imported Project",
+    "description": "Project imported from external source",
+    "requirements": {
+      "req-1": {
+        "title": "Imported Requirement 1",
+        "description": "Description of imported requirement 1",
+        "requirement_type": "functional",
+        "priority": "high",
+        "status": "new"
+      },
+      "req-2": {
+        "title": "Imported Requirement 2",
+        "description": "Description of imported requirement 2",
+        "requirement_type": "non-functional",
+        "priority": "medium",
+        "status": "new"
+      }
+    }
   },
   "format": "json",
   "merge_strategy": "replace"
@@ -517,453 +746,12 @@ Import a project from external data.
 **Response**:
 ```json
 {
-  "project_id": "project-789",
+  "project_id": "imported-project-id",
   "name": "Imported Project",
-  "imported_requirements": 10
-}
-```
-
-### Planning Integration
-
-#### POST /api/projects/{project_id}/analyze
-
-Analyze requirements for planning readiness.
-
-**Response**:
-```json
-{
-  "project_id": "project-123",
-  "analysis": {
-    "status": "ready",
-    "total_requirements": 10,
-    "requirements_ready": 8,
-    "missing_details": [
-      {
-        "requirement_id": "req-5",
-        "missing": ["acceptance_criteria", "priority"]
-      },
-      {
-        "requirement_id": "req-7",
-        "missing": ["description_details"]
-      }
-    ],
-    "suggestions": [
-      "Add acceptance criteria to requirement 'User Logout'",
-      "Provide more detailed description for 'Data Export'"
-    ]
-  }
-}
-```
-
-#### POST /api/projects/{project_id}/plan
-
-Create a plan for the project using Prometheus.
-
-**Response**:
-```json
-{
-  "project_id": "project-123",
-  "plan": {
-    "plan_id": "plan-456",
-    "name": "Implementation Plan for Project 123",
-    "phases": [
-      {
-        "name": "Phase 1: Authentication and User Management",
-        "tasks": [
-          {
-            "task_id": "task-1",
-            "name": "Implement User Authentication",
-            "requirement_ids": ["req-1"],
-            "estimated_effort": "3d",
-            "dependencies": []
-          },
-          // More tasks...
-        ]
-      },
-      // More phases...
-    ],
-    "timeline": {
-      "start_date": "2025-05-01",
-      "end_date": "2025-06-15",
-      "milestones": [
-        {
-          "name": "Authentication Complete",
-          "date": "2025-05-15",
-          "tasks": ["task-1", "task-2"]
-        },
-        // More milestones...
-      ]
-    },
-    "resource_allocation": {
-      // Resource allocation details
-    }
-  }
+  "imported_requirements": 2
 }
 ```
 
 ## WebSocket API
 
-### Endpoint
-
-```
-ws://localhost:8008/ws
-```
-
-### Message Format
-
-All messages follow this general format:
-
-```json
-{
-  "type": "MESSAGE_TYPE",
-  "source": "client",
-  "target": "server",
-  "timestamp": 1650009000,
-  "payload": {
-    // Message-specific payload
-  }
-}
-```
-
-### Message Types
-
-#### REGISTER
-
-Register a client for WebSocket communication.
-
-**Client Message**:
-```json
-{
-  "type": "REGISTER",
-  "source": "client",
-  "target": "server",
-  "timestamp": 1650009000,
-  "payload": {}
-}
-```
-
-**Server Response**:
-```json
-{
-  "type": "RESPONSE",
-  "source": "SERVER",
-  "target": "client",
-  "timestamp": 1650009001,
-  "payload": {
-    "status": "registered",
-    "client_id": "client_1650009000",
-    "message": "Client registered successfully"
-  }
-}
-```
-
-#### STATUS
-
-Get the current status of the Telos service.
-
-**Client Message**:
-```json
-{
-  "type": "STATUS",
-  "source": "client",
-  "target": "server",
-  "timestamp": 1650009100,
-  "payload": {}
-}
-```
-
-**Server Response**:
-```json
-{
-  "type": "RESPONSE",
-  "source": "SERVER",
-  "target": "client",
-  "timestamp": 1650009101,
-  "payload": {
-    "status": "ok",
-    "service": "telos",
-    "version": "0.1.0",
-    "project_count": 5,
-    "prometheus_available": true
-  }
-}
-```
-
-#### PROJECT_SUBSCRIBE
-
-Subscribe to real-time updates for a project.
-
-**Client Message**:
-```json
-{
-  "type": "PROJECT_SUBSCRIBE",
-  "source": "client",
-  "target": "server",
-  "timestamp": 1650009200,
-  "payload": {
-    "project_id": "project-123"
-  }
-}
-```
-
-**Server Response**:
-```json
-{
-  "type": "RESPONSE",
-  "source": "SERVER",
-  "target": "client",
-  "timestamp": 1650009201,
-  "payload": {
-    "status": "subscribed",
-    "project_id": "project-123",
-    "message": "Subscribed to updates for project project-123"
-  }
-}
-```
-
-### Real-time Update Messages
-
-When changes occur to subscribed resources, the server sends update messages:
-
-```json
-{
-  "type": "UPDATE",
-  "source": "SERVER",
-  "target": "client",
-  "timestamp": 1650009300,
-  "payload": {
-    "project_id": "project-123",
-    "resource_type": "requirement",
-    "resource_id": "req-1",
-    "action": "updated",
-    "data": {
-      // Updated resource data
-    }
-  }
-}
-```
-
-## Error Handling
-
-All API endpoints return appropriate HTTP status codes:
-
-- `200 OK`: Successful operation
-- `201 Created`: Resource created successfully
-- `400 Bad Request`: Invalid request parameters
-- `404 Not Found`: Resource not found
-- `500 Internal Server Error`: Server error
-
-Error responses include a detail message:
-
-```json
-{
-  "detail": "Project project-123 not found"
-}
-```
-
-## Integration Examples
-
-### JavaScript API Client
-
-```javascript
-// Example of using the Telos API with fetch
-const BASE_URL = 'http://localhost:8008';
-
-// Get all projects
-async function getProjects() {
-  const response = await fetch(`${BASE_URL}/api/projects`);
-  return response.json();
-}
-
-// Create a new requirement
-async function createRequirement(projectId, requirementData) {
-  const response = await fetch(`${BASE_URL}/api/projects/${projectId}/requirements`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(requirementData)
-  });
-  return response.json();
-}
-
-// Connect to WebSocket for real-time updates
-function connectWebSocket(onMessage) {
-  const ws = new WebSocket(`ws://localhost:8008/ws`);
-  
-  ws.onopen = () => {
-    console.log('Connected to Telos WebSocket');
-    // Register client
-    ws.send(JSON.stringify({
-      type: 'REGISTER',
-      source: 'client',
-      target: 'server',
-      timestamp: Date.now(),
-      payload: {}
-    }));
-  };
-  
-  ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    onMessage(data);
-  };
-  
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
-  };
-  
-  ws.onclose = () => {
-    console.log('Disconnected from WebSocket');
-  };
-  
-  return ws;
-}
-```
-
-### Python API Client
-
-```python
-import requests
-import json
-import websocket
-import threading
-import time
-
-class TelosClient:
-    """Client for interacting with the Telos API."""
-    
-    def __init__(self, base_url="http://localhost:8008"):
-        """Initialize the client with the base URL."""
-        self.base_url = base_url
-        self.ws = None
-        self.ws_thread = None
-        
-    def get_projects(self):
-        """Get all projects."""
-        response = requests.get(f"{self.base_url}/api/projects")
-        return response.json()
-    
-    def create_project(self, project_data):
-        """Create a new project."""
-        response = requests.post(
-            f"{self.base_url}/api/projects",
-            json=project_data
-        )
-        return response.json()
-    
-    def get_project(self, project_id):
-        """Get a specific project with requirements."""
-        response = requests.get(f"{self.base_url}/api/projects/{project_id}")
-        return response.json()
-    
-    def create_requirement(self, project_id, requirement_data):
-        """Create a new requirement."""
-        response = requests.post(
-            f"{self.base_url}/api/projects/{project_id}/requirements",
-            json=requirement_data
-        )
-        return response.json()
-    
-    def connect_websocket(self, on_message=None):
-        """Connect to the WebSocket for real-time updates."""
-        ws_url = f"ws://localhost:8008/ws"
-        
-        def on_open(ws):
-            print("Connected to WebSocket")
-            # Register client
-            ws.send(json.dumps({
-                "type": "REGISTER",
-                "source": "client",
-                "target": "server",
-                "timestamp": int(time.time() * 1000),
-                "payload": {}
-            }))
-        
-        def on_message_internal(ws, message):
-            data = json.loads(message)
-            if on_message:
-                on_message(data)
-            else:
-                print(f"Received: {data}")
-        
-        def on_error(ws, error):
-            print(f"WebSocket error: {error}")
-        
-        def on_close(ws, close_status_code, close_msg):
-            print("Disconnected from WebSocket")
-        
-        def run_websocket():
-            self.ws = websocket.WebSocketApp(
-                ws_url,
-                on_open=on_open,
-                on_message=on_message_internal,
-                on_error=on_error,
-                on_close=on_close
-            )
-            self.ws.run_forever()
-        
-        self.ws_thread = threading.Thread(target=run_websocket)
-        self.ws_thread.daemon = True
-        self.ws_thread.start()
-    
-    def subscribe_to_project(self, project_id):
-        """Subscribe to real-time updates for a project."""
-        if not self.ws:
-            raise RuntimeError("WebSocket not connected")
-            
-        self.ws.send(json.dumps({
-            "type": "PROJECT_SUBSCRIBE",
-            "source": "client",
-            "target": "server",
-            "timestamp": int(time.time() * 1000),
-            "payload": {
-                "project_id": project_id
-            }
-        }))
-    
-    def close(self):
-        """Close the WebSocket connection."""
-        if self.ws:
-            self.ws.close()
-```
-
-## Prometheus Integration
-
-Telos integrates with Prometheus for planning capabilities through these endpoints:
-
-- `POST /api/projects/{project_id}/analyze`: Analyze requirements for planning readiness
-- `POST /api/projects/{project_id}/plan`: Create a plan based on requirements
-
-This integration enables:
-
-1. Analysis of requirements quality before planning
-2. Generation of implementation plans from requirements
-3. Task breakdown with effort estimation
-4. Timeline and milestone creation
-5. Resource allocation suggestions
-
-## LLM Integration
-
-Telos integrates with Rhetor for LLM-powered requirement analysis:
-
-1. Quality assessment of requirements
-2. Improvement suggestions
-3. Clarity and completeness evaluation
-4. Interactive requirement refinement
-
-This integration is implemented through the RequirementAnalyzer class, which uses Rhetor's LLM client.
-
-## Websocket Real-time Updates
-
-The WebSocket endpoint (`/ws`) provides real-time updates for:
-
-1. Requirement changes
-2. Trace updates
-3. Project modifications
-4. Validation results
-
-Clients can subscribe to specific projects to receive real-time updates.
-
-## Rate Limiting
-
-There are currently no rate limits on the API endpoints. However, excessive usage may impact performance.
+In addition to the HTTP API, Telos provides a WebSocket interface for real-time updates at `ws://localhost:8008/ws`. See the technical documentation for WebSocket communication details.

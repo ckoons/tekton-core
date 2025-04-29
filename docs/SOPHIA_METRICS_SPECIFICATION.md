@@ -1,354 +1,635 @@
 # Sophia Metrics Specification
 
-This document defines the standardized metrics system used by Sophia to collect, analyze, and utilize performance data across the Tekton ecosystem.
+This document provides a comprehensive specification for the metrics collection, storage, analysis, and visualization capabilities of Sophia, the machine learning and continuous improvement component of the Tekton ecosystem.
 
 ## Overview
 
-Sophia's metrics system provides a comprehensive framework for:
-- Collecting performance data from all Tekton components
-- Standardizing metrics for consistent analysis
-- Enabling real-time monitoring and historical analysis
-- Supporting the intelligence measurement framework
-- Driving continuous improvement through data-driven recommendations
+Sophia's metrics system serves as the foundation for data-driven decision making and continuous improvement across the Tekton ecosystem. It provides a unified framework for collecting, storing, analyzing, and visualizing metrics from all components, enabling performance tracking, anomaly detection, trend analysis, and experiment evaluation.
 
-## Metric Types
+## Metrics Framework
 
-### 1. Performance Metrics
+### Core Concepts
 
-Metrics related to execution speed, efficiency, and resource utilization.
+The metrics framework is built around these core concepts:
 
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| perf.response_time | Response Time | Time to respond to a request | milliseconds | avg, p50, p95, p99 |
-| perf.processing_time | Processing Time | Time to process a task | milliseconds | avg, p50, p95, p99 |
-| perf.throughput | Throughput | Number of operations per unit time | ops/second | avg, max |
-| perf.latency | Latency | End-to-end time for an operation | milliseconds | avg, p50, p95, p99 |
-| perf.queue_time | Queue Time | Time spent waiting in queue | milliseconds | avg, p50, p95, p99 |
-| perf.idle_time | Idle Time | Time component spends inactive | milliseconds | avg, sum |
-| perf.overhead | Overhead | Non-core processing time | milliseconds | avg, percentage |
+1. **Metric ID**: A hierarchical identifier for the metric type
+2. **Metric Value**: The actual measurement value
+3. **Source**: The component or system generating the metric
+4. **Timestamp**: When the measurement was taken
+5. **Context**: Additional information about the circumstances of the measurement
+6. **Tags**: Categorical labels for filtering and grouping
 
-### 2. Resource Metrics
+### Metric Types
 
-Metrics related to resource consumption and utilization.
+Sophia supports several types of metrics:
 
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| res.cpu_usage | CPU Usage | CPU utilization | percentage | avg, max |
-| res.memory_usage | Memory Usage | Memory consumption | megabytes | avg, max |
-| res.disk_io | Disk I/O | Disk read/write operations | operations/sec | avg, sum |
-| res.network_io | Network I/O | Network traffic | bytes/sec | avg, sum |
-| res.connection_count | Connection Count | Active connections | count | avg, max |
-| res.thread_count | Thread Count | Active threads | count | avg, max |
-| res.token_usage | Token Usage | LLM tokens consumed | count | sum, avg |
-| res.api_calls | API Calls | External API call count | count | sum |
+1. **Counter**: Cumulative values that only increase
+2. **Gauge**: Values that can increase or decrease
+3. **Histogram**: Distribution of values in configurable buckets
+4. **Summary**: Statistical summary with percentiles (e.g., p50, p90, p99)
+5. **Event**: Discrete events with associated metadata
+6. **Dimension**: Multi-dimensional metrics with key-value pairs
 
-### 3. Quality Metrics
+### Metric ID Structure
 
-Metrics related to output quality, accuracy, and reliability.
+Metric IDs follow a hierarchical structure to organize metrics in a logical namespace:
 
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| qual.accuracy | Accuracy | Correctness of output | percentage | avg |
-| qual.error_rate | Error Rate | Frequency of errors | percentage | avg |
-| qual.precision | Precision | Exactness of output | score (0-1) | avg |
-| qual.recall | Recall | Completeness of output | score (0-1) | avg |
-| qual.f1_score | F1 Score | Combined precision/recall | score (0-1) | avg |
-| qual.consistency | Consistency | Variation between similar outputs | score (0-1) | avg |
-| qual.relevance | Relevance | Appropriateness of output | score (0-5) | avg |
-| qual.completeness | Completeness | How complete the output is | percentage | avg |
+```
+<component>.<category>.<subcategory>.<name>
+```
 
-### 4. Intelligence Metrics
+Examples:
+- `terma.performance.latency.average`
+- `engram.memory.retrieval.success_rate`
+- `ergon.workflow.completion.time`
+- `sophia.experiment.sample_size.current`
 
-Metrics specifically related to AI cognitive dimensions (see SOPHIA_INTELLIGENCE_DIMENSIONS.md).
-
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| intel.reasoning | Reasoning Score | Logical reasoning capability | score (0-100) | avg |
-| intel.knowledge | Knowledge Score | Knowledge representation & recall | score (0-100) | avg |
-| intel.learning | Learning Score | Improvement from experience | score (0-100) | avg |
-| intel.creativity | Creativity Score | Novel solution generation | score (0-100) | avg |
-| intel.communication | Communication Score | Clear information exchange | score (0-100) | avg |
-| intel.collaboration | Collaboration Score | Effective teamwork | score (0-100) | avg |
-| intel.execution | Execution Score | Efficient task completion | score (0-100) | avg |
-| intel.adaptability | Adaptability Score | Function in changing conditions | score (0-100) | avg |
-
-### 5. Usage Metrics
-
-Metrics related to component and feature usage patterns.
-
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| usage.request_count | Request Count | Number of requests received | count | sum |
-| usage.active_users | Active Users | Number of active users | count | unique |
-| usage.feature_usage | Feature Usage | Usage of specific features | count | sum |
-| usage.session_duration | Session Duration | Length of user sessions | seconds | avg |
-| usage.interaction_depth | Interaction Depth | Depth of user interaction | count | avg |
-| usage.retention | Retention | Return usage rate | percentage | avg |
-| usage.abandonment | Abandonment | Task abandonment rate | percentage | avg |
-
-### 6. Collaboration Metrics
-
-Metrics specifically measuring multi-component collaboration.
-
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| collab.info_sharing | Information Sharing | Context exchange between components | score (0-5) | avg |
-| collab.task_coordination | Task Coordination | Effective division of responsibilities | score (0-5) | avg |
-| collab.handoff_efficiency | Handoff Efficiency | Smoothness of task transitions | percentage | avg |
-| collab.redundancy | Work Redundancy | Duplicate effort across components | percentage | avg |
-| collab.capability_leverage | Capability Leverage | Optimal use of component strengths | score (0-5) | avg |
-| collab.resolution_time | Conflict Resolution Time | Time to resolve conflicting actions | milliseconds | avg |
-| collab.synergy_factor | Synergy Factor | Performance improvement from collaboration | percentage | avg |
-
-### 7. Operational Metrics
-
-Metrics related to system operations and reliability.
-
-| Metric ID | Name | Description | Unit | Aggregation |
-|-----------|------|-------------|------|------------|
-| ops.uptime | Uptime | System availability | percentage | avg |
-| ops.error_count | Error Count | Number of errors | count | sum |
-| ops.warning_count | Warning Count | Number of warnings | count | sum |
-| ops.crash_count | Crash Count | Number of system crashes | count | sum |
-| ops.retry_count | Retry Count | Number of operation retries | count | sum |
-| ops.recovery_time | Recovery Time | Time to recover from failures | seconds | avg |
-| ops.health_score | Health Score | Overall system health | score (0-100) | avg |
-
-## Metric Collection
+## Metrics Collection
 
 ### Collection Methods
 
-Sophia supports multiple collection methods:
+Sophia provides multiple methods for metrics collection:
 
-1. **Direct Reporting**: Components actively report metrics
-   ```python
-   await sophia_client.report_metric(
-       metric_id="perf.response_time", 
-       value=response_time,
-       context={"operation": "query_processing", "component": "rhetor"}
-   )
-   ```
-
-2. **Passive Observation**: Sophia monitors component operations
-   ```python
-   # In Sophia's monitoring module
-   elapsed_time = end_time - start_time
-   await metrics_engine.record_metric(
-       metric_id="perf.processing_time",
-       value=elapsed_time.total_seconds() * 1000,
-       source="rhetor",
-       context={"operation": "generate_response"}
-   )
-   ```
-
-3. **Periodic Polling**: Regular collection of state metrics
-   ```python
-   # In Sophia's polling service
-   memory_usage = await get_component_memory_usage("engram")
-   await metrics_engine.record_metric(
-       metric_id="res.memory_usage",
-       value=memory_usage,
-       source="engram"
-   )
-   ```
-
+1. **Direct API Submission**: Components can submit metrics directly via the Sophia API
+2. **Automatic Collection**: Integration with Tekton components for automatic metric extraction
+3. **Periodic Polling**: Regular polling of component status endpoints
 4. **Event-based Collection**: Metrics triggered by specific events
-   ```python
-   # In Sophia's event handler
-   @event_bus.subscribe("component.started")
-   async def handle_component_start(event):
-       await metrics_engine.record_metric(
-           metric_id="ops.start_time",
-           value=event.timestamp,
-           source=event.source
-       )
-   ```
+5. **Batch Import**: Bulk import of metrics from external sources
 
-### Context Enrichment
+### Client SDK
 
-All metrics include contextual data:
+The Sophia client library provides methods for metrics submission:
 
-```json
-{
-  "metric_id": "perf.response_time",
-  "value": 135.7,
-  "timestamp": "2025-05-01T14:22:36.123Z",
-  "source": "rhetor",
-  "context": {
-    "operation": "query_processing",
-    "user_id": "system",
-    "input_tokens": 42,
-    "output_tokens": 128,
-    "model": "claude-3-opus-20240229",
-    "priority": "normal",
-    "session_id": "a1b2c3d4"
-  },
-  "tags": ["performance", "prod"]
-}
+```python
+# Submit a single metric
+await client.submit_metric(
+    metric_id="my_component.performance.latency",
+    value=42.5,
+    source="my_component",
+    timestamp="2025-04-28T12:34:56Z",
+    context={"operation": "query", "load": "high"},
+    tags=["performance", "latency"]
+)
+
+# Submit multiple metrics in a batch
+await client.submit_metrics_batch([
+    {
+        "metric_id": "my_component.performance.latency",
+        "value": 42.5,
+        "source": "my_component"
+    },
+    {
+        "metric_id": "my_component.memory.usage",
+        "value": 128.7,
+        "source": "my_component"
+    }
+])
 ```
 
-## Metric Storage
+### Collection Configurations
 
-Sophia implements a multi-tiered storage strategy:
+Metrics collection can be configured with:
 
-1. **In-Memory Cache**: Recent metrics for fast access
-2. **Time-Series Database**: Historical data with efficient querying
-3. **Aggregated Storage**: Pre-calculated aggregations for common queries
-4. **Engram Integration**: Long-term storage leveraging Engram's capabilities
+1. **Sampling Rate**: Frequency of metric collection
+2. **Aggregation Period**: Time window for local aggregation before submission
+3. **Filtering Rules**: Rules for filtering metrics before submission
+4. **Transformation Rules**: Rules for transforming metrics before submission
+5. **Batching Options**: Options for batching metric submissions
 
-## Metric Analysis
+## Metrics Storage
+
+### Storage Layers
+
+Sophia implements a multi-layered storage architecture for metrics:
+
+1. **In-memory Buffer**: Recent metrics kept in memory for fast access
+2. **Time-series Database**: Optimized storage for time-series metrics data
+3. **Aggregated Storage**: Pre-aggregated views for efficient querying
+4. **Cold Storage**: Long-term archival of historical metrics
+
+### Data Lifecycle
+
+Metrics data follows a lifecycle through the storage layers:
+
+1. **Ingestion**: Data enters through the in-memory buffer
+2. **Hot Storage**: Recent data kept in highly available storage
+3. **Warm Storage**: Older data moved to lower-cost storage
+4. **Aggregation**: Data summarized into aggregated views
+5. **Archival**: Very old data moved to cold storage or purged
+
+### Retention Policies
+
+Configurable retention policies determine how long metrics are stored:
+
+1. **Raw Data**: Retention period for raw, high-granularity metrics
+2. **Aggregated Data**: Longer retention for aggregated, lower-granularity metrics
+3. **Critical Metrics**: Extended retention for metrics flagged as critical
+4. **Experiment Data**: Special retention rules for metrics associated with experiments
+
+## Metrics Querying
+
+### Query API
+
+Sophia provides a flexible API for querying metrics:
+
+```python
+# Query metrics with filtering
+metrics = await client.query_metrics(
+    metric_id="my_component.performance.latency",
+    source="my_component",
+    tags=["performance"],
+    start_time="2025-04-01T00:00:00Z",
+    end_time="2025-04-28T23:59:59Z",
+    limit=100,
+    offset=0,
+    sort="timestamp:desc"
+)
+
+# Aggregate metrics
+aggregation = await client.aggregate_metrics(
+    metric_id="my_component.performance.latency",
+    aggregation="avg",
+    interval="1h",
+    source="my_component",
+    start_time="2025-04-01T00:00:00Z",
+    end_time="2025-04-28T23:59:59Z"
+)
+```
+
+### Query Options
+
+The query API supports various options:
+
+1. **Filtering**: By metric ID, source, tags, time range, and value range
+2. **Aggregation**: Functions like avg, sum, min, max, count, percentiles
+3. **Grouping**: By source, tags, or time intervals
+4. **Pagination**: Limit and offset for large result sets
+5. **Sorting**: Ascending or descending sort by timestamp or value
+
+### Aggregation Functions
+
+Supported aggregation functions include:
+
+1. **Statistical**: avg, min, max, sum, count, stddev, variance
+2. **Percentiles**: p50, p90, p95, p99, p999
+3. **Rate**: per_second, per_minute, per_hour
+4. **Change**: delta, rate_of_change, acceleration
+5. **Cumulative**: running_sum, running_avg, cumulative_distribution
+
+## Metrics Analysis
+
+### Analysis Capabilities
+
+Sophia provides advanced metrics analysis capabilities:
+
+1. **Pattern Detection**: Identification of patterns in metrics data
+2. **Anomaly Detection**: Detection of unusual metric values or patterns
+3. **Trend Analysis**: Analysis of long-term trends in metrics
+4. **Correlation Analysis**: Identification of correlated metrics
+5. **Forecasting**: Prediction of future metric values
+6. **Comparative Analysis**: Comparison of metrics across different dimensions
 
 ### Analysis Methods
 
-Sophia employs several analysis methods:
+Analysis is performed using various methods:
 
-1. **Statistical Analysis**: 
-   - Descriptive statistics (mean, median, standard deviation)
-   - Correlation analysis
-   - Regression analysis
-   - Outlier detection
+1. **Statistical Analysis**: Traditional statistical methods
+2. **Machine Learning**: ML-based pattern recognition and prediction
+3. **Time Series Analysis**: Specialized time series analysis techniques
+4. **Threshold-based Analysis**: Comparison with predefined thresholds
+5. **Comparative Benchmarking**: Comparison with historical or peer benchmarks
 
-2. **Pattern Recognition**:
-   - Trend analysis
-   - Seasonality detection
-   - Cyclical pattern identification
-   - Change point detection
+### Analysis API
 
-3. **Anomaly Detection**:
-   - Threshold-based detection
-   - Statistical process control
-   - Machine learning-based detection
-   - Ensemble methods
+The client library provides methods for metrics analysis:
 
-4. **Comparative Analysis**:
-   - Cross-component comparison
-   - Historical comparison
-   - Benchmark comparison
-   - A/B testing analysis
+```python
+# Detect anomalies in a metric
+anomalies = await client.detect_anomalies(
+    metric_id="my_component.performance.latency",
+    source="my_component",
+    start_time="2025-04-01T00:00:00Z",
+    end_time="2025-04-28T23:59:59Z",
+    sensitivity=0.8
+)
 
-5. **Predictive Analysis**:
-   - Time series forecasting
-   - Machine learning prediction
-   - What-if analysis
-   - Impact projection
+# Analyze metric trends
+trends = await client.analyze_trends(
+    metric_id="my_component.performance.latency",
+    source="my_component",
+    start_time="2025-04-01T00:00:00Z",
+    end_time="2025-04-28T23:59:59Z",
+    window="1d"
+)
 
-### Analysis Modules
+# Find correlated metrics
+correlations = await client.find_correlations(
+    metric_id="my_component.performance.latency",
+    min_correlation=0.7,
+    start_time="2025-04-01T00:00:00Z",
+    end_time="2025-04-28T23:59:59Z"
+)
+```
 
-The analysis system includes specialized modules:
+## Standard Metrics
 
-1. **Performance Analyzer**: Focuses on speed and efficiency
-2. **Resource Optimizer**: Analyzes resource utilization
-3. **Quality Evaluator**: Assesses output quality
-4. **Intelligence Assessor**: Evaluates AI cognitive abilities
-5. **Collaboration Analyzer**: Studies multi-component interactions
-6. **Reliability Monitor**: Examines system stability
+### System Metrics
 
-## Visualization
+Standard system-level metrics collected across all components:
 
-Sophia provides several visualization methods:
+1. **Resource Usage**:
+   - `component.resource.cpu.usage`: CPU usage percentage
+   - `component.resource.memory.usage`: Memory usage in MB
+   - `component.resource.disk.usage`: Disk space usage in MB
+   - `component.resource.network.bytes_sent`: Network bytes sent
+   - `component.resource.network.bytes_received`: Network bytes received
 
-1. **Time Series Charts**: For tracking metrics over time
-2. **Heatmaps**: For correlation visualization
-3. **Radar Charts**: For multi-dimensional intelligence visualization
-4. **Network Graphs**: For collaboration visualization
-5. **Dashboards**: For comprehensive monitoring
+2. **Performance**:
+   - `component.performance.latency.average`: Average operation latency in ms
+   - `component.performance.latency.p95`: 95th percentile latency in ms
+   - `component.performance.latency.p99`: 99th percentile latency in ms
+   - `component.performance.throughput`: Operations per second
+   - `component.performance.error_rate`: Error rate percentage
 
-## API Interface
+3. **Availability**:
+   - `component.availability.uptime`: Component uptime in seconds
+   - `component.availability.status`: Component status (0=down, 1=up)
+   - `component.availability.response_time`: Health check response time in ms
+   - `component.availability.failures`: Number of health check failures
 
-### Metric Submission API
+### Component-specific Metrics
 
-```http
-POST /api/metrics
-Content-Type: application/json
+Each Tekton component has specific metrics relevant to its functionality:
 
+#### Engram Metrics
+- `engram.memory.storage.size`: Memory storage size in MB
+- `engram.memory.retrieval.latency`: Memory retrieval latency in ms
+- `engram.memory.retrieval.success_rate`: Memory retrieval success rate
+- `engram.memory.write.rate`: Memory write operations per second
+- `engram.memory.read.rate`: Memory read operations per second
+
+#### Rhetor Metrics
+- `rhetor.prompt.size`: Prompt size in tokens
+- `rhetor.prompt.rendering.time`: Prompt rendering time in ms
+- `rhetor.token.usage`: Token usage by request
+- `rhetor.llm.response.time`: LLM response time in ms
+- `rhetor.cache.hit_rate`: Prompt cache hit rate
+
+#### Terma Metrics
+- `terma.session.count`: Active session count
+- `terma.session.duration`: Average session duration in seconds
+- `terma.command.count`: Commands executed per session
+- `terma.command.success_rate`: Command success rate
+- `terma.command.execution.time`: Command execution time in ms
+
+#### Sophia Metrics
+- `sophia.metrics.count`: Total metrics collected
+- `sophia.metrics.ingest_rate`: Metrics ingestion rate per second
+- `sophia.experiment.count`: Active experiment count
+- `sophia.analysis.execution.time`: Analysis execution time in ms
+- `sophia.recommendation.count`: Generated recommendations count
+
+### Experiment Metrics
+
+Metrics specific to experimentation:
+
+- `experiment.sample_size.current`: Current sample size
+- `experiment.sample_size.target`: Target sample size
+- `experiment.duration.elapsed`: Elapsed experiment time in seconds
+- `experiment.confidence.level`: Current confidence level
+- `experiment.variance`: Variance in experiment results
+
+### Intelligence Metrics
+
+Metrics related to intelligence measurement:
+
+- `intelligence.dimension.score`: Intelligence dimension score (0.0-1.0)
+- `intelligence.dimension.confidence`: Confidence in dimension score (0.0-1.0)
+- `intelligence.measurement.count`: Number of intelligence measurements
+- `intelligence.profile.completeness`: Completeness of intelligence profile (%)
+- `intelligence.comparison.delta`: Delta between intelligence profiles
+
+## Integration with Experiments
+
+### Experiment Metrics Collection
+
+Sophia automatically collects relevant metrics for experiments:
+
+1. **Baseline Metrics**: Metrics collected before the experiment begins
+2. **Control Group Metrics**: Metrics from the control group during the experiment
+3. **Treatment Group Metrics**: Metrics from the treatment group during the experiment
+4. **Experiment Process Metrics**: Metrics about the experiment itself
+5. **Post-experiment Metrics**: Metrics collected after experiment completion
+
+### Experiment Analysis
+
+Metrics are analyzed in the context of experiments:
+
+1. **Statistical Significance**: Determining if results are statistically significant
+2. **Effect Size**: Measuring the magnitude of the experimental effect
+3. **Confidence Intervals**: Calculating confidence intervals for results
+4. **A/B Comparison**: Direct comparison between control and treatment groups
+5. **Multi-variant Analysis**: Analysis of multiple experimental variants
+
+### Experiment Results
+
+Experiment results are derived from metrics analysis:
+
+```python
+# Get experiment results
+results = await client.get_experiment_results("exp-123456")
+
+# Example result structure
 {
-  "metric_id": "perf.response_time",
-  "value": 135.7,
-  "source": "rhetor",
-  "context": {
-    "operation": "query_processing"
-  },
-  "tags": ["performance", "prod"]
+    "experiment_id": "exp-123456",
+    "status": "completed",
+    "metrics": {
+        "component.performance.latency": {
+            "control": {
+                "avg": 120.5,
+                "p95": 180.2,
+                "sample_size": 1000
+            },
+            "treatment": {
+                "avg": 95.3,
+                "p95": 142.8,
+                "sample_size": 1050
+            }
+        }
+    },
+    "analysis": {
+        "statistical_significance": True,
+        "p_value": 0.001,
+        "effect_size": {
+            "relative": -0.209,  # 20.9% reduction
+            "absolute": -25.2    # 25.2ms reduction
+        },
+        "confidence_interval": {
+            "lower": -29.8,
+            "upper": -20.6
+        }
+    },
+    "conclusion": "The treatment shows a statistically significant reduction in latency (20.9% reduction, p=0.001)"
 }
 ```
 
-### Metric Query API
+## Visualization
 
-```http
-GET /api/metrics?metric_id=perf.response_time&source=rhetor&start=2025-05-01T00:00:00Z&end=2025-05-01T23:59:59Z&aggregation=avg&interval=1h
-```
+### Visualization Types
 
-### WebSocket Updates
+Sophia provides various visualization types for metrics:
+
+1. **Time Series**: Line charts showing metrics over time
+2. **Histograms**: Distribution of metric values
+3. **Heatmaps**: Two-dimensional visualization of correlations
+4. **Gauges**: Current metric values with reference ranges
+5. **Bar Charts**: Comparative visualization of metric values
+6. **Scatter Plots**: Relationships between different metrics
+7. **Radar Charts**: Multi-dimensional visualization (e.g., intelligence profiles)
+
+### Dashboards
+
+Metrics can be organized into dashboards for different purposes:
+
+1. **Component Dashboards**: Focused on specific components
+2. **System Dashboards**: System-wide overview
+3. **Experiment Dashboards**: Visualizing experiment results
+4. **Intelligence Dashboards**: Visualizing intelligence profiles
+5. **Custom Dashboards**: User-defined metric combinations
+
+### Integration with Hephaestus UI
+
+Visualization is integrated with the Hephaestus UI component:
+
+1. **Interactive Charts**: Interactive visualization of metrics
+2. **Real-time Updates**: Live updates of metrics visualizations
+3. **Drill-down Capabilities**: Exploring metrics at different levels of detail
+4. **Customization Options**: User-defined visualization preferences
+5. **Export Capabilities**: Exporting visualizations and reports
+
+## WebSocket API
+
+Sophia provides a WebSocket API for real-time metrics updates:
+
+### Subscription
+
+Clients can subscribe to metric updates:
 
 ```javascript
 // Subscribe to metric updates
 socket.send(JSON.stringify({
-  "type": "subscribe",
-  "channel": "metrics",
-  "filters": {
-    "metric_id": ["perf.response_time", "perf.processing_time"],
-    "source": "rhetor"
-  }
+    type: "subscribe",
+    channel: "metrics",
+    filters: {
+        metric_id: "my_component.performance.latency",
+        source: "my_component"
+    }
 }));
-
-// Receive real-time updates
-socket.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === "metric_update") {
-    updateDashboard(data.metric);
-  }
-};
 ```
 
-## Metric Implementation for Components
+### Real-time Updates
 
-Each Tekton component should implement:
+Updates are pushed to clients in real-time:
 
-1. **Metric Instrumentation**: Add metric collection points
-2. **Context Enrichment**: Provide relevant contextual data
-3. **Automatic Reporting**: Send metrics to Sophia
-4. **Custom Metrics**: Define component-specific metrics
-
-Example implementation for a component:
-
-```python
-# In a component's operation
-async def process_query(query, context):
-    start_time = time.time()
-    
-    try:
-        # Process the query
-        result = await perform_operation(query)
-        
-        # Record success metric
-        elapsed_ms = (time.time() - start_time) * 1000
-        await sophia_client.report_metric(
-            metric_id="perf.processing_time",
-            value=elapsed_ms,
-            context={
-                "operation": "process_query",
-                "query_type": query.type,
-                "query_size": len(query.content),
-                "result_size": len(result)
-            }
-        )
-        
-        return result
-        
-    except Exception as e:
-        # Record error metric
-        await sophia_client.report_metric(
-            metric_id="ops.error_count",
-            value=1,
-            context={
-                "operation": "process_query",
-                "error_type": type(e).__name__,
-                "query_type": query.type
-            }
-        )
-        raise
+```javascript
+// Example metric update message
+{
+    "type": "metric_update",
+    "metric_id": "my_component.performance.latency",
+    "value": 42.5,
+    "source": "my_component",
+    "timestamp": "2025-04-28T15:30:45Z",
+    "tags": ["performance", "latency"]
+}
 ```
 
-## Conclusion
+### Alert Notifications
 
-This metrics specification provides a comprehensive framework for measuring, analyzing, and optimizing performance across the Tekton ecosystem. By implementing this standardized approach, Sophia can effectively drive continuous improvement based on data-driven insights.
+Alerts are also pushed through the WebSocket:
+
+```javascript
+// Example alert message
+{
+    "type": "metric_alert",
+    "alert_id": "alert-123456",
+    "severity": "warning",
+    "metric_id": "my_component.performance.latency",
+    "threshold": 50.0,
+    "value": 65.2,
+    "timestamp": "2025-04-28T15:32:10Z",
+    "message": "Latency exceeding warning threshold"
+}
+```
+
+## Alerting
+
+### Alert Rules
+
+Sophia supports defining alert rules:
+
+1. **Threshold Alerts**: Triggered when metrics cross thresholds
+2. **Trend Alerts**: Triggered by concerning trends
+3. **Anomaly Alerts**: Triggered by detected anomalies
+4. **Correlation Alerts**: Triggered by unusual correlations
+5. **Compound Alerts**: Triggered by combinations of conditions
+
+### Alert Severities
+
+Alerts have different severity levels:
+
+1. **Info**: Informational alerts
+2. **Warning**: Potential issues requiring attention
+3. **Error**: Serious issues requiring action
+4. **Critical**: Critical issues requiring immediate action
+
+### Alert Actions
+
+Alerts can trigger various actions:
+
+1. **Notifications**: Sending notifications to users
+2. **Webhooks**: Calling external webhooks
+3. **Automated Responses**: Triggering automated responses
+4. **Incident Creation**: Creating incidents for tracking
+5. **Escalation**: Escalating to higher tiers if unresolved
+
+## Integrations
+
+### Integration with Hermes
+
+Metrics are integrated with the Hermes system:
+
+1. **Registration**: Sophia registers metrics capabilities with Hermes
+2. **Service Discovery**: Components discover metrics capabilities
+3. **Automatic Registration**: New components are automatically registered
+4. **Metadata Sharing**: Metrics metadata is shared across components
+
+### Integration with Engram
+
+Metrics data is stored in Engram for long-term memory:
+
+1. **Historical Context**: Metrics provide historical context
+2. **Retrieval**: Past metrics can be retrieved to inform decisions
+3. **Pattern Memory**: Patterns in metrics are stored for future reference
+4. **Contextual Association**: Metrics are associated with relevant contexts
+
+### Integration with Prometheus
+
+Metrics data informs the planning component:
+
+1. **Performance Prediction**: Using metrics to predict performance
+2. **Resource Planning**: Planning resource allocation based on metrics
+3. **Impact Assessment**: Assessing impact of planned changes
+4. **Capacity Planning**: Planning capacity based on utilization metrics
+
+## Security and Privacy
+
+### Access Control
+
+Metrics access is controlled through:
+
+1. **Authentication**: Verifying client identity
+2. **Authorization**: Controlling access to specific metrics
+3. **Role-based Access**: Different roles have different access levels
+4. **Component Isolation**: Components can only access their own metrics by default
+
+### Data Privacy
+
+Privacy is ensured through:
+
+1. **Data Anonymization**: Sensitive metrics are anonymized
+2. **Data Aggregation**: Individual metrics are aggregated for privacy
+3. **Data Minimization**: Only necessary metrics are collected
+4. **Retention Limits**: Data is retained only as long as needed
+
+### Audit Trail
+
+All metrics operations are audited:
+
+1. **Collection Auditing**: Tracking who collects what metrics
+2. **Query Auditing**: Tracking who queries what metrics
+3. **Analysis Auditing**: Tracking who analyzes what metrics
+4. **Alert Auditing**: Tracking alert generation and responses
+
+## Implementation Details
+
+### Metrics Engine
+
+The core engine for metrics collection and storage:
+
+1. **Ingestion Pipeline**: Processing and storing incoming metrics
+2. **Query Engine**: Efficient retrieval of metrics data
+3. **Aggregation Engine**: Real-time and batch aggregation of metrics
+4. **Storage Manager**: Managing different storage tiers
+5. **Cache Manager**: Caching frequently accessed metrics
+
+### Analysis Engine
+
+The engine for metrics analysis:
+
+1. **Statistical Analysis**: Computing statistical properties
+2. **Pattern Detection**: Identifying patterns in metrics data
+3. **Anomaly Detection**: Detecting anomalies using ML algorithms
+4. **Trend Analysis**: Analyzing short and long-term trends
+5. **Correlation Analysis**: Finding correlations between metrics
+
+### API Implementation
+
+The API is implemented with FastAPI:
+
+1. **RESTful Endpoints**: Standard REST API for metrics operations
+2. **WebSocket Endpoint**: Real-time metrics updates via WebSocket
+3. **GraphQL Support**: Flexible querying with GraphQL (planned)
+4. **Batch Operations**: Efficient batch processing of metrics
+5. **Streaming Responses**: Streaming large result sets
+
+## Future Enhancements
+
+Planned enhancements to the metrics system:
+
+1. **Distributed Processing**: Scaling to handle very large metrics volumes
+2. **Federated Metrics**: Federated metrics collection across instances
+3. **ML-based Forecasting**: Advanced forecasting of metrics trends
+4. **Causal Analysis**: Determining causality in correlated metrics
+5. **Natural Language Queries**: Querying metrics using natural language
+6. **Enhanced Visualization**: More advanced visualization capabilities
+7. **Predictive Alerting**: Alerting based on predicted future metrics
+
+## Appendices
+
+### A. Metric ID Schema
+
+```
+<component>.<category>.<subcategory>.<name>
+```
+
+- **component**: Tekton component identifier (e.g., engram, rhetor, terma)
+- **category**: General category (e.g., performance, resource, availability)
+- **subcategory**: Specific subcategory (e.g., latency, memory, cpu)
+- **name**: Specific metric name (e.g., average, p95, usage)
+
+### B. Context Object Schema
+
+```json
+{
+  "operation": "string",    // Operation type
+  "environment": "string",  // Environment name
+  "region": "string",       // Geographic region
+  "instance": "string",     // Instance identifier
+  "user": "string",         // User identifier (if applicable)
+  "session": "string",      // Session identifier (if applicable)
+  "request": "string",      // Request identifier (if applicable)
+  "version": "string",      // Software version
+  "custom": {}              // Custom contextual data
+}
+```
+
+### C. Standard Tags
+
+- **component**: Component name (e.g., engram, rhetor, terma)
+- **environment**: Environment (e.g., production, staging, development)
+- **instance**: Instance identifier
+- **version**: Software version
+- **region**: Geographic region
+- **type**: Metric type (e.g., counter, gauge, histogram)
+- **severity**: For alert-related metrics
+- **criticality**: Importance level (e.g., critical, high, medium, low)

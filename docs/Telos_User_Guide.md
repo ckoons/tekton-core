@@ -1,137 +1,310 @@
 # Telos User Guide
 
-This guide provides comprehensive information on using the Telos requirements management system within Tekton.
+## Table of Contents
+1. [Introduction](#introduction)
+2. [Getting Started](#getting-started)
+3. [Projects](#projects)
+4. [Requirements](#requirements)
+5. [Requirement Management](#requirement-management)
+6. [Requirement Hierarchy](#requirement-hierarchy)
+7. [Requirement Tracing](#requirement-tracing)
+8. [Requirement Validation](#requirement-validation)
+9. [Requirement Refinement](#requirement-refinement)
+10. [Planning Integration](#planning-integration)
+11. [Export and Import](#export-and-import)
+12. [CLI Usage](#cli-usage)
+13. [API Usage](#api-usage)
+14. [WebSocket Integration](#websocket-integration)
+15. [Troubleshooting](#troubleshooting)
 
-## Overview
+## Introduction
 
-Telos is a requirements management, tracing, and validation system designed to provide a robust platform for documenting, organizing, tracking, and validating project requirements. It supports hierarchical visualization and bidirectional tracing to help teams create high-quality requirements that can be effectively planned and implemented.
+Telos is the comprehensive requirements management and tracing system for the Tekton ecosystem. It provides an intuitive platform for documenting, organizing, tracking, and validating project requirements with support for hierarchical visualization and bidirectional tracing.
+
+This guide will walk you through using Telos, from basic requirement management to advanced features like requirement validation, tracing, and planning integration.
 
 ## Getting Started
 
-### Accessing Telos
-
-Telos can be accessed through multiple interfaces:
-
-1. **Web UI**: Access the Telos component in the Hephaestus UI system at http://localhost:8080
-2. **API**: Interact programmatically with Telos at http://localhost:8008
-3. **CLI**: Use the command-line interface for requirement management
-
 ### Installation
 
-If you haven't installed Telos yet:
+Telos can be installed as part of the Tekton ecosystem or as a standalone component:
 
 ```bash
-# Clone the repository
-git clone https://github.com/example/tekton.git
-cd tekton/Telos
+# Install with Tekton installer
+./tekton-install.sh --components telos
 
-# Install Telos and its dependencies
-./setup.sh
+# Or install from source
+cd Tekton/Telos
+pip install -e .
 ```
 
 ### Starting Telos
 
-You can start Telos in several ways:
+You can start Telos using the Tekton launcher or directly:
 
 ```bash
-# Start Telos API server only
-telos-api
-
-# Start with Tekton (recommended)
+# Start with Tekton
 ./scripts/tekton-launch --components telos
 
-# Register with Hermes (if running separately)
-python register_with_hermes.py
+# Or start directly
+python -m telos.api.app
 ```
 
-## Using the Web UI
+### Accessing Telos
 
-The Telos web UI provides a user-friendly interface for requirements management.
+Once started, Telos is available at:
 
-### Dashboard
+- **UI**: Through the Hephaestus UI at http://localhost:8080
+- **API**: Directly at http://localhost:8008/api
+- **WebSocket**: At ws://localhost:8008/ws
 
-The dashboard provides an overview of all projects and key metrics:
+## Projects
 
-- Project count and requirement statistics
-- Recent activity
-- Quality metrics and validation status
-- Planning readiness indicators
+Projects are the top-level organizational units in Telos, containing related requirements.
 
-### Projects View
+### Creating a Project
 
-In the Projects view, you can:
+To create a project using the UI:
 
-1. **Create a new project**: Click the "New Project" button and provide a name and description
-2. **Browse projects**: View a list of all projects with key metrics
-3. **Filter and search**: Find projects by name, status, or other attributes
-4. **Open a project**: Click on a project card to open the project detail view
+1. Open the Telos component in Hephaestus UI
+2. Click the "New Project" button
+3. Enter project name and description
+4. Click "Create Project"
 
-### Requirements View
-
-The Requirements view shows all requirements for a project:
-
-1. **Create a new requirement**: Click "Add Requirement" and fill in the details
-2. **View requirements**: See a list or board view of all requirements
-3. **Filter and search**: Find requirements by status, type, priority, or tags
-4. **Edit a requirement**: Click on a requirement to edit its details
-5. **Validate requirements**: Run quality checks on requirements
-6. **Export requirements**: Export to various formats (JSON, Markdown)
-
-### Requirement Detail View
-
-When viewing a single requirement, you can:
-
-1. **Edit basic information**: Title, description, type, priority, status
-2. **Add tags**: Categorize the requirement for easier filtering
-3. **Set relationships**: Define parent-child relationships and dependencies
-4. **View traces**: See bidirectional traces to other requirements
-5. **View history**: See a history of changes to the requirement
-6. **Refine with AI**: Use LLM-powered analysis to improve quality
-
-### Hierarchy View
-
-The Hierarchy view shows the structure of requirements:
-
-1. **Visualize parent-child relationships**: See how requirements are organized
-2. **Expand/collapse nodes**: Focus on specific areas of the hierarchy
-3. **Drag and drop**: Reorganize the hierarchy visually
-4. **Add requirements**: Create new requirements directly in the hierarchy
-
-### Traces View
-
-The Traces view shows the relationships between requirements:
-
-1. **View requirement traces**: See how requirements relate to each other
-2. **Create new traces**: Define new relationships between requirements
-3. **Filter by trace type**: Focus on specific types of relationships
-4. **Visualize impact**: See the impact of changes across requirements
-
-### Validation View
-
-The Validation view helps ensure high-quality requirements:
-
-1. **Run validation checks**: Check requirements against quality criteria
-2. **View quality scores**: See scores for clarity, completeness, testability, etc.
-3. **Get improvement suggestions**: Receive AI-powered suggestions for improvement
-4. **Track progress**: Monitor requirement quality over time
-
-### Planning View
-
-The Planning view integrates with Prometheus for project planning:
-
-1. **Check planning readiness**: See if requirements are ready for planning
-2. **Generate implementation plan**: Create a plan based on requirements
-3. **View tasks and timeline**: See tasks derived from requirements
-4. **Adjust priorities**: Modify priorities to affect planning outcome
-
-## Using the CLI
-
-The Telos CLI provides command-line access to all functionality.
-
-### Project Commands
+To create a project using the CLI:
 
 ```bash
-# Create a new project
+telos project create --name "My Project" --description "Project description"
+```
+
+### Managing Projects
+
+From the UI, you can:
+- View all projects in the left sidebar
+- Click on a project to view its requirements
+- Edit a project by selecting it and clicking the settings icon
+- Delete a project by selecting it and using the delete action
+
+## Requirements
+
+Requirements are the core entities of Telos, representing individual project needs or constraints.
+
+### Requirement Types
+
+Telos supports different types of requirements:
+- **Functional**: What the system should do
+- **Non-Functional**: How the system should perform
+- **Constraint**: Limitations or boundaries
+
+### Requirement Attributes
+
+Each requirement includes:
+- **Title**: Short descriptive name
+- **Description**: Detailed explanation
+- **Type**: Functional, non-functional, constraint, etc.
+- **Priority**: Critical, high, medium, low
+- **Status**: New, in-progress, completed, rejected
+- **Tags**: For categorization
+- **Parent/Child Relationships**: For hierarchical organization
+- **Dependencies**: Other requirements this one depends on
+
+## Requirement Management
+
+### Creating Requirements
+
+To create a requirement using the UI:
+
+1. Select a project
+2. Click "Add Requirement"
+3. Fill in the required fields (title, description)
+4. Set the type, priority, and other attributes
+5. Click "Create Requirement"
+
+To create a requirement using the CLI:
+
+```bash
+telos requirement add --project-id my-project-id --title "User Authentication" --description "The system must authenticate users with username and password" --priority high --type functional
+```
+
+### Viewing Requirements
+
+Telos offers multiple views for requirements:
+- **List View**: Table format with all requirements
+- **Board View**: Kanban-style view organized by status
+- **Hierarchy View**: Tree view showing parent-child relationships
+- **Trace View**: Visualizes traces between requirements
+
+To switch views, use the "View" dropdown in the requirements interface.
+
+### Filtering Requirements
+
+You can filter requirements by:
+- **Status**: New, in-progress, completed, rejected
+- **Type**: Functional, non-functional, constraint
+- **Priority**: Critical, high, medium, low
+- **Search**: Full-text search across titles and descriptions
+
+### Editing Requirements
+
+To edit a requirement:
+
+1. Select the requirement in any view
+2. View the requirement details
+3. Click "Edit" to modify fields
+4. Save your changes
+
+## Requirement Hierarchy
+
+Telos supports hierarchical relationships between requirements.
+
+### Creating Hierarchies
+
+To establish a parent-child relationship:
+
+1. When creating a new requirement, select a parent from the dropdown
+2. Or edit an existing requirement and set its parent
+
+### Viewing Hierarchies
+
+The hierarchy view displays requirements in a tree structure:
+
+1. Select "Hierarchy" from the View dropdown
+2. Expand/collapse nodes to navigate the hierarchy
+3. Click on any requirement to view its details
+
+## Requirement Tracing
+
+Tracing connects related requirements for impact analysis.
+
+### Creating Traces
+
+To create a trace between requirements:
+
+1. Navigate to a requirement's details
+2. Select the "Traces" tab
+3. Click "Create Trace"
+4. Select the target requirement and trace type
+5. Add an optional description and click "Create"
+
+### Viewing Traces
+
+To view traces:
+
+1. From a requirement's details, select the "Traces" tab
+2. Or use the "Trace View" to visualize all traces in the project
+
+### Trace Types
+
+Common trace types include:
+- **Depends On**: This requirement depends on the target
+- **Implements**: This requirement implements the target
+- **Refines**: This requirement refines the target
+- **Conflicts With**: This requirement conflicts with the target
+
+## Requirement Validation
+
+Telos can automatically validate requirements for quality.
+
+### Running Validation
+
+To validate requirements:
+
+1. Select a project or individual requirement
+2. Click "Validate"
+3. Select validation criteria
+4. View the validation results
+
+### Validation Criteria
+
+Telos checks requirements against:
+- **Completeness**: Is the requirement fully specified?
+- **Clarity**: Is the requirement clear and unambiguous?
+- **Verifiability**: Can the requirement be verified?
+- **Consistency**: Is the requirement consistent with others?
+- **Feasibility**: Is the requirement achievable?
+
+### Validation Results
+
+Validation results include:
+- **Overall Score**: Quality score from 0-10
+- **Issues**: Specific problems detected
+- **Suggestions**: Recommendations for improvement
+
+## Requirement Refinement
+
+Telos can help refine requirements using LLM integration.
+
+### Refining Requirements
+
+To refine a requirement:
+
+1. Select a requirement
+2. Click "Refine"
+3. Provide feedback or select automatic refinement
+4. Review the suggestions
+5. Apply the changes if desired
+
+### Refinement Features
+
+Refinement can help with:
+- **Clarity**: Improving wording for clarity
+- **Completeness**: Adding missing details
+- **Precision**: Making vague requirements more specific
+- **Consistency**: Aligning with project terminology
+
+## Planning Integration
+
+Telos integrates with Prometheus for planning.
+
+### Preparing for Planning
+
+To prepare requirements for planning:
+
+1. Select a project
+2. Click "Analyze" under planning options
+3. Review the readiness assessment
+4. Address any issues with requirements that need refinement
+
+### Creating a Plan
+
+To create a plan:
+
+1. Ensure requirements are ready for planning
+2. Click "Create Plan"
+3. Review the generated plan
+4. Export or integrate with Prometheus for detailed planning
+
+## Export and Import
+
+Telos supports exporting and importing requirements.
+
+### Exporting
+
+To export a project:
+
+1. Select a project
+2. Click "Export"
+3. Choose the export format (JSON, Markdown)
+4. Select sections to include
+5. Download the export file
+
+### Importing
+
+To import a project:
+
+1. Click "Import"
+2. Upload a JSON or Markdown file
+3. Select import options
+4. Review and confirm the import
+
+## CLI Usage
+
+Telos provides a comprehensive CLI for requirement management.
+
+### Project Management
+
+```bash
+# Create a project
 telos project create --name "My Project" --description "Project description"
 
 # List all projects
@@ -144,88 +317,111 @@ telos project show --project-id my-project-id
 telos project delete --project-id my-project-id
 ```
 
-### Requirement Commands
+### Requirement Management
 
 ```bash
 # Add a requirement
-telos requirement add --project-id my-project-id --title "User Authentication" --description "The system must authenticate users"
+telos requirement add --project-id my-project-id --title "User Authentication" --description "Description..."
 
 # List requirements
 telos requirement list --project-id my-project-id
 
 # Show requirement details
-telos requirement show --project-id my-project-id --requirement-id my-requirement-id
+telos requirement show --project-id my-project-id --requirement-id req-id
 
 # Update a requirement
-telos requirement update --project-id my-project-id --requirement-id my-requirement-id --title "Updated Title"
+telos requirement update --project-id my-project-id --requirement-id req-id --title "New Title"
 
 # Delete a requirement
-telos requirement delete --project-id my-project-id --requirement-id my-requirement-id
+telos requirement delete --project-id my-project-id --requirement-id req-id
 ```
 
-### Visualization Commands
+### Validation and Refinement
 
 ```bash
-# Visualize requirements hierarchy
-telos viz requirements --project-id my-project-id --output requirements.png
+# Validate requirements
+telos validate --project-id my-project-id
 
-# Visualize requirement traces
-telos viz traces --project-id my-project-id --output traces.png
+# Refine a requirement
+telos refine requirement --project-id my-project-id --requirement-id req-id
 ```
 
-### Refinement Commands
+### Planning Integration
 
 ```bash
-# Interactively refine a requirement
-telos refine requirement --project-id my-project-id --requirement-id my-requirement-id
-
 # Analyze requirements for planning
 telos refine analyze --project-id my-project-id
+
+# Create a plan
+telos plan create --project-id my-project-id
 ```
 
-## Using the API
+## API Usage
 
-The Telos API provides programmatic access to all functionality. See the [API Reference](telos_api_reference.md) for detailed documentation.
+Telos provides a RESTful API for programmatic interaction.
 
-### Example: Creating a Project
+### Project Operations
 
 ```python
 import requests
 
+# Base URL
+base_url = "http://localhost:8008"
+
 # Create a project
-response = requests.post("http://localhost:8008/api/projects", json={
-    "name": "API Test Project",
-    "description": "Created via API",
-    "metadata": {
-        "category": "Development",
-        "priority": "High"
+response = requests.post(f"{base_url}/api/projects", json={
+    "name": "API Project",
+    "description": "Created via API"
+})
+project_id = response.json()["project_id"]
+
+# Get project details
+response = requests.get(f"{base_url}/api/projects/{project_id}")
+project = response.json()
+```
+
+### Requirement Operations
+
+```python
+# Add a requirement
+response = requests.post(f"{base_url}/api/projects/{project_id}/requirements", json={
+    "title": "API Feature",
+    "description": "This requirement was created via the API",
+    "requirement_type": "functional",
+    "priority": "high"
+})
+requirement_id = response.json()["requirement_id"]
+
+# Update a requirement
+response = requests.put(f"{base_url}/api/projects/{project_id}/requirements/{requirement_id}", json={
+    "status": "in-progress"
+})
+```
+
+### Validation and Refinement
+
+```python
+# Validate a requirement
+response = requests.post(f"{base_url}/api/projects/{project_id}/requirements/{requirement_id}/validate", json={
+    "criteria": {
+        "check_completeness": True,
+        "check_verifiability": True,
+        "check_clarity": True
     }
 })
 
-project_id = response.json()["project_id"]
-print(f"Created project with ID: {project_id}")
-```
-
-### Example: Creating a Requirement
-
-```python
-import requests
-
-# Create a requirement
-response = requests.post(f"http://localhost:8008/api/projects/{project_id}/requirements", json={
-    "title": "User Authentication",
-    "description": "The system shall authenticate users with username and password",
-    "requirement_type": "functional",
-    "priority": "high",
-    "status": "new",
-    "tags": ["security", "user"]
+# Refine a requirement
+response = requests.post(f"{base_url}/api/projects/{project_id}/requirements/{requirement_id}/refine", json={
+    "feedback": "This requirement should be more specific about the authentication method",
+    "auto_update": False
 })
-
-requirement_id = response.json()["requirement_id"]
-print(f"Created requirement with ID: {requirement_id}")
 ```
 
-### Example: WebSocket for Real-time Updates
+## WebSocket Integration
+
+Telos provides WebSocket integration for real-time updates.
+
+### Connecting to WebSocket
 
 ```javascript
 // Connect to WebSocket
@@ -258,124 +454,43 @@ ws.send(JSON.stringify({
 }));
 ```
 
-## Best Practices
+### WebSocket Events
 
-### Writing Good Requirements
-
-1. **Be specific and clear**: Avoid ambiguous language
-2. **Use "shall" statements**: For functional requirements ("The system shall...")
-3. **Include context**: Explain why the requirement matters
-4. **Make them testable**: Include criteria for verification
-5. **Keep them atomic**: Each requirement should describe one capability
-6. **Use consistent terminology**: Maintain a glossary of terms
-7. **Avoid weak words**: Like "should", "may", "might", "could"
-8. **Include acceptance criteria**: Define what "done" means
-9. **Add metadata**: Tags, priority, status, etc.
-10. **Maintain relationships**: Link related requirements
-
-### Organizing Requirements
-
-1. **Use hierarchical structure**: Group related requirements
-2. **Create logical categories**: Functional, non-functional, etc.
-3. **Use consistent numbering**: Make requirements easy to reference
-4. **Maintain traceability**: Create traces between related requirements
-5. **Tag for easy filtering**: Use consistent tags for categorization
-
-### Validating Requirements
-
-1. **Run validation regularly**: Check quality early and often
-2. **Address all issues**: Fix problems identified by validation
-3. **Use AI-powered refinement**: Get suggestions for improvement
-4. **Review before planning**: Ensure requirements are ready for planning
-5. **Maintain quality metrics**: Track improvement over time
-
-### Integration with Planning
-
-1. **Ensure requirements are ready**: Validate before planning
-2. **Create traces to design**: Link requirements to design elements
-3. **Link to implementation tasks**: Connect requirements to tasks
-4. **Track progress against requirements**: Monitor implementation status
-5. **Update requirements as needed**: Requirements evolve as projects progress
+Telos sends the following events via WebSocket:
+- **Project updates**: When a project is created, updated, or deleted
+- **Requirement updates**: When a requirement is created, updated, or deleted
+- **Trace updates**: When a trace is created, updated, or deleted
+- **Validation results**: When validation is completed
+- **Refinement results**: When refinement is completed
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **API connection failure**:
-   - Ensure Telos API server is running (`telos-api`)
-   - Check port 8008 is available and not blocked
-   - Verify network connectivity
+#### Connection Issues
 
-2. **UI component not loading**:
-   - Ensure Hephaestus UI server is running
-   - Check browser console for errors
-   - Clear browser cache and reload
+If you can't connect to Telos:
+1. Ensure the Telos service is running
+2. Check that port 8008 is available and not blocked by a firewall
+3. Verify that environment variables are correctly set
 
-3. **WebSocket disconnects**:
-   - Check network stability
-   - Implement reconnection logic in clients
+#### API Errors
 
-4. **LLM analysis not working**:
-   - Verify Rhetor is running and registered with Hermes
-   - Check LLM client configuration
-   - Ensure API keys are set if using external LLMs
+Common API error responses:
+- **404 Not Found**: Resource (project/requirement) doesn't exist
+- **400 Bad Request**: Invalid input data
+- **503 Service Unavailable**: Requirements manager not initialized
+
+#### UI Issues
+
+If the UI doesn't load or behave correctly:
+1. Check browser console for JavaScript errors
+2. Verify that all required scripts are loading
+3. Try clearing browser cache and reloading
 
 ### Getting Help
 
-If you encounter issues not covered here:
-
-1. Check logs in the Tekton Dashboard
-2. Review documentation in the docs directory
-3. Contact the Tekton team for support
-
-## Advanced Topics
-
-### Custom Validation Rules
-
-You can create custom validation rules by extending the validation engine:
-
-```python
-# Example: Custom validation rule
-def validate_security_requirements(requirement):
-    """Validate that security requirements follow specific patterns."""
-    if requirement.tags and "security" in requirement.tags:
-        if not any(word in requirement.description.lower() for word in ["encrypt", "secure", "protect", "authenticate"]):
-            return {
-                "valid": False,
-                "issue": "Security requirement missing specific security actions"
-            }
-    return {"valid": True}
-```
-
-### Requirement Templates
-
-Create templates for common requirement types:
-
-```python
-# Example: Functional requirement template
-functional_template = {
-    "title": "{{feature}} Capability",
-    "description": "The system shall provide the capability to {{action}} {{object}} by {{means}}.",
-    "requirement_type": "functional",
-    "tags": ["feature"],
-    "metadata": {
-        "template": "functional"
-    }
-}
-```
-
-### Integration with External Systems
-
-Telos can integrate with external systems through:
-
-1. **API integration**: Use the REST API for system integration
-2. **WebSocket for real-time updates**: Subscribe to changes
-3. **Export/Import functionality**: Transfer requirements between systems
-4. **Prometheus integration**: Connect to planning systems
-
-## Resources
-
-- [API Reference](telos_api_reference.md) - Detailed API documentation
-- [SINGLE_PORT_ARCHITECTURE.md](../docs/SINGLE_PORT_ARCHITECTURE.md) - Architecture details
-- [README.md](../Telos/README.md) - Quick reference guide
-- [port_assignments.md](../config/port_assignments.md) - Port configuration
+If you encounter issues:
+1. Check the logs for error messages
+2. Refer to the technical documentation
+3. File an issue in the Tekton repository
