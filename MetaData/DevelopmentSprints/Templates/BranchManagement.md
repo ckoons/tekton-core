@@ -30,6 +30,96 @@ Examples:
 - `sprint/github-utils-250505`
 - `sprint/llm-integration-250512`
 
+## Branch Management Utilities
+
+Tekton provides several utilities to streamline branch management across components:
+
+### tekton-branch-create
+
+Creates branches with consistent naming across all components:
+
+```bash
+scripts/github/tekton-branch-create [OPTIONS] BRANCH_NAME
+
+# Options:
+#   -b, --base BRANCH    Base branch to create from (default: main)
+#   -p, --push           Push new branches to remote repositories
+#   -c, --components     Only create in component repositories
+#   -m, --main-only      Only create in main repository
+#   -f, --force          Force branch creation even if it exists
+
+# Example:
+scripts/github/tekton-branch-create -b develop -p sprint/feature-name-250430
+```
+
+### tekton-branch-verify
+
+Verifies branch correctness before beginning work:
+
+```bash
+scripts/github/tekton-branch-verify [OPTIONS] EXPECTED_BRANCH
+
+# Options:
+#   -c, --claude         Format output specifically for Claude sessions
+#   -s, --strict         Fail if branch doesn't exactly match expected
+#   -j, --json           Output in JSON format
+
+# Example:
+scripts/github/tekton-branch-verify sprint/github-support-250430
+```
+
+### tekton-branch-status
+
+Checks branch status across all Tekton components:
+
+```bash
+scripts/github/tekton-branch-status [OPTIONS] [BRANCH_NAME]
+
+# Options:
+#   -j, --json           Output in JSON format
+#   -c, --components     Only check component repositories
+#   -m, --main-only      Only check main repository
+#   -r, --remote REMOTE  Remote name to check against (default: origin)
+
+# Example:
+scripts/github/tekton-branch-status -j sprint/feature-name-250430
+```
+
+### tekton-branch-sync
+
+Synchronizes changes between branches across components:
+
+```bash
+scripts/github/tekton-branch-sync [OPTIONS] SOURCE_BRANCH TARGET_BRANCH
+
+# Options:
+#   -d, --dry-run        Show what would be done without making changes
+#   -f, --force          Force synchronization even if conflicts are detected
+#   -p, --push           Push changes after synchronization
+#   -s, --strategy STR   Merge strategy to use (merge, rebase, cherry-pick)
+
+# Example:
+scripts/github/tekton-branch-sync -s rebase -p main sprint/feature-name-250430
+```
+
+### tekton-branch-cleanup
+
+Safely removes unused branches:
+
+```bash
+scripts/github/tekton-branch-cleanup [OPTIONS] [PATTERN]
+
+# Options:
+#   -d, --dry-run        Show what would be done without making changes
+#   -l, --local          Delete only local branches
+#   -r, --remote         Delete only remote branches
+#   -f, --force          Force branch deletion (including unmerged branches)
+#   -o, --older-than N   Only delete branches older than N days
+
+# Example:
+scripts/github/tekton-branch-cleanup --dry-run "sprint/*"
+```
+
 ## Branch Creation Process
 
 1. **Before creating a branch**:
@@ -37,11 +127,10 @@ Examples:
    - Verify that all submodules are in sync
 
 2. **Branch creation**:
-   - Create the branch from the latest main
-   - Push the branch to the remote repository
-   - Set up branch protection if applicable
+   - Use the `tekton-branch-create` utility to create branches across all components
+   - This utility handles the creation of branches in both the main repository and component repositories
 
-### Command Line Example
+### Example
 
 ```bash
 # Ensure main is up to date
@@ -49,14 +138,13 @@ git checkout main
 git pull
 git submodule update --init --recursive
 
-# Create the sprint branch
-git checkout -b sprint/shared-code-250428
-git push -u origin sprint/shared-code-250428
+# Create the sprint branch across all components
+scripts/github/tekton-branch-create -p sprint/shared-code-250428
 ```
 
 ## Submodule Management
 
-Since Tekton consists of multiple components that may exist as submodules, special attention is needed for branch management across these components:
+Since Tekton consists of multiple components that may exist as submodules, special attention is needed for branch management across these components. The `tekton-branch-create` utility handles this automatically, but here's what's happening behind the scenes:
 
 1. **Main Repository Branch**:
    - Create a branch in the main Tekton repository first
@@ -68,7 +156,9 @@ Since Tekton consists of multiple components that may exist as submodules, speci
 3. **Submodule References**:
    - Update submodule references in the main repository to point to the component branches
 
-### Example for Component Branches
+### Manual Example for Component Branches
+
+If you need to manually manage branches in a component:
 
 ```bash
 # Navigate to component directory
@@ -90,26 +180,41 @@ git commit -m "Update Ergon submodule reference to sprint/shared-code-250428"
 
 Working Claude sessions must verify they are working on the correct branch before making any changes. This verification should be performed at the start of each session and after any significant operation.
 
-### Branch Verification Commands
+### Automated Branch Verification
+
+Use the `tekton-branch-verify` utility for reliable branch verification:
 
 ```bash
-# Check current branch in main repository
-git branch --show-current
+# Verify current branch matches expected branch
+scripts/github/tekton-branch-verify sprint/shared-code-250428
 
-# Verify each component's branch
-for dir in */; do
-  if [ -d "$dir/.git" ]; then
-    echo "Checking $dir"
-    (cd "$dir" && git branch --show-current)
-  fi
-done
+# For Claude sessions, use the --claude flag for structured output
+scripts/github/tekton-branch-verify --claude sprint/shared-code-250428
+
+# For stricter verification, use the --strict flag
+scripts/github/tekton-branch-verify --strict sprint/shared-code-250428
+```
+
+### Claude-Specific Utilities
+
+For Claude Code sessions, use the specialized helper scripts:
+
+```bash
+# Simple branch validation for Claude
+scripts/github/claude/branch-validator.sh sprint/shared-code-250428
+
+# Comprehensive session preparation with project context
+scripts/github/claude/prepare-session.sh -c -p sprint/shared-code-250428
 ```
 
 ## Handling Changes During a Sprint
 
 1. **Committing Changes**:
    - Make frequent, atomic commits with clear messages
-   - Follow the commit message format specified in project guidelines
+   - Use the `tekton-commit` utility to ensure consistent message format:
+     ```bash
+     scripts/github/tekton-commit --title "Add branch management utilities" feature
+     ```
    - Include the sprint name in commit messages for clarity
 
 2. **Pushing Changes**:
@@ -117,8 +222,28 @@ done
    - Ensure submodule changes are pushed first, then update references
 
 3. **Keeping Up with Main**:
-   - If the sprint runs for an extended period, periodically merge or rebase from main
+   - If the sprint runs for an extended period, use `tekton-branch-sync` to stay current:
+     ```bash
+     scripts/github/tekton-branch-sync main sprint/shared-code-250428
+     ```
    - Address any conflicts that arise
+
+## Branch Status Checking
+
+Regularly check the status of branches across components using the `tekton-branch-status` utility:
+
+```bash
+# Check status of current branch across all components
+scripts/github/tekton-branch-status
+
+# Check status of a specific branch
+scripts/github/tekton-branch-status sprint/shared-code-250428
+
+# Get detailed JSON output for automation
+scripts/github/tekton-branch-status -j sprint/shared-code-250428
+```
+
+This will show which components are ahead, behind, or diverged from their remote branches, helping to identify synchronization issues early.
 
 ## Merging Process
 
@@ -163,7 +288,20 @@ git push
 
 ## Branch Cleanup
 
-After a sprint is successfully completed and merged:
+After a sprint is successfully completed and merged, use the `tekton-branch-cleanup` utility:
+
+```bash
+# Preview which branches would be deleted (dry run)
+scripts/github/tekton-branch-cleanup --dry-run "sprint/shared-code-*"
+
+# Delete local and remote branches matching pattern
+scripts/github/tekton-branch-cleanup "sprint/shared-code-*"
+
+# Only delete branches older than 30 days
+scripts/github/tekton-branch-cleanup --older-than 30 "sprint/*"
+```
+
+For manual cleanup:
 
 1. **Delete Remote Branches**:
    ```bash
@@ -180,12 +318,23 @@ After a sprint is successfully completed and merged:
 
 ## Handling Merge Conflicts
 
-If merge conflicts occur:
+If merge conflicts occur during synchronization:
 
-1. Identify the conflicting files
-2. Resolve conflicts with careful attention to both sets of changes
-3. Test thoroughly after resolution
-4. Document any significant conflict resolution decisions
+1. Use the `--dry-run` option with `tekton-branch-sync` to preview changes:
+   ```bash
+   scripts/github/tekton-branch-sync --dry-run main sprint/feature-name
+   ```
+
+2. For complex conflicts, you may need to resolve them manually:
+   - Identify the conflicting files
+   - Resolve conflicts with careful attention to both sets of changes
+   - Test thoroughly after resolution
+   - Document any significant conflict resolution decisions
+
+3. After resolving conflicts, complete the synchronization:
+   ```bash
+   scripts/github/tekton-branch-sync main sprint/feature-name
+   ```
 
 ## Branch Protection Guidelines
 
@@ -203,40 +352,37 @@ For critical components or the main repository, consider these branch protection
 
 If a Working Claude session discovers it's working on the wrong branch:
 
-1. Stash any uncommitted changes:
+1. Check the current branch status:
+   ```bash
+   scripts/github/tekton-branch-verify sprint/expected-branch-name
+   ```
+
+2. If needed, stash any uncommitted changes:
    ```bash
    git stash
    ```
 
-2. Switch to the correct branch:
+3. Switch to the correct branch:
    ```bash
    git checkout sprint/shared-code-250428
    ```
 
-3. Apply stashed changes if appropriate:
+4. Apply stashed changes if appropriate:
    ```bash
    git stash apply
    ```
 
-4. Verify the changes make sense in the new context before committing
+5. Verify the changes make sense in the new context before committing
 
 ### Submodule Issues
 
-If submodules are not tracking the correct branches:
+If submodules are not tracking the correct branches, use the branch status utility to check:
 
-1. Check the current submodule status:
-   ```bash
-   git submodule status
-   ```
+```bash
+scripts/github/tekton-branch-status
+```
 
-2. Update submodule to the correct branch:
-   ```bash
-   cd Ergon
-   git checkout sprint/shared-code-250428
-   cd ..
-   git add Ergon
-   git commit -m "Update Ergon submodule reference"
-   ```
+This will show which components are on different branches or have diverged from the expected state.
 
 ## References
 
@@ -244,4 +390,5 @@ For more detailed Git information, consult:
 
 - [Pro Git Book](https://git-scm.com/book/en/v2)
 - [GitHub Documentation](https://docs.github.com/en)
+- Tekton's GitHub utilities documentation in `scripts/github/README.md`
 - Tekton's CLAUDE.md for project-specific guidelines
