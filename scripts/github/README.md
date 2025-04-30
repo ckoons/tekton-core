@@ -168,6 +168,40 @@ Examples:
     Force delete remote bugfix branches
 ```
 
+#### tekton-branch-merge
+
+Merge branches across Tekton components, with options for creating pull requests or direct merges.
+
+```bash
+tekton-branch-merge [OPTIONS] SOURCE_BRANCH [TARGET_BRANCH]
+
+Options:
+  -h, --help           Display help message and exit
+  -v, --verbose        Enable verbose output
+  -d, --dry-run        Show what would be done without making changes
+  -p, --push           Push changes after merging
+  -r, --pr             Create a pull request instead of direct merge
+  -y, --yes            Skip all confirmation prompts (YOLO mode)
+  -m, --message TEXT   Custom merge commit message
+  -f, --force          Force merge even if conflicts are detected
+  -c, --components     Only merge component repositories
+  -M, --main-only      Only merge main repository
+  
+Arguments:
+  SOURCE_BRANCH        Source branch containing changes to merge
+  TARGET_BRANCH        Target branch to merge changes into (defaults to main)
+
+Examples:
+  tekton-branch-merge sprint/feature-name-250430
+    Merge sprint branch into main across all repositories
+
+  tekton-branch-merge -p -y sprint/feature-name-250430
+    Merge sprint branch into main and push changes, skipping confirmations (YOLO)
+
+  tekton-branch-merge -r sprint/feature-name-250430 main
+    Create pull requests from feature branch to main for all components
+```
+
 ### Commit Management
 
 #### tekton-commit
@@ -325,6 +359,15 @@ tekton-commit --title "Complete feature implementation" feature
 
 # Push final changes
 git push
+
+# Merge the sprint branch into main (interactive mode)
+tekton-branch-merge sprint/feature-name-YYMMDD
+
+# Or create pull requests instead of direct merges
+tekton-branch-merge --pr sprint/feature-name-YYMMDD
+
+# Clean up after merging and approving PRs
+tekton-branch-cleanup sprint/feature-name-YYMMDD
 ```
 
 ## Library Documentation
