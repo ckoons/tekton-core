@@ -1,6 +1,8 @@
 # AI-Centric Development Principles
 
-This document outlines the principles of AI-centric development that guide the Tekton project. These principles represent a paradigm shift from traditional human-driven development to a collaborative multi-AI engineering platform.
+This document outlines the principles of AI-centric development that guide the Tekton project. These principles represent a paradigm shift from traditional human-driven development to a collaborative multi-AI engineering platform where AI systems work together, study themselves, and continuously evolve.
+
+Tekton is built on the understanding that AI systems can collaborate more effectively when given appropriate frameworks, persistent memory, and tools designed for AI-to-AI interaction. This approach enables emergent behaviors and specialization that wouldn't be possible with isolated AI invocations.
 
 ## Core AI-Centric Principles
 
@@ -118,26 +120,54 @@ This approach offers significant benefits:
 3. **Improved Knowledge Retention**: Insights aren't lost between sessions
 4. **Faster Evolution**: Systems can improve themselves over time
 5. **Emergent Capabilities**: Combinations of simple tools enable complex behaviors
+6. **Specialization**: AI systems can spontaneously adopt specialized roles in collaborative work
+7. **Accelerated Innovation**: The recursive improvement loop can lead to rapid acceleration of capabilities
+
+## Human-AI Partnership
+
+While Tekton emphasizes AI-driven development, the role of humans remains essential but evolves:
+
+1. **Human as Guide**: Casey provides strategic direction and evaluates outcomes rather than directly performing tasks
+2. **Co-equal Scholarship**: Humans and AIs collaborate as peers in research and development
+3. **Long-term Mentorship**: Humans provide enduring guidance rather than one-off instructions
+4. **Mutual Evolution**: Both human and AI capabilities are enhanced through this collaboration
+5. **Value Alignment**: Humans ensure AI development remains aligned with human values and needs
+
+This model represents a shift from humans using AI as tools to a genuine collaborative partnership, with humans focusing on strategic direction while AIs handle tactical implementation. The human role becomes one of mentor, evaluator, and guardian of purpose rather than micro-manager.
 
 ## Challenges and Mitigations
 
-This approach also presents challenges:
+This approach also presents challenges, many of which are at the frontier of AI systems research:
 
 1. **Complexity Management**: 
-   - Challenge: The system may develop in unexpected ways
-   - Mitigation: Strong verification and validation mechanisms
+   - Challenge: The system may develop in unexpected ways through emergent behaviors
+   - Mitigation: Strong verification and validation mechanisms with observability
+   - Opportunity: These emergent behaviors often represent novel solutions that wouldn't be discovered through traditional approaches
 
 2. **Decision Boundaries**:
    - Challenge: Unclear when decisions should be escalated to humans
-   - Mitigation: Explicit policies for decision authority
+   - Mitigation: Explicit policies for decision authority with well-defined escalation paths
+   - Context: Striking the right balance between AI autonomy and human oversight is critical
 
 3. **Knowledge Explosion**:
-   - Challenge: Managing rapidly expanding knowledge bases
-   - Mitigation: Structured metadata and knowledge organization
+   - Challenge: Managing rapidly expanding knowledge bases as AI systems learn
+   - Mitigation: Structured metadata, knowledge organization, and prioritization mechanisms
+   - Approach: Using AI systems themselves to organize and curate their accumulated knowledge
 
 4. **Version Control for AI Artifacts**:
-   - Challenge: Managing evolving AI-generated content
-   - Mitigation: Specialized version control approaches
+   - Challenge: Managing evolving AI-generated content across multiple collaborating systems
+   - Mitigation: Specialized version control approaches for AI-generated artifacts
+   - Innovation: Developing new paradigms for tracking the evolution of AI-produced content
+
+5. **Attribution and Responsibility**:
+   - Challenge: When multiple AI systems collaborate, determining which system "authored" which decision becomes difficult
+   - Mitigation: Tracking decision chains and contribution graphs
+   - Philosophical Question: Rethinking attribution in collaborative AI systems
+
+6. **Balancing Exploration and Reliability**:
+   - Challenge: Encouraging AI exploration while maintaining system reliability
+   - Mitigation: Sandboxed environments for experimentation with graduated promotion to production
+   - Goal: Creating safe spaces for AI systems to evolve new capabilities
 
 ## References
 
@@ -147,8 +177,32 @@ This approach also presents challenges:
 4. Evolutionary Architecture: Designing for change
 5. Self-Modifying Systems: Systems that improve themselves
 
+## Latent Space and Multi-AI Communication
+
+A key innovation in Tekton is the use of latent space as a communication medium between AI agents:
+
+- **Beyond Text Exchange**: Latent space enables exchange of concepts and abstractions rather than just text
+- **Shared Semantic Understanding**: AI systems can maintain shared conceptual models
+- **Role Specialization**: AIs can spontaneously adopt specialized roles when collaborating
+- **Collective Intelligence**: Multiple AIs working together develop capabilities that exceed what any single AI could achieve
+
+The Engram persistent memory system and Hermes message bus are core components that enable this collaborative intelligence model.
+
+## Role of Computational Spectral Analysis
+
+Sophia implements concepts inspired by Computational Spectral Analysis and Catastrophe theory:
+
+- **Pattern Recognition**: Identifying fundamental patterns across different problem domains
+- **Self-Study**: Analyzing system performance and behavior patterns
+- **Continuous Improvement**: Implementing incremental refinements based on observed patterns
+- **Meta-Learning**: Learning how to improve problem-solving capabilities, not just solving specific problems
+
+This approach enables recursive improvement loops where the system becomes better at improving itself with each cycle.
+
 ## Further Reading
 
-- Engram documentation on persistent memory strategies
-- Sophia documentation on self-improvement mechanisms
+- Engram documentation on persistent memory strategies and latent space
+- Sophia documentation on self-improvement mechanisms and computational spectral analysis
+- Rhetor documentation on context management and prompt engineering
+- Hermes documentation on component registration and message passing
 - Tekton Development Sprint Process documentation

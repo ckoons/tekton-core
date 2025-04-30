@@ -139,6 +139,7 @@ feat: Descriptive title for the changes
 - Additional context about the implementation
 
 🤖 Generated with [Claude Code](https://claude.ai/code)
+Design & Engineering Guidance by Casey Koons <cskoons@gmail.com>
 Co-Authored-By: Casey Koons <cskoons@gmail.com> & Claude <noreply@anthropic.com>
 ```
 
