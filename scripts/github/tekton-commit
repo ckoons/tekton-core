@@ -10,8 +10,19 @@ set -euo pipefail
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="${SCRIPT_DIR}/lib"
-TEMPLATE_DIR="${SCRIPT_DIR}/templates/commit-messages"
+
+# Determine Tekton root directory - prefer environment variable if set
+if [[ -n "${TEKTON_ROOT:-}" ]]; then
+  REPO_ROOT="${TEKTON_ROOT}"
+else
+  # Fall back to relative path detection
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "Warning: TEKTON_ROOT environment variable not set. Using detected path: ${REPO_ROOT}"
+  echo "For reliable operation, please set TEKTON_ROOT to the root of your Tekton repository."
+fi
+
+LIB_DIR="${REPO_ROOT}/scripts/github/lib"
+TEMPLATE_DIR="${REPO_ROOT}/scripts/github/templates/commit-messages"
 
 # shellcheck source=lib/github-utils.sh
 source "${LIB_DIR}/github-utils.sh"

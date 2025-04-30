@@ -93,6 +93,7 @@ Tekton is built on several foundational principles:
 - Python 3.10+
 - Linux or macOS
 - UV package manager (installed automatically if not present)
+- `TEKTON_ROOT` environment variable (set to Tekton repository root)
 
 ## Installation
 
@@ -146,6 +147,20 @@ Then set up individual or all Tekton components:
 # Setup all components
 ./setup-all.sh
 ```
+
+### Environment Setup
+
+Before running Tekton, you need to set the `TEKTON_ROOT` environment variable to the root directory of your Tekton repository:
+
+```bash
+# Set TEKTON_ROOT in your current shell
+export TEKTON_ROOT="$(pwd)"
+
+# Add to your shell profile for persistence (.bashrc, .zshrc, etc.)
+echo 'export TEKTON_ROOT="/path/to/your/tekton/repository"' >> ~/.bashrc
+```
+
+The `TEKTON_ROOT` environment variable is required by various Tekton utilities, particularly the GitHub utilities, to locate resources and libraries correctly regardless of where they're executed from.
 
 ### Running Tekton
 

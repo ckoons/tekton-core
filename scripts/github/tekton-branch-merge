@@ -11,7 +11,18 @@ set -euo pipefail
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="${SCRIPT_DIR}/lib"
+
+# Determine Tekton root directory - prefer environment variable if set
+if [[ -n "${TEKTON_ROOT:-}" ]]; then
+  REPO_ROOT="${TEKTON_ROOT}"
+else
+  # Fall back to relative path detection
+  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  echo "Warning: TEKTON_ROOT environment variable not set. Using detected path: ${REPO_ROOT}"
+  echo "For reliable operation, please set TEKTON_ROOT to the root of your Tekton repository."
+fi
+
+LIB_DIR="${REPO_ROOT}/scripts/github/lib"
 
 # shellcheck source=lib/github-utils.sh
 source "${LIB_DIR}/github-utils.sh"
@@ -156,7 +167,7 @@ Co-Authored-By: Casey Koons <cskoons@gmail.com> & Claude <noreply@anthropic.com>
 fi
 
 # Prepare pull request template
-pr_template_path="${SCRIPT_DIR}/templates/pr-templates/sprint-completion.txt"
+pr_template_path="${REPO_ROOT}/scripts/github/templates/pr-templates/sprint-completion.txt"
 if [[ -f "${pr_template_path}" ]]; then
   pr_template="$(cat "${pr_template_path}")"
 else
@@ -639,7 +650,7 @@ echo -e "\n${BLUE}Generating detailed merge report...${RESET}"
 report=$(generate_merge_report "${source_branch}" "${target_branch}" "${components_to_merge[@]}")
 
 # Save the report to a file
-report_file="${tekton_root}/MetaData/DevelopmentSprints/MergeReports/merge-${source_branch//\//-}-to-${target_branch//\//-}-$(date +%Y%m%d-%H%M%S).md"
+report_file="${REPO_ROOT}/MetaData/DevelopmentSprints/MergeReports/merge-${source_branch//\//-}-to-${target_branch//\//-}-$(date +%Y%m%d-%H%M%S).md"
 mkdir -p "$(dirname "${report_file}")"
 echo "${report}" > "${report_file}"
 echo -e "Detailed merge report saved to: ${report_file}"
