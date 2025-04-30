@@ -58,7 +58,7 @@ The Working Claude is an AI assistant (which may be different for each phase) re
 ### 3. Implementation (potentially multiple phases)
 
 - Working Claude reviews all sprint documentation
-- Working Claude verifies they are working on the correct GitHub branch
+- Working Claude verifies they are working on the correct GitHub branch using `tekton-branch-verify`
 - Working Claude asks any questions before beginning implementation
 - Working Claude implements the code according to the plan
 - Working Claude creates/updates tests
@@ -118,6 +118,60 @@ MetaData/DevelopmentSprints/
 
 Each sprint directory may also contain additional documents specific to that sprint.
 
+## GitHub Workflow
+
+Tekton Development Sprints utilize a structured GitHub workflow to manage changes across components. The following utilities facilitate this workflow:
+
+### Branch Management
+
+- **tekton-branch-create**: Creates branches with consistent naming across all components
+  ```bash
+  scripts/github/tekton-branch-create sprint/feature-name-YYMMDD
+  ```
+
+- **tekton-branch-verify**: Verifies branch correctness before beginning work
+  ```bash
+  scripts/github/tekton-branch-verify sprint/feature-name-YYMMDD
+  ```
+
+- **tekton-branch-status**: Checks branch status across all Tekton components
+  ```bash
+  scripts/github/tekton-branch-status sprint/feature-name-YYMMDD
+  ```
+
+- **tekton-branch-sync**: Synchronizes changes between branches across components
+  ```bash
+  scripts/github/tekton-branch-sync source-branch target-branch
+  ```
+
+- **tekton-branch-cleanup**: Safely removes unused branches
+  ```bash
+  scripts/github/tekton-branch-cleanup --dry-run "sprint/*"
+  ```
+
+### Commit Management
+
+- **tekton-commit**: Generates standardized commit messages using templates
+  ```bash
+  scripts/github/tekton-commit --title "Add new feature" feature
+  ```
+
+### Claude Code Integration
+
+Special utilities are provided for Claude Code sessions:
+
+- **scripts/github/claude/branch-validator.sh**: Validates branch for Claude sessions
+- **scripts/github/claude/prepare-session.sh**: Prepares environment for Claude sessions
+- **scripts/github/claude/generate-commit.sh**: Generates commit message templates
+
+### Setup and Configuration
+
+Working Claude sessions must use these utilities to ensure consistency across all Development Sprints. To verify the correct setup, Working Claude should run:
+
+```bash
+scripts/github/claude/prepare-session.sh -c -p sprint/your-sprint-name-YYMMDD
+```
+
 ## Branch Management
 
 Every Development Sprint must work in isolation on a dedicated branch to prevent conflicts between sprints. The branch naming convention is:
@@ -128,7 +182,29 @@ sprint/[sprint-name]-[date]
 
 For example: `sprint/shared-code-042825`
 
-Working Claude sessions must verify they are on the correct branch before making any changes. Branch management tools and utilities will be used to ensure proper isolation and tracking.
+Working Claude sessions must verify they are on the correct branch before making any changes. This is done using the `tekton-branch-verify` utility:
+
+```bash
+scripts/github/tekton-branch-verify sprint/your-sprint-name-YYMMDD
+```
+
+For detailed branch management guidelines, see [Branch Management Guide](/MetaData/DevelopmentSprints/Templates/BranchManagement.md).
+
+## Commit Messages
+
+Commit messages should be descriptive and specific to the changes being made. They should also be formatted according to the [Conventional Commits specification](https://www.conventionalcommits.org/en/v1.0.0/) and should always include the following lines to credit both Claude Code and Casey Koons.
+
+```
+🤖 Generated with [Claude Code](https://claude.ai/code)
+Design & Engineering Guidance by Casey Koons <cskoons@gmail.com>
+Co-Authored-By: Casey Koons <cskoons@gmail.com> & Claude <noreply@anthropic.com>
+```
+
+To ensure consistent commit messages, use the `tekton-commit` utility:
+
+```bash
+scripts/github/tekton-commit --title "Your commit title" feature|fix|docs|refactor|test|chore
+```
 
 ## Documentation Requirements
 
@@ -151,9 +227,53 @@ Documentation updates are a critical part of every Development Sprint. Three cat
 
 Each Implementation Plan will specify which documentation falls into each category for that sprint.
 
+## AI-Centric Development Paradigm
+
+Tekton represents a paradigm shift from traditional human-driven development to a collaborative multi-AI engineering platform. This approach influences how Development Sprints are conducted and evaluated.
+
+### Core AI-Centric Principles
+
+1. **Composable, Single-Purpose Tools**: Following the UNIX philosophy, create small, well-defined utilities that can be composed rather than monolithic systems.
+
+2. **Protocol-First Development**: Define interfaces and contracts before implementation, enabling parallel development by different AI systems.
+
+3. **Declarative Over Imperative**: Specify desired outcomes rather than step-by-step procedures, allowing AIs to determine optimal implementation paths.
+
+4. **Evolutionary Architecture**: Build systems that expect and facilitate their own evolution through experimental branches and feedback loops.
+
+5. **Knowledge Transfer Between AI Instances**: Create structured ways for AI insights to be persisted and shared between Claude sessions and across sprints.
+
+6. **Contextual Memory and Progressive Reasoning**: Design systems where context is preserved across AI invocations through mechanisms like Engram.
+
+7. **Meta-Programming Capabilities**: Provide frameworks where AIs can define and test abstractions, generating tools to improve their own workflows.
+
+8. **Self-Discovery and Registration**: Components should register their capabilities, making them discoverable without human guidance.
+
+For detailed information on these principles and their implementation, see [AI-Centric Development Principles](/MetaData/DevelopmentSprints/Templates/AICentricDevelopment.md).
+
+### Self-Improvement Cycle
+
+Each Development Sprint should include dedicated time and resources for self-improvement:
+
+- AI systems should analyze their own performance and suggest improvements
+- Successful patterns should be extracted and formalized
+- Meta-level improvements to the development process itself should be prioritized
+- Opportunities for shared libraries and utilities should be identified
+- New insights should be documented for future sprints
+
+This self-improvement cycle ensures that Tekton evolves not just through planned features but through discoveries made during the development process itself.
+
 ## Continuous Improvement
 
 The Development Sprint process itself is subject to continuous improvement. Each retrospective should not only address the specific sprint but also identify ways to improve the sprint process itself. These improvements will be incorporated into future sprints.
+
+Sprint retrospectives should specifically address:
+
+1. **Process Improvements**: How can the Development Sprint workflow be enhanced?
+2. **Tool Enhancements**: What new tools or improvements to existing tools would streamline development?
+3. **Communication Patterns**: How can AI collaboration be made more effective?
+4. **Knowledge Persistence**: How can insights from this sprint be better preserved for future work?
+5. **Meta-Programming Opportunities**: What repetitive tasks could be automated through new utilities?
 
 ## Getting Started
 
@@ -162,8 +282,8 @@ To initiate a Development Sprint:
 1. Casey discusses the idea with Claude
 2. If approved, Casey requests a detailed plan from Architect Claude
 3. Architect Claude creates the initial sprint documentation
-4. A dedicated branch is created for the sprint
-5. The Working Claude session begins implementation
+4. A dedicated branch is created for the sprint using the `tekton-branch-create` utility
+5. The Working Claude session begins implementation, first verifying the branch with `tekton-branch-verify`
 6. Status is tracked throughout the process
 7. The sprint is completed with a retrospective
 
