@@ -1,0 +1,36 @@
+component_id: prometheus
+component_name: Prometheus Planning System
+component_description: Intelligent planning and retrospective analysis system for project management
+component_type: service
+component_port: 8005
+component_host: localhost
+component_url: http://localhost:8005
+component_health_endpoint: /health
+component_version: 0.1.0
+component_capabilities:
+  - planning
+  - risk_analysis
+  - retrospective_analysis
+  - improvement_suggestions
+  - critical_path_analysis
+component_dependencies:
+  - rhetor
+  - engram
+  - telos
+component_tags:
+  - planning
+  - project_management
+  - llm_integration
+  - risk_analysis
+  - retrospective
+component_registration:
+  hermes_url: "http://localhost:8000/api/v1/registration"
+  auto_register: true
+component_routes:
+  - path: "/api"
+    type: "http"
+    description: "HTTP API endpoints"
+  - path: "/api/v1/llm"
+    type: "http"
+    description: "LLM integration endpoints"
+EOF < /dev/null

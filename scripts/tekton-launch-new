@@ -1,0 +1,920 @@
+#!/usr/bin/env bash
+# tekton-launch - Unified script to launch all Tekton components in the correct order
+# Created: April 11, 2025
+# Updated: May 1, 2025 - Refactored to use shared utility libraries
+
+# Find Tekton root directory and script directories
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+fi
+
+# Load shared libraries
+LIB_DIR="${SCRIPT_DIR}/lib"
+source "${LIB_DIR}/tekton-utils.sh"
+source "${LIB_DIR}/tekton-ports.sh"
+source "${LIB_DIR}/tekton-process.sh"
+source "${LIB_DIR}/tekton-config.sh"
+
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
+
+# Default values
+MODEL_TYPE="claude" 
+MODEL="claude-3-sonnet-20240229"
+CLIENT_ID="tekton"
+LAUNCH_UI=true
+LAUNCH_ALL=false
+INTERACTIVE=true
+COMPONENTS=()
+DEFAULT_COMPONENTS=("engram" "hermes" "rhetor")
+
+# Save the original working directory
+ORIGINAL_DIR="$(pwd)"
+
+# Component directories
+HEPHAESTUS_DIR="${TEKTON_DIR}/Hephaestus"
+ENGRAM_DIR="${TEKTON_DIR}/Engram"
+HERMES_DIR="${TEKTON_DIR}/Hermes"
+ERGON_DIR="${TEKTON_DIR}/Ergon"
+RHETOR_DIR="${TEKTON_DIR}/Rhetor"
+ATHENA_DIR="${TEKTON_DIR}/Athena"
+PROMETHEUS_DIR="${TEKTON_DIR}/Prometheus"
+HARMONIA_DIR="${TEKTON_DIR}/Harmonia"
+SOPHIA_DIR="${TEKTON_DIR}/Sophia"
+TELOS_DIR="${TEKTON_DIR}/Telos"
+SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
+TERMA_DIR="${TEKTON_DIR}/Terma"
+LLM_ADAPTER_DIR="${TEKTON_DIR}/LLMAdapter"
+
+# Function to display usage information
+show_usage() {
+    echo "Tekton - Unified launcher for all Tekton components"
+    echo ""
+    echo "Usage: tekton-launch [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --components COMP        Comma-separated list of components to launch:"
+    echo "                           all: All available components"
+    echo "                           Individual: engram,hermes,ergon,rhetor,athena,prometheus,"
+    echo "                                       harmonia,sophia,telos,hephaestus"
+    echo "  --launch-all             Launch all available components (equivalent to --components all)"
+    echo "  --model-type TYPE        Type of model to launch: claude, ollama (default: claude)"
+    echo "  --model MODEL            Specific model to use (defaults depend on model type)"
+    echo "  --client-id ID           Client ID for Engram (default: tekton)"
+    echo "  --no-ui                  Don't launch the Hephaestus UI"
+    echo "  --non-interactive        Run in non-interactive mode (use defaults for unspecified options)"
+    echo "  --help                   Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  Launch all components:                 tekton-launch --launch-all"
+    echo "  Launch selected components:            tekton-launch --components engram,hermes,ergon"
+    echo "  Launch with Ollama and custom model:   tekton-launch --model-type ollama --model llama3"
+}
+
+# We'll conditionally check if we're launching Hermes
+LAUNCHING_HERMES=false
+
+# Function to check if we're launching Hermes (called after parsing arguments)
+check_if_launching_hermes() {
+    # Check if launch-all is specified
+    if [ "$LAUNCH_ALL" = true ]; then
+        LAUNCHING_HERMES=true
+        return
+    fi
+
+    # Check if "hermes" or "all" is in the components list
+    for comp in "${COMPONENTS[@]}"; do
+        if [ "$comp" = "hermes" ] || [ "$comp" = "all" ]; then
+            LAUNCHING_HERMES=true
+            return
+        fi
+    done
+}
+
+# Function to detect and list available components
+detect_components() {
+    tekton_info "Detecting Tekton components..."
+    
+    local components=()
+    
+    # Check for Synthesis
+    if [ -d "$SYNTHESIS_DIR" ] && [ -f "$SYNTHESIS_DIR/synthesis/core/execution_engine.py" ]; then
+        components+=("synthesis")
+        tekton_success "Synthesis (Execution Engine)"
+    else
+        tekton_warn "Synthesis not found or incomplete"
+    fi
+    
+    # Check for Hephaestus
+    if [ -d "$HEPHAESTUS_DIR" ] && [ -f "$HEPHAESTUS_DIR/ui/server/server.py" ]; then
+        components+=("hephaestus")
+        tekton_success "Hephaestus (UI System)"
+    else
+        tekton_warn "Hephaestus not found or incomplete"
+    fi
+    
+    # Check for Engram
+    if [ -d "$ENGRAM_DIR" ] && [ -f "$ENGRAM_DIR/core/engram_consolidated" ]; then
+        components+=("engram")
+        tekton_success "Engram (Memory System)"
+    else
+        tekton_warn "Engram not found or incomplete"
+    fi
+    
+    # Check for Hermes
+    if [ -d "$HERMES_DIR" ] && [ -f "$HERMES_DIR/hermes/core/service_discovery.py" ]; then
+        components+=("hermes")
+        tekton_success "Hermes (Database & Messaging)"
+    else
+        tekton_warn "Hermes not found or incomplete"
+    fi
+    
+    # Check for Ergon
+    if [ -d "$ERGON_DIR" ]; then
+        if [ -d "$ERGON_DIR/ergon" ] && [ -f "$ERGON_DIR/ergon/__init__.py" ]; then
+            components+=("ergon")
+            tekton_success "Ergon (Agent System)"
+        else
+            tekton_warn "Ergon found but not fully implemented"
+        fi
+    fi
+    
+    # Check for Rhetor
+    if [ -d "$RHETOR_DIR" ]; then
+        if [ -d "$RHETOR_DIR/rhetor" ] && [ -f "$RHETOR_DIR/rhetor/__init__.py" ]; then
+            components+=("rhetor")
+            tekton_success "Rhetor (Communication)"
+        else
+            tekton_warn "Rhetor found but not fully implemented"
+        fi
+    fi
+    
+    # Check for Telos
+    if [ -d "$TELOS_DIR" ]; then
+        if [ -d "$TELOS_DIR/telos" ] && [ -f "$TELOS_DIR/telos/__init__.py" ]; then
+            components+=("telos")
+            tekton_success "Telos (User Interface)"
+        else
+            tekton_warn "Telos found but not fully implemented"
+        fi
+    fi
+    
+    # Check for Prometheus
+    if [ -d "$PROMETHEUS_DIR" ] && [ -f "$PROMETHEUS_DIR/prometheus/core/planning_engine.py" ]; then
+        components+=("prometheus")
+        tekton_success "Prometheus (Planning)"
+    else
+        tekton_warn "Prometheus not found or incomplete"
+    fi
+    
+    # Check for Harmonia
+    if [ -d "$HARMONIA_DIR" ]; then
+        if [ -d "$HARMONIA_DIR/harmonia" ] && [ -f "$HARMONIA_DIR/harmonia/core/workflow.py" ]; then
+            components+=("harmonia")
+            tekton_success "Harmonia (Workflow)"
+        else
+            tekton_warn "Harmonia found but not fully implemented"
+        fi
+    fi
+    
+    # Check for Athena
+    if [ -d "$ATHENA_DIR" ]; then
+        if [ -d "$ATHENA_DIR/athena" ] && [ -f "$ATHENA_DIR/athena/core/entity.py" ]; then
+            components+=("athena")
+            tekton_success "Athena (Knowledge Graph)"
+        else
+            tekton_warn "Athena found but not fully implemented"
+        fi
+    fi
+    
+    # Check for Sophia
+    if [ -d "$SOPHIA_DIR" ]; then
+        if [ -d "$SOPHIA_DIR/sophia" ] && [ -f "$SOPHIA_DIR/sophia/core/ml_engine.py" ]; then
+            components+=("sophia")
+            tekton_success "Sophia (Machine Learning)"
+        else
+            tekton_warn "Sophia found but not fully implemented"
+        fi
+    fi
+    
+    # Return the list of components
+    echo "${components[@]}"
+}
+
+# Interactive component selection
+select_components() {
+    local all_components=("$@")
+    local selected_components=()
+    
+    tekton_info "Select components to launch:"
+    
+    # Ask about Hephaestus (UI)
+    if [[ " ${all_components[*]} " == *" hephaestus "* ]]; then
+        if tekton_prompt_yes_no "Launch Hephaestus (UI System)?" "y"; then
+            selected_components+=("hephaestus")
+        fi
+    fi
+    
+    # Ask about Engram (Memory)
+    if [[ " ${all_components[*]} " == *" engram "* ]]; then
+        if tekton_prompt_yes_no "Launch Engram (Memory System)?" "y"; then
+            selected_components+=("engram")
+        fi
+    fi
+    
+    # Ask about Hermes (Database)
+    if [[ " ${all_components[*]} " == *" hermes "* ]]; then
+        if tekton_prompt_yes_no "Launch Hermes (Database & Messaging)?" "y"; then
+            selected_components+=("hermes")
+        fi
+    fi
+    
+    # Ask about Ergon (Agents)
+    if [[ " ${all_components[*]} " == *" ergon "* ]]; then
+        if tekton_prompt_yes_no "Launch Ergon (Agent System)?" "y"; then
+            selected_components+=("ergon")
+        fi
+    fi
+    
+    # Ask about Rhetor (Communication)
+    if [[ " ${all_components[*]} " == *" rhetor "* ]]; then
+        if tekton_prompt_yes_no "Launch Rhetor (Communication)?" "n"; then
+            selected_components+=("rhetor")
+        fi
+    fi
+    
+    # Ask about Telos (User Interface)
+    if [[ " ${all_components[*]} " == *" telos "* ]]; then
+        if tekton_prompt_yes_no "Launch Telos (User Interface)?" "n"; then
+            selected_components+=("telos")
+        fi
+    fi
+    
+    # Ask about Prometheus (Planning)
+    if [[ " ${all_components[*]} " == *" prometheus "* ]]; then
+        if tekton_prompt_yes_no "Launch Prometheus (Planning)?" "n"; then
+            selected_components+=("prometheus")
+        fi
+    fi
+    
+    # Ask about Harmonia (Workflow)
+    if [[ " ${all_components[*]} " == *" harmonia "* ]]; then
+        if tekton_prompt_yes_no "Launch Harmonia (Workflow)?" "n"; then
+            selected_components+=("harmonia")
+        fi
+    fi
+    
+    # Ask about Athena (Knowledge Graph)
+    if [[ " ${all_components[*]} " == *" athena "* ]]; then
+        if tekton_prompt_yes_no "Launch Athena (Knowledge Graph)?" "n"; then
+            selected_components+=("athena")
+        fi
+    fi
+    
+    # Ask about Sophia (Machine Learning)
+    if [[ " ${all_components[*]} " == *" sophia "* ]]; then
+        if tekton_prompt_yes_no "Launch Sophia (Machine Learning)?" "n"; then
+            selected_components+=("sophia")
+        fi
+    fi
+    
+    # Ask about Synthesis (Execution Engine)
+    if [[ " ${all_components[*]} " == *" synthesis "* ]]; then
+        if tekton_prompt_yes_no "Launch Synthesis (Execution Engine)?" "n"; then
+            selected_components+=("synthesis")
+        fi
+    fi
+    
+    # Ask about Terma (Terminal)
+    if [[ " ${all_components[*]} " == *" terma "* ]]; then
+        if tekton_prompt_yes_no "Launch Terma (Terminal System)?" "n"; then
+            selected_components+=("terma")
+        fi
+    fi
+    
+    echo "${selected_components[@]}"
+}
+
+# Launch Hephaestus UI
+launch_hephaestus() {
+    tekton_info "Launching Hephaestus UI..."
+    
+    # Check if Hephaestus is already running
+    if tekton_is_running "Hephaestus/ui/server/server.py"; then
+        tekton_success "Hephaestus UI is already running"
+        return 0
+    fi
+    
+    # Verify ports are free before launching
+    tekton_info "Checking if Hephaestus ports are available..."
+    
+    # Use targeted port management - only release the specific ports needed by this component
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release HTTP port if it's in use
+        tekton_release_port "$HEPHAESTUS_PORT" "Hephaestus HTTP"
+        HTTP_PORT_RESULT=$?
+        
+        # Verify ports are now free
+        if [ $HTTP_PORT_RESULT -ne 0 ]; then
+            tekton_error_exit "Ports $HEPHAESTUS_PORT could not be released. Cannot start Hephaestus UI."
+        fi
+    fi
+    
+    # By this point the ports should be available
+    tekton_success "Ports are available. Proceeding with launch."
+    
+    # Launch Hephaestus UI directly
+    if [ -x "$HEPHAESTUS_DIR/run_ui.sh" ]; then
+        tekton_info "Using run_ui.sh script..."
+        
+        # Set up Python path
+        export PYTHONPATH="$TEKTON_DIR:$PYTHONPATH"
+        
+        # Create logs directory
+        mkdir -p "$HOME/.tekton/logs"
+        
+        # Launch the UI server
+        (cd "$HEPHAESTUS_DIR" && "./run_ui.sh" --port $HEPHAESTUS_PORT > "$HOME/.tekton/logs/hephaestus.log" 2>&1) &
+        HEPHAESTUS_PID=$!
+        
+        # Wait briefly to see if it crashed
+        sleep 3
+        if ps -p $HEPHAESTUS_PID > /dev/null; then
+            tekton_success "Hephaestus UI started successfully"
+            tekton_success "Access the UI at: http://localhost:$HEPHAESTUS_PORT"
+            return 0
+        else
+            tekton_error_exit "Hephaestus UI failed to start. Check logs at $HOME/.tekton/logs/hephaestus.log"
+        fi
+    else
+        tekton_error_exit "No Hephaestus launch script found at $HEPHAESTUS_DIR/run_ui.sh"
+    fi
+}
+
+# Launch Engram component
+launch_engram() {
+    tekton_info "Launching Engram Memory System..."
+    
+    # Check if Engram memory service is already running
+    if tekton_is_running "engram.api.consolidated_server"; then
+        tekton_success "Engram memory service is already running"
+        return 0
+    fi
+    
+    # Verify port is free before launching
+    tekton_info "Checking if Engram port $ENGRAM_PORT is available..."
+    
+    # Use targeted port management - only release the specific port needed by this component
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        # Release the port if it's in use
+        tekton_release_port "$ENGRAM_PORT" "Engram Memory"
+        if [ $? -ne 0 ]; then
+            tekton_error_exit "Port $ENGRAM_PORT could not be released. Cannot start Engram Memory Service."
+        fi
+    fi
+    
+    # Find the consolidated server script
+    ENGRAM_STARTUP="$ENGRAM_DIR/core/engram_consolidated"
+    
+    # Double-check the directory structure
+    if [ ! -d "$ENGRAM_DIR" ]; then
+        tekton_error_exit "Engram directory not found at $ENGRAM_DIR"
+    fi
+    
+    # Check if the startup script exists
+    if [ -x "$ENGRAM_STARTUP" ]; then
+        tekton_success "Found Engram startup script at: $ENGRAM_STARTUP"
+        
+        # Create data directory
+        mkdir -p "$HOME/.tekton/data"
+        mkdir -p "$HOME/.tekton/logs"
+        
+        # First check if Engram is in the Python path
+        python3 -c "import engram" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            tekton_info "Adding Engram to Python path..."
+            export PYTHONPATH="$ENGRAM_DIR:$PYTHONPATH"
+            
+            # Install Engram package if needed
+            if [ -f "$ENGRAM_DIR/setup.py" ]; then
+                tekton_info "Installing Engram package..."
+                (cd "$ENGRAM_DIR" && pip install -e . --quiet)
+            fi
+        fi
+        
+        # Force fallback mode to avoid vector database issues
+        export ENGRAM_USE_FALLBACK=1
+        tekton_info "Setting ENGRAM_USE_FALLBACK=1 to use file-based storage"
+        
+        # Start the service
+        (cd "$TEKTON_DIR" && "$ENGRAM_STARTUP" --fallback --data-dir "$HOME/.tekton/data" --port "$ENGRAM_PORT" > "$HOME/.tekton/logs/engram.log" 2>&1) &
+        ENGRAM_PID=$!
+        
+        tekton_success "Started Engram memory service with PID: $ENGRAM_PID"
+        
+        # Wait for service to be ready
+        tekton_info "Waiting for Engram service to be ready..."
+        tekton_wait_for_port_responding "$ENGRAM_PORT" 60 "Engram Memory Service" || {
+            tekton_error_exit "Engram memory service failed to start. Check logs at $HOME/.tekton/logs/engram.log"
+        }
+        
+        tekton_success "Engram memory service is online!"
+        return 0
+    else
+        tekton_error_exit "Engram consolidated server script not found at $ENGRAM_STARTUP"
+    fi
+}
+
+# Launch Hermes component
+launch_hermes() {
+    tekton_info "Launching Hermes Database & Messaging as Lifecycle Manager..."
+    
+    # Check if Hermes is already running
+    if tekton_is_running "hermes.*database_manager"; then
+        tekton_success "Hermes services are already running"
+        return 0
+    fi
+    
+    # Verify ports are free before launching
+    tekton_info "Checking if Hermes port $HERMES_PORT is available..."
+    
+    # Release Hermes port
+    tekton_release_port "$HERMES_PORT" "Hermes" || {
+        tekton_error_exit "Port $HERMES_PORT could not be released. Cannot start Hermes services."
+    }
+    
+    # Set up Python path
+    export PYTHONPATH="$HERMES_DIR:$PYTHONPATH"
+    
+    # Create data directory
+    mkdir -p "$HOME/.tekton/data/hermes"
+    
+    # Create log directories
+    mkdir -p "$HOME/.tekton/logs"
+    
+    # Start the component server using our utility
+    tekton_start_component_server "hermes" "hermes.api.app" "$HERMES_DIR" "$HERMES_PORT"
+    
+    # Wait for service to be ready
+    tekton_info "Waiting for Hermes service to be ready..."
+    tekton_wait_for_port_responding "$HERMES_PORT" 30 "Hermes Service" || {
+        tekton_warn "Hermes may not be fully ready, but continuing..."
+    }
+    
+    return 0
+}
+
+# Launch component using standardized function
+launch_component() {
+    local component="$1"
+    local description="$2"
+    local component_dir="$3"
+    local module="$4"
+    local port="$5"
+    
+    tekton_info "Launching $description..."
+    
+    # Check if component is already running
+    if tekton_is_running "$module"; then
+        tekton_success "$description is already running"
+        return 0
+    fi
+    
+    # Verify port is free before launching
+    tekton_info "Checking if port $port is available..."
+    
+    # Only release port if we're not using Hermes for lifecycle management
+    if [ "$LAUNCHING_HERMES" = false ]; then
+        tekton_release_port "$port" "$description" || {
+            tekton_error_exit "Port $port could not be released. Cannot start $description."
+        }
+    fi
+    
+    # Check if component is implemented
+    if [ -d "$component_dir" ] && [ -f "$component_dir/$component/__init__.py" ]; then
+        # Set up Python path
+        export PYTHONPATH="$component_dir:$PYTHONPATH"
+        
+        # Start the component server
+        tekton_start_component_server "$component" "$module" "$component_dir" "$port"
+        
+        # Wait for service to be ready (with a shorter timeout)
+        tekton_info "Waiting for $description to be ready..."
+        tekton_wait_for_port_responding "$port" 10 "$description" || {
+            tekton_warn "$description may not be fully ready, but continuing..."
+        }
+        
+        tekton_success "$description initialized"
+        return 0
+    else
+        tekton_warn "$description is not fully implemented. Skipping."
+        return 0
+    fi
+}
+
+# Launch LLM Adapter component (checking for Rhetor first)
+launch_llm_adapter() {
+    tekton_info "Launching LLM Management System..."
+
+    # First check if Rhetor is running or available
+    if tekton_is_running "rhetor.api.app" || tekton_is_port_used "$RHETOR_PORT"; then
+        tekton_success "Rhetor or LLM service is already running"
+        return 0
+    fi
+    
+    # Check if Rhetor is implemented
+    if [ -d "$RHETOR_DIR/rhetor" ] && [ -f "$RHETOR_DIR/rhetor/api/app.py" ]; then
+        tekton_info "Rhetor is available but not running. Launching Rhetor instead of LLM Adapter..."
+        launch_component "rhetor" "Rhetor LLM Management System" "$RHETOR_DIR" "rhetor.api.app" "$RHETOR_PORT"
+        return $?
+    fi
+    
+    # If Rhetor is not available, fall back to LLM Adapter
+    tekton_info "Rhetor not available or not fully implemented, falling back to LLM Adapter"
+
+    # Release ports
+    tekton_release_port "$LLM_ADAPTER_HTTP_PORT" "LLM Adapter HTTP"
+    tekton_release_port "$LLM_ADAPTER_WS_PORT" "LLM Adapter WebSocket"
+
+    # Run the adapter script
+    if [ -f "$LLM_ADAPTER_DIR/run_adapter.sh" ]; then
+        (cd "$LLM_ADAPTER_DIR" && ./run_adapter.sh > "$HOME/.tekton/logs/llm_adapter.log" 2>&1) &
+        LLM_PID=$!
+
+        # Wait for the adapter to start
+        tekton_info "Waiting for LLM Adapter to initialize..."
+        tekton_wait_for_port_responding "$LLM_ADAPTER_HTTP_PORT" 15 "LLM Adapter" || {
+            tekton_warn "LLM Adapter may not be fully ready, but continuing..."
+        }
+        
+        tekton_success "LLM Adapter started successfully"
+        return 0
+    else
+        tekton_error_exit "LLM Adapter script not found at $LLM_ADAPTER_DIR/run_adapter.sh"
+    fi
+}
+
+# Launch AI model (Claude or Ollama)
+launch_ai_model() {
+    tekton_info "Launching $MODEL_TYPE model: $MODEL"
+    
+    case "$MODEL_TYPE" in
+        "claude")
+            # Check if model is available
+            if [ "$MODEL" = "claude-3-sonnet-20240229" ] || [ "$MODEL" = "claude-3-opus-20240229" ] || [ "$MODEL" = "claude-3-5-sonnet" ]; then
+                tekton_success "Using Claude model: $MODEL"
+            else
+                tekton_warn "Requested model '$MODEL' may not be available, attempting to use anyway"
+            fi
+            
+            # Set model via env var
+            export ANTHROPIC_API_MODEL="$MODEL"
+            
+            # Check if Claude CLI is installed
+            if tekton_command_exists "claude"; then
+                # Launch Claude
+                tekton_info "Starting Claude with model: $MODEL"
+                tekton_info "To exit Claude, press Ctrl+D"
+                echo -e "${TEKTON_COLOR_BLUE}-----------------------------------------------${TEKTON_COLOR_RESET}"
+                claude --allowedTools='Bash(*),Edit,View,Replace,BatchTool,GlobTool,GrepTool,LS,ReadNotebook,NotebookEditCell,WebFetchTool'
+            else
+                tekton_error_exit "Claude CLI not found in PATH. To install Claude CLI, follow instructions at: https://github.com/anthropics/anthropic-cli"
+            fi
+            ;;
+            
+        "ollama")
+            # Check if Ollama is running
+            if ! curl -s http://localhost:11434/api/tags > /dev/null; then
+                tekton_error_exit "Ollama is not running. Please start Ollama first."
+            fi
+            
+            # Find the Ollama bridge script
+            OLLAMA_BRIDGE="$ENGRAM_DIR/ollama/ollama_bridge.py"
+            
+            # Verify the bridge file exists
+            if [ ! -f "$OLLAMA_BRIDGE" ]; then
+                # Check for alternative locations
+                ALT_BRIDGES=(
+                    "$ENGRAM_DIR/ollama/bridge/ollama_bridge.py"
+                    "$ENGRAM_DIR/bridge/ollama_bridge.py"
+                )
+                
+                for alt_bridge in "${ALT_BRIDGES[@]}"; do
+                    if [ -f "$alt_bridge" ]; then
+                        tekton_success "Found alternative Ollama bridge at: $alt_bridge"
+                        OLLAMA_BRIDGE="$alt_bridge"
+                        break
+                    fi
+                done
+                
+                if [ ! -f "$OLLAMA_BRIDGE" ]; then
+                    tekton_error_exit "No Ollama bridge script found"
+                fi
+            fi
+            
+            # Add paths to PYTHONPATH
+            export PYTHONPATH="$ENGRAM_DIR/ollama:$ENGRAM_DIR:$PYTHONPATH"
+            
+            # Build command
+            CMD="python3 $OLLAMA_BRIDGE $MODEL --prompt-type combined --client-id $CLIENT_ID --temperature 0.7 --max-tokens 2048 --memory-functions"
+            
+            # Execute the command
+            tekton_success "Starting Ollama with model: $MODEL"
+            $CMD
+            ;;
+            
+        *)
+            tekton_error_exit "Unknown model type: $MODEL_TYPE. Supported model types: claude, ollama"
+            ;;
+    esac
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --components)
+      IFS=',' read -r -a COMPONENTS <<< "$2"
+      shift 2
+      ;;
+    --launch-all)
+      LAUNCH_ALL=true
+      shift
+      ;;
+    --model-type)
+      MODEL_TYPE="$2"
+      shift 2
+      ;;
+    --model)
+      MODEL="$2"
+      shift 2
+      ;;
+    --client-id)
+      CLIENT_ID="$2"
+      shift 2
+      ;;
+    --no-ui)
+      LAUNCH_UI=false
+      shift
+      ;;
+    --non-interactive)
+      INTERACTIVE=false
+      shift
+      ;;
+    --help)
+      show_usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Try 'tekton-launch --help' for more information."
+      exit 1
+      ;;
+  esac
+done
+
+# Display banner
+tekton_info "====== Tekton Orchestration System ======"
+tekton_info "Tekton installation: $TEKTON_DIR"
+echo ""
+
+# Create necessary directories
+mkdir -p "$HOME/.tekton/data"
+mkdir -p "$HOME/.tekton/logs"
+tekton_success "Ensured data directories exist in $HOME/.tekton"
+
+# Check if we're launching Hermes after parsing all arguments
+check_if_launching_hermes
+
+# Only source the kill script and clean up if we're launching Hermes
+if [ "$LAUNCHING_HERMES" = true ]; then
+    tekton_info "Hermes will be launched - cleaning up existing environment..."
+    
+    # Clean up any existing components and ensure ports are available
+    tekton_info "Ensuring a clean environment before launch..."
+    tekton_ensure_ports_available
+    if [ $? -ne 0 ]; then
+        tekton_warn "Could not free all required ports. Attempting to continue..."
+    fi
+    echo ""
+else
+    tekton_success "Hermes is not being launched - preserving existing environment"
+    tekton_warn "Note: Some ports may already be in use by other Tekton components"
+    echo ""
+fi
+
+# Detect available components
+AVAILABLE_COMPONENTS=($(detect_components))
+
+# If launch-all is specified, set all available components
+if [ "$LAUNCH_ALL" = true ]; then
+    COMPONENTS=("${AVAILABLE_COMPONENTS[@]}")
+    tekton_success "Launch-all option specified. All available components will be launched."
+    
+    # Always ensure hermes is first in the list when launching all
+    if [[ " ${COMPONENTS[*]} " == *" hermes "* ]]; then
+        # Remove hermes from its current position
+        NEW_COMPONENTS=()
+        for comp in "${COMPONENTS[@]}"; do
+            if [ "$comp" != "hermes" ]; then
+                NEW_COMPONENTS+=("$comp")
+            fi
+        done
+        # Add hermes as the first component
+        COMPONENTS=("hermes" "${NEW_COMPONENTS[@]}")
+    fi
+    
+# If no components specified, check if we're in interactive mode
+elif [ ${#COMPONENTS[@]} -eq 0 ]; then
+    if [ "$INTERACTIVE" = true ]; then
+        # Ask user to select components
+        COMPONENTS=($(select_components "${AVAILABLE_COMPONENTS[@]}"))
+    else
+        # Use default components in non-interactive mode
+        COMPONENTS=("${DEFAULT_COMPONENTS[@]}")
+    fi
+fi
+
+# Special case for "all" in components list
+if [[ " ${COMPONENTS[*]} " == *" all "* ]]; then
+    COMPONENTS=("${AVAILABLE_COMPONENTS[@]}")
+    LAUNCH_ALL=true
+    
+    # Always ensure hermes is first in the list when launching all
+    if [[ " ${COMPONENTS[*]} " == *" hermes "* ]]; then
+        # Remove hermes from its current position
+        NEW_COMPONENTS=()
+        for comp in "${COMPONENTS[@]}"; do
+            if [ "$comp" != "hermes" ]; then
+                NEW_COMPONENTS+=("$comp")
+            fi
+        done
+        # Add hermes as the first component
+        COMPONENTS=("hermes" "${NEW_COMPONENTS[@]}")
+    fi
+fi
+
+# If UI is explicitly disabled, remove hephaestus from components
+if [ "$LAUNCH_UI" = false ]; then
+    NEW_COMPONENTS=()
+    for comp in "${COMPONENTS[@]}"; do
+        if [ "$comp" != "hephaestus" ]; then
+            NEW_COMPONENTS+=("$comp")
+        fi
+    done
+    COMPONENTS=("${NEW_COMPONENTS[@]}")
+fi
+
+# If we're launching all components and UI is not explicitly disabled, ensure hephaestus is in the list
+if [ "$LAUNCH_ALL" = true ] && [ "$LAUNCH_UI" = true ]; then
+    if [[ ! " ${COMPONENTS[*]} " == *" hephaestus "* ]]; then
+        COMPONENTS+=("hephaestus")
+    fi
+fi
+
+# Display selected components
+tekton_info "Components to launch:"
+for comp in "${COMPONENTS[@]}"; do
+    tekton_success "• $comp"
+done
+echo ""
+
+# Launch components in the correct dependency order
+# Always launch Hermes first if it's in the components list as it will manage other components
+HERMES_LAUNCHED=false
+OTHER_COMPONENTS=()
+
+# First check if Hermes is in the component list
+for comp in "${COMPONENTS[@]}"; do
+    if [ "$comp" = "hermes" ]; then
+        tekton_info "Launching Hermes first as lifecycle manager..."
+        launch_hermes
+        if [ $? -eq 0 ]; then
+            HERMES_LAUNCHED=true
+            # Give Hermes time to initialize before launching other components
+            tekton_info "Waiting for Hermes to fully initialize..."
+            sleep 5
+        else
+            tekton_warn "Hermes failed to launch. Components may not be properly managed."
+        fi
+    else
+        OTHER_COMPONENTS+=("$comp")
+    fi
+done
+
+# Always ensure LLM Adapter is running, regardless of components requested
+if ! tekton_is_running "llm_adapter" && ! tekton_is_running "rhetor.api.app"; then
+    tekton_info "LLM Adapter not detected - starting it automatically"
+    launch_llm_adapter
+fi
+
+# First: core infrastructure (Engram)
+for comp in "${OTHER_COMPONENTS[@]}"; do
+    if [ "$comp" = "engram" ]; then
+        launch_engram
+    fi
+done
+
+# Second: mid-level components (Ergon, Rhetor, Prometheus, Harmonia)
+for comp in "${OTHER_COMPONENTS[@]}"; do
+    if [ "$comp" = "ergon" ]; then
+        launch_component "ergon" "Ergon Agent System" "$ERGON_DIR" "ergon.api.app" "$ERGON_PORT"
+    elif [ "$comp" = "rhetor" ]; then
+        launch_component "rhetor" "Rhetor LLM Management System" "$RHETOR_DIR" "rhetor.api.app" "$RHETOR_PORT"
+    elif [ "$comp" = "prometheus" ]; then
+        launch_component "prometheus" "Prometheus Planning System" "$PROMETHEUS_DIR" "prometheus.api.app" "$PROMETHEUS_PORT"
+    elif [ "$comp" = "harmonia" ]; then
+        launch_component "harmonia" "Harmonia Workflow System" "$HARMONIA_DIR" "harmonia.api.app" "$HARMONIA_PORT"
+    elif [ "$comp" = "llm_adapter" ]; then
+        launch_llm_adapter
+    fi
+done
+
+# Third: high-level components (Athena, Sophia, Telos, Synthesis, Terma)
+for comp in "${OTHER_COMPONENTS[@]}"; do
+    if [ "$comp" = "athena" ]; then
+        launch_component "athena" "Athena Knowledge Graph" "$ATHENA_DIR" "athena.api.app" "$ATHENA_PORT"
+    elif [ "$comp" = "sophia" ]; then
+        launch_component "sophia" "Sophia Machine Learning System" "$SOPHIA_DIR" "sophia.api.app" "$SOPHIA_PORT"
+    elif [ "$comp" = "telos" ]; then
+        launch_component "telos" "Telos Requirements System" "$TELOS_DIR" "telos.api.app" "$TELOS_PORT"
+    elif [ "$comp" = "synthesis" ]; then
+        launch_component "synthesis" "Synthesis Execution Engine" "$SYNTHESIS_DIR" "synthesis.api.app" "$SYNTHESIS_PORT"
+    elif [ "$comp" = "terma" ]; then
+        launch_component "terma" "Terma Terminal System" "$TERMA_DIR" "terma.api.app" "$TERMA_PORT"
+    fi
+done
+
+# Finally: UI component (Hephaestus)
+# Always ask about Hephaestus, even if not explicitly selected
+if [[ " ${COMPONENTS[*]} " != *" hephaestus "* ]]; then
+    if [ "$INTERACTIVE" = true ]; then
+        if tekton_prompt_yes_no "Launch Hephaestus UI?" "y"; then
+            COMPONENTS+=("hephaestus")
+        fi
+    fi
+fi
+
+# Launch Hephaestus if it's in the component list
+for comp in "${COMPONENTS[@]}"; do
+    if [ "$comp" = "hephaestus" ]; then
+        launch_hephaestus
+    fi
+done
+
+# Ask the user if they want to launch an AI model
+if [ "$INTERACTIVE" = true ]; then
+    if tekton_prompt_yes_no "Would you like to launch an AI model?" "y"; then
+        # Ask about model type
+        # Store model type in a clean variable to prevent interpretation issues
+        model_type_response=$(tekton_prompt_with_default "Which AI model type would you like to use?" "$MODEL_TYPE" "claude, ollama")
+        MODEL_TYPE=$(echo "$model_type_response" | tr -d '[:space:]')
+        
+        # Ask about specific model
+        case "$MODEL_TYPE" in
+            "claude")
+                MODEL=$(tekton_prompt_with_default "Which Claude model would you like to use?" "$MODEL" "claude-3-sonnet-20240229, claude-3-opus-20240229, claude-3-5-sonnet")
+                ;;
+            "ollama")
+                # Try to list available Ollama models
+                if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+                    MODELS=$(curl -s http://localhost:11434/api/tags | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    models = data.get('models', [])
+    print(', '.join([model.get('name') for model in models]))
+except:
+    print('llama3, mistral, gemma')
+")
+                    MODEL=$(tekton_prompt_with_default "Which Ollama model would you like to use?" "llama3" "$MODELS")
+                else
+                    tekton_warn "Ollama doesn't appear to be running. Please start it first."
+                    MODEL=$(tekton_prompt_with_default "Which Ollama model would you like to use?" "llama3" "llama3, mistral, gemma")
+                fi
+                ;;
+            *)
+                tekton_warn "Unknown model type: '$MODEL_TYPE'"
+                tekton_warn "Defaulting to Claude"
+                MODEL_TYPE="claude"
+                MODEL="claude-3-sonnet-20240229"
+                ;;
+        esac
+        
+        # Launch the selected AI model
+        launch_ai_model
+    fi
+fi
+
+echo ""
+tekton_success "Tekton components launched successfully!"
+
+if [[ " ${COMPONENTS[*]} " == *" hephaestus "* ]]; then
+    tekton_success "Tekton UI is available at: http://localhost:$HEPHAESTUS_PORT"
+fi
+
+tekton_info "To stop all Tekton components, run: ./scripts/tekton-kill"

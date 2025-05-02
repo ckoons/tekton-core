@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# tekton-kill - Master script to stop all Tekton components and AI services
+# Created: April 11, 2025
+# Updated: May 1, 2025 - Refactored to use shared utility libraries
+
+# Find Tekton root directory and script directories
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+fi
+
+# Load shared libraries
+LIB_DIR="${SCRIPT_DIR}/lib"
+source "${LIB_DIR}/tekton-utils.sh"
+source "${LIB_DIR}/tekton-ports.sh"
+source "${LIB_DIR}/tekton-process.sh"
+source "${LIB_DIR}/tekton-config.sh"
+
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
+
+# Main kill process
+# Only execute this part if script is run directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    # Display information
+    tekton_info "====== Tekton Shutdown ======"
+    tekton_info "Tekton installation: ${TEKTON_COLOR_YELLOW}$TEKTON_DIR${TEKTON_COLOR_RESET}"
+    echo ""
+    
+    # First attempt to use Hermes for graceful shutdown if running
+    HERMES_SHUTDOWN_USED=false
+    if tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.*database_manager"; then
+        # Attempt graceful shutdown via Hermes
+        if tekton_shutdown_via_hermes; then
+            HERMES_SHUTDOWN_USED=true
+        fi
+    fi
+    
+    # Kill Claude AI processes
+    tekton_kill_processes "claude" "Claude AI"
+    
+    # Kill Ollama processes that might have been launched by Tekton
+    tekton_kill_processes "ollama_bridge.py" "Ollama bridge"
+    
+    # If Hermes didn't handle shutdown, kill components directly in reverse dependency order
+    if [ "$HERMES_SHUTDOWN_USED" = false ]; then
+        tekton_info "Direct process termination..."
+        
+        # Kill Tekton components in reverse dependency order
+        tekton_kill_processes "sophia.core" "Sophia (ML Engine)"
+        tekton_kill_processes "athena.core" "Athena (Knowledge Graph)"
+        tekton_kill_processes "prometheus.core" "Prometheus (Planning)"
+        tekton_kill_processes "harmonia.core" "Harmonia (Workflow)"
+        tekton_kill_processes "telos.core" "Telos (User Interface)"
+        
+        # Kill Rhetor processes with comprehensive pattern matching
+        tekton_kill_processes "rhetor.api.app" "Rhetor LLM Manager"
+        tekton_kill_processes "rhetor.core" "Rhetor Communication Engine"
+        
+        # Standard process check for Terma
+        tekton_kill_processes "terma.api.app" "Terma Terminal System"
+        tekton_kill_processes "terma.api.ui_server" "Terma UI Server"
+        tekton_kill_processes "llm_adapter" "LLM Adapter"
+        tekton_kill_processes "ergon.core" "Ergon (Agent System)"
+        tekton_kill_processes "engram_with_ollama" "Engram+Ollama"
+        tekton_kill_processes "engram_with_claude" "Engram+Claude"
+        tekton_kill_processes "engram.api.consolidated_server" "Engram Memory Server"
+    fi
+    
+    # Always kill Hermes last (even if it handled other component shutdowns)
+    if tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes.*database_manager" || tekton_is_running "hermes.*database_mcp_server" || tekton_is_running "hermes.*service_discovery"; then
+        tekton_info "Shutting down Hermes services..."
+        tekton_kill_processes "hermes/api/app.py" "Hermes API Server"
+        tekton_kill_processes "hermes.*database.manager" "Hermes Database Manager" 
+        tekton_kill_processes "hermes.*database_manager" "Hermes Database Manager" 
+        tekton_kill_processes "hermes.*database_mcp_server" "Hermes Database MCP Server"
+        tekton_kill_processes "hermes/core/database" "Hermes Database Core"
+        tekton_kill_processes "hermes.*service_discovery" "Hermes Service Registry"
+    fi
+    
+    # Kill Hephaestus UI by process name
+    tekton_kill_processes "Hephaestus/ui/server/server.py" "Hephaestus UI"
+    
+    # Release all ports used by Tekton components
+    tekton_ensure_ports_available
+    
+    # Kill any Python processes related to Tekton
+    tekton_info "Checking for any remaining Tekton Python processes..."
+    if pgrep -f "$TEKTON_DIR.*python" >/dev/null; then
+        tekton_warn "Killing remaining Python processes in Tekton directory..."
+        pkill -f "$TEKTON_DIR.*python"
+        sleep 1
+        if pgrep -f "$TEKTON_DIR.*python" >/dev/null; then
+            tekton_warn "Some Python processes could not be killed. You may want to check them manually:"
+            ps aux | grep "$TEKTON_DIR.*python" | grep -v grep
+        else
+            tekton_success "All remaining Python processes killed"
+        fi
+    else
+        tekton_success "No remaining Tekton Python processes found"
+    fi
+    
+    # Force kill any remaining Hermes processes (more aggressive pattern matching)
+    HERMES_PATTERNS=("hermes" "database.manager" "database_manager" "database_mcp_server" "service_discovery")
+    
+    for pattern in "${HERMES_PATTERNS[@]}"; do
+        if pgrep -f "$pattern" >/dev/null; then
+            tekton_warn "Force killing remaining processes matching: $pattern..."
+            pkill -9 -f "$pattern"
+            sleep 1
+        fi
+    done
+    
+    # Final Hermes check
+    if pgrep -f "hermes" >/dev/null; then
+        tekton_warn "Some Hermes processes could not be killed. You may want to check them manually:"
+        ps aux | grep "hermes" | grep -v grep
+    else
+        tekton_success "All Hermes processes successfully terminated"
+    fi
+    
+    # Final sweep for any remaining Tekton component processes
+    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis hephaestus llm_adapter; do
+        if pgrep -f "$component" >/dev/null; then
+            tekton_warn "Killing remaining $component processes..."
+            pkill -9 -f "$component"
+        fi
+    done
+    
+    # Kill any Node.js processes related to Hephaestus UI if running
+    if pgrep -f "node.*$TEKTON_DIR/Hephaestus" >/dev/null; then
+        tekton_warn "Killing Hephaestus UI Node.js processes..."
+        pkill -f "node.*$TEKTON_DIR/Hephaestus"
+        sleep 1
+        if ! pgrep -f "node.*$TEKTON_DIR/Hephaestus" >/dev/null; then
+            tekton_success "Successfully killed Hephaestus UI Node.js processes"
+        else
+            tekton_warn "Failed to kill some Hephaestus UI Node.js processes"
+        fi
+    fi
+    
+    echo ""
+    tekton_success "Tekton shutdown complete."
+fi
