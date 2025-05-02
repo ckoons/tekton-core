@@ -29,6 +29,11 @@ pip install -e .
 - Retry logic for reliability
 - Token counting and optimization utilities
 - JavaScript client for frontend components
+- **New in v0.2.0:**
+  - Shared prompt templates with Jinja2 templating
+  - Response handlers for JSON and structured outputs
+  - Advanced streaming response processing
+  - Configuration utilities for settings management
 
 ## Usage
 
@@ -282,6 +287,163 @@ The client uses these environment variables if set:
 - `RHETOR_AUTH_TOKEN`: Authentication token for Rhetor API
 - `RHETOR_TIMEOUT`: Default timeout in seconds (default: `30`)
 - `RHETOR_MAX_RETRIES`: Default number of retries (default: `3`)
+
+## New Features (v0.2.0)
+
+### Prompt Templates
+
+The new prompt template system provides a standardized way to manage and render prompt templates with variable substitution:
+
+```python
+import asyncio
+from tekton_llm_client import TektonLLMClient, PromptTemplateRegistry
+
+async def template_example():
+    # Create a template registry
+    registry = PromptTemplateRegistry()
+    
+    # Register a custom template
+    registry.register({
+        "name": "code_review",
+        "template": "Review this {{ language }} code:\n\n```{{ language }}\n{{ code }}\n```\n\nFocus on {{ focus_area }}.",
+        "description": "Template for code review tasks."
+    })
+    
+    # Create a client
+    client = TektonLLMClient(component_id="my-component")
+    await client.initialize()
+    
+    # Render the template
+    code = "function add(a, b) { return a + b; }"
+    prompt = registry.render(
+        "code_review",
+        language="javascript",
+        code=code,
+        focus_area="best practices"
+    )
+    
+    # Use the rendered prompt
+    response = await client.generate_text(prompt=prompt)
+    print(f"Response: {response.content}")
+    
+    await client.shutdown()
+
+asyncio.run(template_example())
+```
+
+The system includes:
+- Template registry for managing common templates
+- Jinja2-based variable substitution
+- Template loading from files or embedded resources
+- Default templates for common tasks
+
+### Response Handlers
+
+New response handlers help process and parse LLM outputs in various formats:
+
+```python
+import asyncio
+from tekton_llm_client import (
+    TektonLLMClient, parse_json, 
+    StructuredOutputParser, OutputFormat
+)
+
+async def response_handler_example():
+    client = TektonLLMClient(component_id="my-component")
+    await client.initialize()
+    
+    # Get JSON response
+    system_prompt = "You are a JSON-only assistant. Always respond with valid JSON."
+    prompt = "List the top 3 programming languages with a 'name' and 'type' field."
+    
+    response = await client.generate_text(
+        prompt=prompt,
+        system_prompt=system_prompt
+    )
+    
+    # Parse JSON response
+    try:
+        data = parse_json(response.content)
+        print("Languages:")
+        for lang in data.get("languages", []):
+            print(f"- {lang['name']} ({lang['type']})")
+    except Exception as e:
+        print(f"Error parsing JSON: {e}")
+    
+    # Parse structured lists
+    list_prompt = "List 5 tips for writing clean code."
+    list_response = await client.generate_text(list_prompt)
+    
+    parser = StructuredOutputParser(format=OutputFormat.LIST)
+    tips = parser.parse(list_response.content)
+    
+    print("\nCoding tips:")
+    for i, tip in enumerate(tips, 1):
+        print(f"{i}. {tip}")
+    
+    await client.shutdown()
+
+asyncio.run(response_handler_example())
+```
+
+Features include:
+- JSON parsing with robust error handling
+- Structured output parsing for lists, key-value pairs, and more
+- Advanced streaming response processing
+- Validation with Pydantic models
+
+### Configuration Utilities
+
+Configuration utilities help manage settings from environment variables and files:
+
+```python
+import asyncio
+from tekton_llm_client import (
+    TektonLLMClient, ClientSettings, LLMSettings,
+    load_settings, save_settings
+)
+
+async def config_example():
+    # Create default settings
+    settings = ClientSettings(
+        component_id="my-component",
+        llm=LLMSettings(
+            provider="anthropic",
+            model="claude-3-haiku-20240307",
+            temperature=0.7
+        )
+    )
+    
+    # Save settings to file
+    save_settings(settings, "/tmp/llm_settings.json")
+    
+    # Load settings from file (and environment variables)
+    loaded_settings = load_settings(
+        component_id="my-component",
+        file_path="/tmp/llm_settings.json",
+        load_from_env=True
+    )
+    
+    # Create client using settings
+    client = TektonLLMClient(
+        component_id=loaded_settings.component_id,
+        provider_id=loaded_settings.llm.provider,
+        model_id=loaded_settings.llm.model,
+        temperature=loaded_settings.llm.temperature
+    )
+    
+    await client.initialize()
+    # Use client...
+    await client.shutdown()
+
+asyncio.run(config_example())
+```
+
+Features include:
+- Environment variable management
+- Settings loading from files
+- Pydantic models for settings validation
+- Default values and overrides
 
 ## License
 

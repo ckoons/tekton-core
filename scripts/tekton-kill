@@ -1,7 +1,7 @@
 #!/bin/bash
 # tekton-kill - Master script to stop all Tekton components and AI services
 # Created: April 11, 2025
-# Updated: April 19, 2025 - Enhanced Hermes database process detection and termination
+# Updated: May 2, 2025 - Enhanced path detection for running from symlinks
 
 # ============================
 # Single Port Architecture by Component (Logical Sequence)
@@ -18,6 +18,19 @@
 # Prometheus:           8006   (Planning system - HTTP, Events)
 # Harmonia:             8007   (Workflow system - HTTP, Events)
 # Telos:                8008   (Requirements system - HTTP, Events)
+
+# Find Tekton root directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
 # Synthesis:            8009   (Execution engine - HTTP, WebSocket, Events)
 # Tekton Core:          8010   (Core orchestration - HTTP, Events)
 #
