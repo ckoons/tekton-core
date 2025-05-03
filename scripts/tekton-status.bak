@@ -1,5 +1,5 @@
 #!/bin/bash
-# tekton_status - Script to show the status of Tekton components
+# tekton-status - Script to show the status of Tekton components
 # Created: April 1, 2025
 # Updated: April 19, 2025 - Enhanced port status reporting
 
@@ -10,6 +10,19 @@ YELLOW="\033[93m"
 RED="\033[91m"
 BOLD="\033[1m"
 RESET="\033[0m"
+
+# Find Tekton root directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+    # Script is running from a symlink in utils
+    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+else
+    # Script is running from Tekton/scripts
+    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+fi
+
+# Ensure we're in the correct directory context
+cd "$TEKTON_DIR"
 
 # Function to check if a process is running
 is_running() {
@@ -33,31 +46,30 @@ get_port_process() {
         echo "$pid"$'\t'"$process"
     else
         echo ""
-    fi$'\t'"$process"
-    else
-        echo ""
     fi
 }
 
-# Find Tekton root directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
-    # Script is running from a symlink in utils
-    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
-else
-    # Script is running from Tekton/scripts
-    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-fi
+# Export standardized ports as environment variables for all components
+# All components should reference these variables, not hardcoded port numbers
+export HEPHAESTUS_PORT=8080  # UI uses standard web port
+export ENGRAM_PORT=8000
+export HERMES_PORT=8001
+export ERGON_PORT=8002
+export RHETOR_PORT=8003
+export TERMA_PORT=8004
+export ATHENA_PORT=8005
+export PROMETHEUS_PORT=8006
+export HARMONIA_PORT=8007
+export TELOS_PORT=8008
+export SYNTHESIS_PORT=8009
+export TEKTON_CORE_PORT=8010
 
-# Ensure we're in the correct directory context
-cd "$TEKTON_DIR"
-
-# Header
+# Display banner
 echo -e "${BLUE}${BOLD}=== Tekton System Status ===${RESET}"
 echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
+echo ""
 
 # Check for Hermes lifecycle management mode
-echo ""
 echo -e "${BLUE}${BOLD}Lifecycle Management Status:${RESET}"
 if is_running "hermes.*database.manager" || is_running "hermes/api/app.py" || is_running "hermes.*service_discovery"; then
     echo -e "${GREEN}✓ Hermes is running and may be managing component lifecycle${RESET}"
@@ -68,102 +80,63 @@ if is_running "hermes.*database.manager" || is_running "hermes/api/app.py" || is
         COMPONENTS_RUNNING="$COMPONENTS_RUNNING Database Manager"
     fi
     if is_running "hermes/api/app.py"; then
+        if [ -n "$COMPONENTS_RUNNING" ]; then
+            COMPONENTS_RUNNING="$COMPONENTS_RUNNING,"
+        fi
         COMPONENTS_RUNNING="$COMPONENTS_RUNNING API Server"
     fi
     if is_running "hermes.*service_discovery"; then
-        COMPONENTS_RUNNING="$COMPONENTS_RUNNING Service Registry"
+        if [ -n "$COMPONENTS_RUNNING" ]; then
+            COMPONENTS_RUNNING="$COMPONENTS_RUNNING,"
+        fi
+        COMPONENTS_RUNNING="$COMPONENTS_RUNNING Service Discovery"
     fi
-    echo -e "${GREEN}✓ Running Hermes components:${RESET} $COMPONENTS_RUNNING"
     
-    # Check if Hermes API is responding and if it's in lifecycle management mode
-    if curl -s "http://localhost:8100/api/health" > /dev/null 2>&1; then
-        # Try to get the lifecycle management status
-        LIFECYCLE_STATUS=$(curl -s "http://localhost:8100/api/lifecycle/status" 2>/dev/null)
-        if [[ "$LIFECYCLE_STATUS" == *"enabled"* ]]; then
+    if [ -n "$COMPONENTS_RUNNING" ]; then
+        echo -e "${GREEN}✓ Running Hermes components:${RESET}  $COMPONENTS_RUNNING"
+    fi
+    
+    # Check if lifecycle management is enabled by querying the API
+    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8100/api/lifecycle/status" | grep -q "200"; then
+        LIFECYCLE_STATUS=$(curl -s "http://localhost:8100/api/lifecycle/status" | grep -o '"enabled":[^,}]*' | cut -d ":" -f2)
+        if [[ "$LIFECYCLE_STATUS" == *"true"* ]]; then
             echo -e "${GREEN}✓ Hermes lifecycle management is ENABLED${RESET}"
-            if [[ "$LIFECYCLE_STATUS" == *"auto_launch"* ]]; then
-                echo -e "${GREEN}✓ Hermes auto-launch is ENABLED${RESET}"
-            else
-                echo -e "${YELLOW}⚠ Hermes auto-launch is DISABLED${RESET}"
-            fi
         else
             echo -e "${YELLOW}⚠ Hermes is running but lifecycle management is DISABLED${RESET}"
         fi
     else
-        echo -e "${YELLOW}⚠ Hermes API is not responding at http://localhost:8100${RESET}"
+        echo -e "${YELLOW}⚠ Hermes is running but lifecycle management is DISABLED${RESET}"
     fi
 else
-    echo -e "${RED}✗ Hermes is not running - no lifecycle management available${RESET}"
-    echo -e "${YELLOW}⚠ Components will need to be launched and managed individually${RESET}"
+    echo -e "${RED}✗ Hermes is not running${RESET}"
+    echo -e "${YELLOW}  Component lifecycle management is unavailable${RESET}"
 fi
+
 echo ""
-
-# Check Hermes service registry if available
-HERMES_DIR="$TEKTON_DIR/Hermes"
-if [ -d "$HERMES_DIR" ]; then
-    echo -e "${BLUE}${BOLD}Hermes Service Registry:${RESET}"
+echo -e "${BLUE}${BOLD}Hermes Service Registry:${RESET}"
+if curl -s "http://localhost:8100/api/registry/services" > /dev/null 2>&1; then
+    echo -e "${GREEN}Hermes service registry is accessible${RESET}"
     
-    # Check if we can import the registry module
-    if python3 -c "import sys; sys.path.insert(0, '$HERMES_DIR'); 
-                  try:
-                      from hermes.core.service_discovery import ServiceRegistry
-                      print('${GREEN}Hermes service discovery module found${RESET}')
-                      exit(0)
-                  except ImportError as e:
-                      print(f'${YELLOW}Cannot import Hermes service discovery module: {e}${RESET}')
-                      exit(1)" >/dev/null 2>&1; then
-        
-        # Try to fetch all registered services
-        python3 -c "
-import sys, asyncio, json
-sys.path.insert(0, '$HERMES_DIR')
-
-async def get_services():
-    try:
-        from hermes.core.service_discovery import ServiceRegistry
-        registry = ServiceRegistry()
-        await registry.start()
-        
-        services = await registry.get_all_services()
-        if services:
-            print('${GREEN}${BOLD}Registered Services:${RESET}')
-            for service_id, service_info in services.items():
-                name = service_info.get('name', 'Unknown')
-                version = service_info.get('version', 'Unknown')
-                capabilities = ', '.join(service_info.get('capabilities', []))
-                endpoint = service_info.get('endpoint', 'Unknown')
-                
-                print(f'${YELLOW}• {name} (ID: {service_id})${RESET}')
-                print(f'  Version: {version}')
-                print(f'  Endpoint: {endpoint}')
-                print(f'  Capabilities: {capabilities}')
-                
-                if 'metadata' in service_info:
-                    print('  Metadata:')
-                    for key, value in service_info['metadata'].items():
-                        print(f'    {key}: {value}')
-                print()
-        else:
-            print('${YELLOW}No services registered with Hermes${RESET}')
-            
-        await registry.stop()
-    except Exception as e:
-        print(f'${RED}Error communicating with Hermes service registry: {e}${RESET}')
-
-asyncio.run(get_services())
-"
+    # Display registered services
+    REGISTERED_SERVICES=$(curl -s "http://localhost:8100/api/registry/services" | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+    
+    if [ -n "$REGISTERED_SERVICES" ]; then
+        echo -e "${GREEN}Registered services:${RESET}"
+        echo "$REGISTERED_SERVICES" | while read service; do
+            echo -e "  - $service"
+        done
     else
-        echo -e "${RED}Hermes service registry not accessible${RESET}"
+        echo -e "${YELLOW}No services currently registered${RESET}"
     fi
 else
-    echo -e "${YELLOW}Hermes not installed or not found at $HERMES_DIR${RESET}"
+    echo -e "${RED}Hermes service registry not accessible${RESET}"
 fi
 
 echo ""
 echo -e "${BLUE}${BOLD}Tekton Component Status:${RESET}"
 
-# Check core component processes
-components=(
+# List of components and their process patterns
+COMPONENTS=(
     "engram.api.consolidated_server:Engram Memory Service"
     "engram_with_claude:Engram with Claude"
     "engram_with_ollama:Engram with Ollama"
@@ -172,37 +145,87 @@ components=(
     "hermes/api/app.py:Hermes API Server"
     "hermes.*service_discovery:Hermes Service Registry"
     "prometheus.core:Prometheus Planning Engine"
+    "rhetor.api.app:Rhetor LLM Manager"
     "rhetor.core:Rhetor Communication Engine"
     "telos.core:Telos User Interface"
     "harmonia.core:Harmonia Workflow Engine"
     "athena.core:Athena Knowledge Graph"
+    "llm_adapter:LLM Adapter"
     "Hephaestus/ui/server/server.py:Hephaestus UI Server"
+    "terma.api.app:Terma API Server ($TERMA_API_PORT)"
+    "terma.api.ui_server:Terma WebSocket Server ($TERMA_WS_PORT)"
 )
 
-any_component_running=false
-
-for comp in "${components[@]}"; do
-    pattern=$(echo "$comp" | cut -d: -f1)
-    name=$(echo "$comp" | cut -d: -f2)
+# Check each component
+for component in "${COMPONENTS[@]}"; do
+    pattern=$(echo "$component" | cut -d ":" -f1)
+    name=$(echo "$component" | cut -d ":" -f2)
     
-    if is_running "$pattern"; then
+    # Special case for Terma components - check by port using environment variables
+    if [[ "$name" == "Terma API Server" ]]; then
+        if is_port_used $TERMA_API_PORT; then
+            echo -e "${GREEN}✓ $name is running on port $TERMA_API_PORT${RESET}"
+            pid=$(lsof -ti :$TERMA_API_PORT 2>/dev/null)
+            echo "  PID: $pid"
+        else
+            echo -e "${RED}✗ $name is not running (port $TERMA_API_PORT)${RESET}"
+        fi
+    elif [[ "$name" == "Terma UI Server" ]]; then
+        if is_port_used $TERMA_WS_PORT; then
+            echo -e "${GREEN}✓ $name is running on port $TERMA_WS_PORT${RESET}"
+            pid=$(lsof -ti :$TERMA_WS_PORT 2>/dev/null)
+            echo "  PID: $pid"
+        else
+            echo -e "${RED}✗ $name is not running (port $TERMA_WS_PORT)${RESET}"
+        fi
+    # Normal process check for all other components
+    elif is_running "$pattern"; then
         echo -e "${GREEN}✓ $name is running${RESET}"
-        pids=$(pgrep -f "$pattern")
-        echo -e "  PIDs: $pids"
-        any_component_running=true
+        # Get PIDs
+        PIDS=$(pgrep -f "$pattern")
+        echo "  PIDs: $PIDS"
     else
         echo -e "${RED}✗ $name is not running${RESET}"
     fi
 done
 
-if [ "$any_component_running" = false ]; then
-    echo -e "${YELLOW}${BOLD}No Tekton components are currently running${RESET}"
-fi
+echo ""
+echo -e "${BLUE}${BOLD}Port Status:${RESET}"
+
+# Check component ports using environment variables
+declare -a PORT_INFO=(
+    "$TEKTON_CORE_PORT:Tekton Core"
+    "$HEPHAESTUS_PORT:Hephaestus"
+    "$ENGRAM_PORT:Engram Memory"
+    "$HERMES_PORT:Hermes"
+    "$ERGON_PORT:Ergon Agent System"
+    "$RHETOR_PORT:Rhetor LLM Management"
+    "$TERMA_PORT:Terma Terminal"
+    "$ATHENA_PORT:Athena Knowledge Graph"
+    "$PROMETHEUS_PORT:Prometheus Planning"
+    "$HARMONIA_PORT:Harmonia Workflow"
+    "$TELOS_PORT:Telos Requirements"
+    "$SYNTHESIS_PORT:Synthesis Engine"
+)
+
+# Check each port
+for port_item in "${PORT_INFO[@]}"; do
+    port="${port_item%%:*}"
+    description="${port_item#*:}"
+    
+    if is_port_used "$port"; then
+        process_info=$(get_port_process "$port")
+        pid=$(echo "$process_info" | cut -f1)
+        process=$(echo "$process_info" | cut -f2-)
+        echo -e "${YELLOW}Port $port ($description): In use by PID $pid${RESET}"
+        echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
+    else
+        echo -e "${GREEN}Port $port ($description): Available${RESET}"
+    fi
+done
 
 echo ""
 echo -e "${BLUE}${BOLD}UI Services:${RESET}"
-
-# Check if Hephaestus UI is running
 if is_running "Hephaestus/ui/server/server.py"; then
     echo -e "${GREEN}✓ Hephaestus UI is running${RESET}"
     echo -e "  Access the UI at: http://localhost:8080"
@@ -212,26 +235,13 @@ fi
 
 echo ""
 echo -e "${BLUE}${BOLD}Database Services:${RESET}"
-
-# Check for vector database services
-if is_running "faiss"; then
+if is_running ".*faiss_adapter.*"; then
     echo -e "${GREEN}✓ FAISS vector database is running${RESET}"
-elif is_running "lancedb"; then
-    echo -e "${GREEN}✓ LanceDB vector database is running${RESET}"
 else
     echo -e "${YELLOW}No vector database service detected${RESET}"
 fi
 
-# Check for Neo4j if installed
-if command -v neo4j >/dev/null 2>&1; then
-    if neo4j status >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ Neo4j graph database is running${RESET}"
-    else
-        echo -e "${RED}✗ Neo4j graph database is not running${RESET}"
-    fi
-fi
-
-# Check if Redis is running
+# Check for Redis (common key-value store)
 if command -v redis-cli >/dev/null 2>&1; then
     if redis-cli ping >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Redis key-value store is running${RESET}"
@@ -241,169 +251,98 @@ if command -v redis-cli >/dev/null 2>&1; then
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}Port Status:${RESET}"
-# Hephaestus UI ports
-if is_port_used 8080; then
-    process_info=$(get_port_process 8080)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8080 (Hephaestus HTTP): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8080 (Hephaestus HTTP): Available${RESET}"
-fi
-
-if is_port_used 8081; then
-    process_info=$(get_port_process 8081)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8081 (Hephaestus WebSocket): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8081 (Hephaestus WebSocket): Available${RESET}"
-fi
-
-# Engram port
-if is_port_used 8000; then
-    process_info=$(get_port_process 8000)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8000 (Engram Memory): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8000 (Engram Memory): Available${RESET}"
-fi
-
-# Hermes ports
-if is_port_used 8100; then
-    process_info=$(get_port_process 8100)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8100 (Hermes Service Registry): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8100 (Hermes Service Registry): Available${RESET}"
-fi
-
-if is_port_used 8101; then
-    process_info=$(get_port_process 8101)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8101 (Hermes Database): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8101 (Hermes Database): Available${RESET}"
-fi
-
-# Ergon port
-if is_port_used 8200; then
-    process_info=$(get_port_process 8200)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 8200 (Ergon Agent System): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 8200 (Ergon Agent System): Available${RESET}"
-fi
-
-# Synthesis port
-if is_port_used 5005; then
-    process_info=$(get_port_process 5005)
-    pid=$(echo "$process_info" | cut -f1)
-    process=$(echo "$process_info" | cut -f2-)
-    echo -e "${YELLOW}Port 5005 (Synthesis Engine): In use by PID $pid${RESET}"
-    echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-else
-    echo -e "${GREEN}Port 5005 (Synthesis Engine): Available${RESET}"
-fi
-
-echo ""
 echo -e "${BLUE}${BOLD}LLM Availability:${RESET}"
 
 # Check Ollama status
 if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
     echo -e "${GREEN}✓ Ollama is running${RESET}"
     
-    # Get available models
-    models=$(curl -s http://localhost:11434/api/tags | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    models = data.get('models', [])
-    print('  Available models:')
-    for model in models:
-        print(f'    - {model.get(\"name\")}')
-except Exception as e:
-    print(f'  Error parsing models: {e}')
-")
-    echo -e "$models"
+    # Try to list available models
+    MODELS=$(curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"' | cut -d ":" -f2 | tr -d '"' | sort)
+    if [ -n "$MODELS" ]; then
+        echo -e "  Available models:"
+        echo "$MODELS" | while read model; do
+            echo -e "    - $model"
+        done
+    fi
 else
     echo -e "${RED}✗ Ollama is not running${RESET}"
 fi
 
 # Check for Claude API
-if [ -n "$ANTHROPIC_API_KEY" ]; then
+if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.anthropic-access-tokens ]; then
     echo -e "${GREEN}✓ Claude API is configured${RESET}"
 else
-    echo -e "${YELLOW}⚠ Claude API key not set (ANTHROPIC_API_KEY)${RESET}"
+    echo -e "${RED}✗ Claude API is not configured${RESET}"
 fi
 
 # Check for OpenAI API
 if [ -n "$OPENAI_API_KEY" ]; then
     echo -e "${GREEN}✓ OpenAI API is configured${RESET}"
 else
-    echo -e "${YELLOW}⚠ OpenAI API key not set (OPENAI_API_KEY)${RESET}"
+    echo -e "${RED}✗ OpenAI API is not configured${RESET}"
 fi
 
 echo ""
 echo -e "${BLUE}${BOLD}System Resources:${RESET}"
-echo -e "${YELLOW}Memory Usage:${RESET}"
-# Check if we're on macOS or Linux and use appropriate command
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS - use a simpler approach with vm_stat
-    page_size=$(vm_stat | grep "page size" | awk '{print $8}')
-    if [ -z "$page_size" ]; then
-        page_size=4096  # Default page size if not found
-    fi
+
+# Show memory usage
+if command -v free >/dev/null 2>&1; then
+    # Linux
+    MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}')
+    MEM_USED=$(free -h | awk '/^Mem:/ {print $3}')
+    MEM_PERCENT=$(free | awk '/^Mem:/ {printf("%.1f%%", $3/$2 * 100)}')
+    echo -e "${YELLOW}Memory Usage:${RESET}"
+    echo -e "  ${MEM_USED} used / ${MEM_TOTAL} total (${MEM_PERCENT})"
+elif command -v vm_stat >/dev/null 2>&1; then
+    # macOS
+    MEM_TOTAL=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+    PAGE_SIZE=$(vm_stat | grep "page size" | awk '{print $8}')
+    PAGES_FREE=$(vm_stat | grep "Pages free" | awk '{print $3}' | tr -d '.')
+    PAGES_ACTIVE=$(vm_stat | grep "Pages active" | awk '{print $3}' | tr -d '.')
+    PAGES_INACTIVE=$(vm_stat | grep "Pages inactive" | awk '{print $3}' | tr -d '.')
+    PAGES_SPECULATIVE=$(vm_stat | grep "Pages speculative" | awk '{print $3}' | tr -d '.')
+    PAGES_WIRED=$(vm_stat | grep "Pages wired down" | awk '{print $4}' | tr -d '.')
     
-    # Get total physical memory
-    total_mem=$(sysctl -n hw.memsize | awk -v ps="$page_size" '{printf "%.1f", $1/1024/1024/1024}')
+    MEM_USED=$(( (PAGES_ACTIVE + PAGES_WIRED) * PAGE_SIZE / 1024 / 1024 / 1024 ))
+    MEM_PERCENT=$(( MEM_USED * 100 / MEM_TOTAL ))
     
-    # Calculate used memory from vm_stat output
-    vm_stat_output=$(vm_stat)
-    wired_pages=$(echo "$vm_stat_output" | grep "Pages wired down" | awk '{print $4}' | tr -d '.')
-    active_pages=$(echo "$vm_stat_output" | grep "Pages active" | awk '{print $3}' | tr -d '.')
-    used_mem=$(echo "$wired_pages $active_pages $page_size" | awk '{printf "%.1f", ($1+$2)*$3/1024/1024/1024}')
-    
-    # Calculate percentage
-    percent=$(echo "$used_mem $total_mem" | awk '{printf "%.1f", ($1/$2)*100}')
-    
-    echo "  ${used_mem}Gi used / ${total_mem}Gi total (${percent}%)"
-else
-    # Linux - use free
-    if command -v free &> /dev/null; then
-        free -h | grep -v total | awk '{print "  " $1 ": " $3 " used / " $2 " total (" $3/$2*100 "%)"}' | column -t
+    echo -e "${YELLOW}Memory Usage:${RESET}"
+    echo -e "  ${MEM_USED}Gi used / ${MEM_TOTAL}.0Gi total (${MEM_PERCENT}.${MEM_PERCENT}%)"
+fi
+
+# Show CPU usage
+if command -v top >/dev/null 2>&1; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # macOS
+        CPU_USAGE=$(top -l 1 -n 0 | grep "CPU usage" | awk '{print $3, $5, $7}')
+        echo -e "${YELLOW}CPU Usage:${RESET}"
+        echo -e "  $CPU_USAGE"
     else
-        echo "  Memory usage information not available"
+        # Linux
+        CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')
+        echo -e "${YELLOW}CPU Usage:${RESET}"
+        echo -e "  $CPU_USAGE"
     fi
 fi
 
-echo -e "${YELLOW}CPU Usage:${RESET}"
-# Check if we're on macOS or Linux and use appropriate command
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS - use top in a different way
-    top -l 1 -n 0 | grep "CPU usage" | awk '{print "  " $3 " user, " $5 " sys, " $7 " idle"}'
-else
-    # Linux - use top with batch mode
-    if command -v top &> /dev/null; then
-        top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/  \1% idle/" | awk '{print "  " 100-$1 "% used"}'
+# Show disk usage
+if command -v df >/dev/null 2>&1; then
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # macOS
+        DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
+        DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
+        DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}')
     else
-        echo "  CPU usage information not available"
+        # Linux
+        DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
+        DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
+        DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}')
     fi
+    
+    echo -e "${YELLOW}Disk Usage:${RESET}"
+    echo -e "  ${DISK_USED} used / ${DISK_TOTAL} total (${DISK_PERCENT} used)"
 fi
-
-echo -e "${YELLOW}Disk Usage:${RESET}"
-df -h / | grep -v Filesystem | awk '{print "  " $3 " used / " $2 " total (" $5 " used)"}'
 
 echo ""
 echo -e "${BLUE}${BOLD}=== Tekton Status Check Complete ===${RESET}"

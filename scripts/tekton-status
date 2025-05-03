@@ -1,91 +1,117 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # tekton-status - Script to show the status of Tekton components
 # Created: April 1, 2025
-# Updated: April 19, 2025 - Enhanced port status reporting
+# Updated: May 1, 2025 - Refactored to use shared utility libraries
 
-# ANSI color codes for terminal output
-BLUE="\033[94m"
-GREEN="\033[92m"
-YELLOW="\033[93m"
-RED="\033[91m"
-BOLD="\033[1m"
-RESET="\033[0m"
+# Debug mode (set to false for production use)
+DEBUG_PATH=false
 
-# Find Tekton root directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
-    # Script is running from a symlink in utils
-    TEKTON_DIR=$(cd "$SCRIPT_DIR" && cd "$(readlink "${BASH_SOURCE[0]}" | xargs dirname | xargs dirname)" && pwd)
+# Use TEKTON_ROOT if it's set, otherwise find Tekton root directory
+if [[ -n "${TEKTON_ROOT}" ]]; then
+    TEKTON_DIR="${TEKTON_ROOT}"
+    SCRIPT_DIR="${TEKTON_DIR}/scripts"
+    
+    [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Using TEKTON_ROOT: $TEKTON_ROOT" >&2
+    [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Set SCRIPT_DIR to: $SCRIPT_DIR" >&2
 else
-    # Script is running from Tekton/scripts
-    TEKTON_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+    # Determine the script location, handling symlinks
+    [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: BASH_SOURCE[0] = ${BASH_SOURCE[0]}" >&2
+    
+    if [[ -L "${BASH_SOURCE[0]}" ]]; then
+        # This is a symlink, resolve it
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: File is a symlink" >&2
+        
+        SOURCE_LINK=$(readlink "${BASH_SOURCE[0]}")
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Symlink points to: $SOURCE_LINK" >&2
+        
+        if [[ "$SOURCE_LINK" == /* ]]; then
+            # Absolute path
+            REAL_SCRIPT="$SOURCE_LINK"
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Using absolute path: $REAL_SCRIPT" >&2
+        else
+            # Relative path
+            SCRIPT_PARENT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+            REAL_SCRIPT="$SCRIPT_PARENT/$SOURCE_LINK"
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Using relative path:" >&2
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: SCRIPT_PARENT = $SCRIPT_PARENT" >&2
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: REAL_SCRIPT = $REAL_SCRIPT" >&2
+        fi
+        
+        SCRIPT_DIR="$( cd "$( dirname "$REAL_SCRIPT" )" && pwd )"
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: SCRIPT_DIR set to: $SCRIPT_DIR" >&2
+    else
+        # Not a symlink, use the standard path
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: File is not a symlink" >&2
+        SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: SCRIPT_DIR set to: $SCRIPT_DIR" >&2
+    fi
+    
+    # Check if we're in a utils directory
+    if [[ "$SCRIPT_DIR" == *"/utils" ]]; then
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Script running from a utils directory" >&2
+        
+        # Extract the Tekton scripts directory from the resolved symlink path
+        if [[ "$REAL_SCRIPT" == */scripts/* ]]; then
+            # Get the part before /scripts/
+            TEKTON_DIR=$(echo "$REAL_SCRIPT" | sed 's/\/scripts\/.*$//')
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: TEKTON_DIR set to: $TEKTON_DIR (from /scripts/ in path)" >&2
+        else
+            # Fallback - try using the symlink directly to figure out the path
+            [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Path doesn't contain /scripts/" >&2
+            
+            # Get the Tekton root by looking for a scripts dir in the path
+            if [[ "$SOURCE_LINK" == */Tekton/scripts/* ]]; then
+                TEKTON_DIR=$(echo "$SOURCE_LINK" | sed 's/\/scripts\/.*$//')
+                [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: TEKTON_DIR set to: $TEKTON_DIR (from SOURCE_LINK)" >&2
+            else
+                [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Cannot determine Tekton root directory from symlink" >&2
+                echo "ERROR: Cannot determine Tekton root directory from symlink" >&2
+                exit 1
+            fi
+        fi
+    else
+        # Standard case - script is in the Tekton/scripts directory
+        TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+        [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Standard case - TEKTON_DIR is parent of SCRIPT_DIR: $TEKTON_DIR" >&2
+    fi
+    
+    # Set TEKTON_ROOT for consistency
+    export TEKTON_ROOT="${TEKTON_DIR}"
+    [[ "$DEBUG_PATH" == "true" ]] && echo "DEBUG: Set TEKTON_ROOT to: $TEKTON_ROOT" >&2
 fi
+
+# Load shared libraries
+LIB_DIR="${SCRIPT_DIR}/lib"
+source "${LIB_DIR}/tekton-utils.sh"
+source "${LIB_DIR}/tekton-ports.sh"
+source "${LIB_DIR}/tekton-process.sh"
+source "${LIB_DIR}/tekton-config.sh"
 
 # Ensure we're in the correct directory context
 cd "$TEKTON_DIR"
 
-# Function to check if a process is running
-is_running() {
-    pgrep -f "$1" >/dev/null
-    return $?
-}
-
-# Function to check if a port is in use
-is_port_used() {
-    lsof -ti :"$1" >/dev/null 2>&1
-    return $?
-}
-
-# Function to get the process using a specific port
-get_port_process() {
-    local port="$1"
-    local pid=$(lsof -ti :"$port" 2>/dev/null)
-    
-    if [ -n "$pid" ]; then
-        local process=$(ps -p "$pid" -o args= 2>/dev/null)
-        echo "$pid"$'\t'"$process"
-    else
-        echo ""
-    fi
-}
-
-# Export standardized ports as environment variables for all components
-# All components should reference these variables, not hardcoded port numbers
-export HEPHAESTUS_PORT=8080  # UI uses standard web port
-export ENGRAM_PORT=8000
-export HERMES_PORT=8001
-export ERGON_PORT=8002
-export RHETOR_PORT=8003
-export TERMA_PORT=8004
-export ATHENA_PORT=8005
-export PROMETHEUS_PORT=8006
-export HARMONIA_PORT=8007
-export TELOS_PORT=8008
-export SYNTHESIS_PORT=8009
-export TEKTON_CORE_PORT=8010
-
 # Display banner
-echo -e "${BLUE}${BOLD}=== Tekton System Status ===${RESET}"
-echo -e "${BLUE}Tekton installation: ${YELLOW}$TEKTON_DIR${RESET}"
+tekton_info "=== Tekton System Status ==="
+tekton_info "Tekton installation: ${TEKTON_COLOR_YELLOW}$TEKTON_DIR${TEKTON_COLOR_RESET}"
 echo ""
 
 # Check for Hermes lifecycle management mode
-echo -e "${BLUE}${BOLD}Lifecycle Management Status:${RESET}"
-if is_running "hermes.*database.manager" || is_running "hermes/api/app.py" || is_running "hermes.*service_discovery"; then
-    echo -e "${GREEN}✓ Hermes is running and may be managing component lifecycle${RESET}"
+tekton_info "Lifecycle Management Status:"
+if tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.*service_discovery"; then
+    tekton_success "✓ Hermes is running and may be managing component lifecycle"
     
     # Check for specific components
     COMPONENTS_RUNNING=""
-    if is_running "hermes.*database.manager"; then
+    if tekton_is_running "hermes.*database.manager"; then
         COMPONENTS_RUNNING="$COMPONENTS_RUNNING Database Manager"
     fi
-    if is_running "hermes/api/app.py"; then
+    if tekton_is_running "hermes/api/app.py"; then
         if [ -n "$COMPONENTS_RUNNING" ]; then
             COMPONENTS_RUNNING="$COMPONENTS_RUNNING,"
         fi
         COMPONENTS_RUNNING="$COMPONENTS_RUNNING API Server"
     fi
-    if is_running "hermes.*service_discovery"; then
+    if tekton_is_running "hermes.*service_discovery"; then
         if [ -n "$COMPONENTS_RUNNING" ]; then
             COMPONENTS_RUNNING="$COMPONENTS_RUNNING,"
         fi
@@ -93,169 +119,172 @@ if is_running "hermes.*database.manager" || is_running "hermes/api/app.py" || is
     fi
     
     if [ -n "$COMPONENTS_RUNNING" ]; then
-        echo -e "${GREEN}✓ Running Hermes components:${RESET}  $COMPONENTS_RUNNING"
+        tekton_success "✓ Running Hermes components:  $COMPONENTS_RUNNING"
     fi
     
     # Check if lifecycle management is enabled by querying the API
-    if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8100/api/lifecycle/status" | grep -q "200"; then
-        LIFECYCLE_STATUS=$(curl -s "http://localhost:8100/api/lifecycle/status" | grep -o '"enabled":[^,}]*' | cut -d ":" -f2)
+    if tekton_is_port_responding "$HERMES_PORT" "localhost" "/api/lifecycle/status"; then
+        LIFECYCLE_STATUS=$(curl -s "http://localhost:${HERMES_PORT}/api/lifecycle/status" | grep -o '"enabled":[^,}]*' | cut -d ":" -f2)
         if [[ "$LIFECYCLE_STATUS" == *"true"* ]]; then
-            echo -e "${GREEN}✓ Hermes lifecycle management is ENABLED${RESET}"
+            tekton_success "✓ Hermes lifecycle management is ENABLED"
         else
-            echo -e "${YELLOW}⚠ Hermes is running but lifecycle management is DISABLED${RESET}"
+            tekton_warn "⚠ Hermes is running but lifecycle management is DISABLED"
         fi
     else
-        echo -e "${YELLOW}⚠ Hermes is running but lifecycle management is DISABLED${RESET}"
+        tekton_warn "⚠ Hermes is running but lifecycle management is DISABLED"
     fi
 else
-    echo -e "${RED}✗ Hermes is not running${RESET}"
-    echo -e "${YELLOW}  Component lifecycle management is unavailable${RESET}"
+    tekton_error_exit "✗ Hermes is not running. Component lifecycle management is unavailable" 0
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}Hermes Service Registry:${RESET}"
-if curl -s "http://localhost:8100/api/registry/services" > /dev/null 2>&1; then
-    echo -e "${GREEN}Hermes service registry is accessible${RESET}"
+tekton_info "Hermes Service Registry:"
+if tekton_is_port_responding "$HERMES_PORT" "localhost" "/api/registry/services"; then
+    tekton_success "Hermes service registry is accessible"
     
     # Display registered services
-    REGISTERED_SERVICES=$(curl -s "http://localhost:8100/api/registry/services" | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+    REGISTERED_SERVICES=$(curl -s "http://localhost:${HERMES_PORT}/api/registry/services" | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
     
     if [ -n "$REGISTERED_SERVICES" ]; then
-        echo -e "${GREEN}Registered services:${RESET}"
+        tekton_success "Registered services:"
         echo "$REGISTERED_SERVICES" | while read service; do
             echo -e "  - $service"
         done
     else
-        echo -e "${YELLOW}No services currently registered${RESET}"
+        tekton_warn "No services currently registered"
     fi
 else
-    echo -e "${RED}Hermes service registry not accessible${RESET}"
+    tekton_error_exit "Hermes service registry not accessible" 0
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}Tekton Component Status:${RESET}"
+tekton_info "Tekton Component Status:"
 
 # List of components and their process patterns
 COMPONENTS=(
-    "engram.api.consolidated_server:Engram Memory Service"
-    "engram_with_claude:Engram with Claude"
-    "engram_with_ollama:Engram with Ollama"
-    "ollama_bridge.py:Ollama Bridge"
-    "hermes.*database.manager:Hermes Database Manager"
-    "hermes/api/app.py:Hermes API Server"
-    "hermes.*service_discovery:Hermes Service Registry"
-    "prometheus.core:Prometheus Planning Engine"
-    "rhetor.api.app:Rhetor LLM Manager"
-    "rhetor.core:Rhetor Communication Engine"
-    "telos.core:Telos User Interface"
-    "harmonia.core:Harmonia Workflow Engine"
-    "athena.core:Athena Knowledge Graph"
-    "llm_adapter:LLM Adapter"
-    "Hephaestus/ui/server/server.py:Hephaestus UI Server"
-    "terma.api.app:Terma API Server ($TERMA_API_PORT)"
-    "terma.api.ui_server:Terma WebSocket Server ($TERMA_WS_PORT)"
+    "engram:engram.api.consolidated_server:Engram Memory Service"
+    "hermes:hermes.*database.manager:Hermes Database Manager"
+    "hermes:hermes/api/app.py:Hermes API Server"
+    "hermes:hermes.*service_discovery:Hermes Service Registry"
+    "prometheus:prometheus.core:Prometheus Planning Engine"
+    "rhetor:rhetor.api.app:Rhetor LLM Manager"
+    "rhetor:rhetor.core:Rhetor Communication Engine"
+    "telos:telos.core:Telos User Interface"
+    "harmonia:harmonia.core:Harmonia Workflow Engine"
+    "athena:athena.core:Athena Knowledge Graph"
+    "llm_adapter:llm_adapter:LLM Adapter"
+    "hephaestus:Hephaestus/ui/server/server.py:Hephaestus UI Server"
+    "terma:terma.api.app:Terma API Server"
 )
 
 # Check each component
 for component in "${COMPONENTS[@]}"; do
-    pattern=$(echo "$component" | cut -d ":" -f1)
-    name=$(echo "$component" | cut -d ":" -f2)
+    component_id=$(echo "$component" | cut -d ":" -f1)
+    pattern=$(echo "$component" | cut -d ":" -f2)
+    name=$(echo "$component" | cut -d ":" -f3)
+    port=$(tekton_get_component_port "$component_id")
     
-    # Special case for Terma components - check by port using environment variables
-    if [[ "$name" == "Terma API Server" ]]; then
-        if is_port_used $TERMA_API_PORT; then
-            echo -e "${GREEN}✓ $name is running on port $TERMA_API_PORT${RESET}"
-            pid=$(lsof -ti :$TERMA_API_PORT 2>/dev/null)
-            echo "  PID: $pid"
-        else
-            echo -e "${RED}✗ $name is not running (port $TERMA_API_PORT)${RESET}"
-        fi
-    elif [[ "$name" == "Terma UI Server" ]]; then
-        if is_port_used $TERMA_WS_PORT; then
-            echo -e "${GREEN}✓ $name is running on port $TERMA_WS_PORT${RESET}"
-            pid=$(lsof -ti :$TERMA_WS_PORT 2>/dev/null)
-            echo "  PID: $pid"
-        else
-            echo -e "${RED}✗ $name is not running (port $TERMA_WS_PORT)${RESET}"
-        fi
-    # Normal process check for all other components
-    elif is_running "$pattern"; then
-        echo -e "${GREEN}✓ $name is running${RESET}"
+    # Check if component is running
+    is_running=""
+    if tekton_is_running "$pattern"; then
+        tekton_success "✓ $name is running"
+        
         # Get PIDs
-        PIDS=$(pgrep -f "$pattern")
-        echo "  PIDs: $PIDS"
+        pids=$(tekton_get_pids "$pattern")
+        if [ -n "$pids" ]; then
+            echo "  PIDs: $pids"
+        fi
+        
+        # Check if port is being used
+        if [ -n "$port" ] && [ "$port" -ne 0 ]; then
+            if tekton_is_port_used "$port"; then
+                echo "  Port $port is in use"
+                
+                # Check if port is responding
+                if tekton_is_port_responding "$port"; then
+                    echo "  Service is responding on port $port"
+                else
+                    tekton_warn "  Port $port is in use but not responding"
+                fi
+            else
+                tekton_warn "  Process is running but port $port is not in use"
+            fi
+        fi
     else
-        echo -e "${RED}✗ $name is not running${RESET}"
+        # Component is not running, check if the port is still in use
+        if [ -n "$port" ] && [ "$port" -ne 0 ] && tekton_is_port_used "$port"; then
+            tekton_warn "✗ $name is not running but port $port is in use"
+            
+            # Get the process using this port
+            process_info=$(tekton_get_port_process "$port")
+            if [ -n "$process_info" ]; then
+                echo "  Port $port is being used by: $process_info"
+            fi
+        else
+            tekton_error_exit "✗ $name is not running" 0
+        fi
     fi
 done
 
 echo ""
-echo -e "${BLUE}${BOLD}Port Status:${RESET}"
+tekton_info "Port Status:"
 
-# Check component ports using environment variables
-declare -a PORT_INFO=(
-    "$TEKTON_CORE_PORT:Tekton Core"
-    "$HEPHAESTUS_PORT:Hephaestus"
-    "$ENGRAM_PORT:Engram Memory"
-    "$HERMES_PORT:Hermes"
-    "$ERGON_PORT:Ergon Agent System"
-    "$RHETOR_PORT:Rhetor LLM Management"
-    "$TERMA_PORT:Terma Terminal"
-    "$ATHENA_PORT:Athena Knowledge Graph"
-    "$PROMETHEUS_PORT:Prometheus Planning"
-    "$HARMONIA_PORT:Harmonia Workflow"
-    "$TELOS_PORT:Telos Requirements"
-    "$SYNTHESIS_PORT:Synthesis Engine"
-)
-
-# Check each port
-for port_item in "${PORT_INFO[@]}"; do
-    port="${port_item%%:*}"
-    description="${port_item#*:}"
+# Get all component ports and check their status
+for component_id in engram hermes ergon rhetor terma athena prometheus harmonia telos synthesis hephaestus tekton-core llm-adapter; do
+    port=$(tekton_get_component_port "$component_id")
     
-    if is_port_used "$port"; then
-        process_info=$(get_port_process "$port")
-        pid=$(echo "$process_info" | cut -f1)
-        process=$(echo "$process_info" | cut -f2-)
-        echo -e "${YELLOW}Port $port ($description): In use by PID $pid${RESET}"
-        echo -e "  ${YELLOW}Process: ${process:0:80}${RESET}"
-    else
-        echo -e "${GREEN}Port $port ($description): Available${RESET}"
+    if [ -n "$port" ] && [ "$port" -ne 0 ]; then
+        component_name=$(echo "$component_id" | tr '[:lower:]' '[:upper:]')
+        
+        if tekton_is_port_used "$port"; then
+            # Get the process using this port
+            process_info=$(tekton_get_port_process "$port")
+            if [ -n "$process_info" ]; then
+                pid=$(echo "$process_info" | cut -f1)
+                process=$(echo "$process_info" | cut -f2-)
+                tekton_warn "Port $port ($component_name): In use by PID $pid"
+                echo -e "  ${TEKTON_COLOR_YELLOW}Process: ${process:0:80}${TEKTON_COLOR_RESET}"
+            else
+                tekton_warn "Port $port ($component_name): In use (process unknown)"
+            fi
+        else
+            tekton_success "Port $port ($component_name): Available"
+        fi
     fi
 done
 
 echo ""
-echo -e "${BLUE}${BOLD}UI Services:${RESET}"
-if is_running "Hephaestus/ui/server/server.py"; then
-    echo -e "${GREEN}✓ Hephaestus UI is running${RESET}"
-    echo -e "  Access the UI at: http://localhost:8080"
+tekton_info "UI Services:"
+if tekton_is_running "Hephaestus/ui/server/server.py"; then
+    tekton_success "✓ Hephaestus UI is running"
+    echo -e "  Access the UI at: http://localhost:$HEPHAESTUS_PORT"
 else
-    echo -e "${RED}✗ Hephaestus UI is not running${RESET}"
+    tekton_error_exit "✗ Hephaestus UI is not running" 0
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}Database Services:${RESET}"
-if is_running ".*faiss_adapter.*"; then
-    echo -e "${GREEN}✓ FAISS vector database is running${RESET}"
+tekton_info "Database Services:"
+if tekton_is_running ".*faiss_adapter.*"; then
+    tekton_success "✓ FAISS vector database is running"
 else
-    echo -e "${YELLOW}No vector database service detected${RESET}"
+    tekton_warn "No vector database service detected"
 fi
 
 # Check for Redis (common key-value store)
-if command -v redis-cli >/dev/null 2>&1; then
+if tekton_command_exists "redis-cli"; then
     if redis-cli ping >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ Redis key-value store is running${RESET}"
+        tekton_success "✓ Redis key-value store is running"
     else
-        echo -e "${RED}✗ Redis key-value store is not running${RESET}"
+        tekton_error_exit "✗ Redis key-value store is not running" 0
     fi
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}LLM Availability:${RESET}"
+tekton_info "LLM Availability:"
 
 # Check Ollama status
 if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ Ollama is running${RESET}"
+    tekton_success "✓ Ollama is running"
     
     # Try to list available models
     MODELS=$(curl -s http://localhost:11434/api/tags | grep -o '"name":"[^"]*"' | cut -d ":" -f2 | tr -d '"' | sort)
@@ -266,83 +295,82 @@ if curl -s http://localhost:11434/api/tags >/dev/null 2>&1; then
         done
     fi
 else
-    echo -e "${RED}✗ Ollama is not running${RESET}"
+    tekton_error_exit "✗ Ollama is not running" 0
 fi
 
 # Check for Claude API
 if [ -n "$ANTHROPIC_API_KEY" ] || [ -f ~/.anthropic-access-tokens ]; then
-    echo -e "${GREEN}✓ Claude API is configured${RESET}"
+    tekton_success "✓ Claude API is configured"
 else
-    echo -e "${RED}✗ Claude API is not configured${RESET}"
+    tekton_error_exit "✗ Claude API is not configured" 0
 fi
 
 # Check for OpenAI API
 if [ -n "$OPENAI_API_KEY" ]; then
-    echo -e "${GREEN}✓ OpenAI API is configured${RESET}"
+    tekton_success "✓ OpenAI API is configured"
 else
-    echo -e "${RED}✗ OpenAI API is not configured${RESET}"
+    tekton_error_exit "✗ OpenAI API is not configured" 0
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}System Resources:${RESET}"
+tekton_info "System Resources:"
+
+# Get OS type for system-specific commands
+OS_TYPE=$(tekton_detect_os)
 
 # Show memory usage
-if command -v free >/dev/null 2>&1; then
+if [[ "$OS_TYPE" == "linux" ]]; then
     # Linux
-    MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}')
-    MEM_USED=$(free -h | awk '/^Mem:/ {print $3}')
-    MEM_PERCENT=$(free | awk '/^Mem:/ {printf("%.1f%%", $3/$2 * 100)}')
-    echo -e "${YELLOW}Memory Usage:${RESET}"
-    echo -e "  ${MEM_USED} used / ${MEM_TOTAL} total (${MEM_PERCENT})"
-elif command -v vm_stat >/dev/null 2>&1; then
+    if tekton_command_exists "free"; then
+        MEM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}')
+        MEM_USED=$(free -h | awk '/^Mem:/ {print $3}')
+        MEM_PERCENT=$(free | awk '/^Mem:/ {printf("%.1f%%", $3/$2 * 100)}')
+        tekton_info "Memory Usage:"
+        echo -e "  ${MEM_USED} used / ${MEM_TOTAL} total (${MEM_PERCENT})"
+    fi
+elif [[ "$OS_TYPE" == "darwin" ]]; then
     # macOS
-    MEM_TOTAL=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
-    PAGE_SIZE=$(vm_stat | grep "page size" | awk '{print $8}')
-    PAGES_FREE=$(vm_stat | grep "Pages free" | awk '{print $3}' | tr -d '.')
-    PAGES_ACTIVE=$(vm_stat | grep "Pages active" | awk '{print $3}' | tr -d '.')
-    PAGES_INACTIVE=$(vm_stat | grep "Pages inactive" | awk '{print $3}' | tr -d '.')
-    PAGES_SPECULATIVE=$(vm_stat | grep "Pages speculative" | awk '{print $3}' | tr -d '.')
-    PAGES_WIRED=$(vm_stat | grep "Pages wired down" | awk '{print $4}' | tr -d '.')
-    
-    MEM_USED=$(( (PAGES_ACTIVE + PAGES_WIRED) * PAGE_SIZE / 1024 / 1024 / 1024 ))
-    MEM_PERCENT=$(( MEM_USED * 100 / MEM_TOTAL ))
-    
-    echo -e "${YELLOW}Memory Usage:${RESET}"
-    echo -e "  ${MEM_USED}Gi used / ${MEM_TOTAL}.0Gi total (${MEM_PERCENT}.${MEM_PERCENT}%)"
+    if tekton_command_exists "vm_stat"; then
+        MEM_TOTAL=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+        PAGE_SIZE=$(vm_stat | grep "page size" | awk '{print $8}')
+        PAGES_FREE=$(vm_stat | grep "Pages free" | awk '{print $3}' | tr -d '.')
+        PAGES_ACTIVE=$(vm_stat | grep "Pages active" | awk '{print $3}' | tr -d '.')
+        PAGES_INACTIVE=$(vm_stat | grep "Pages inactive" | awk '{print $3}' | tr -d '.')
+        PAGES_SPECULATIVE=$(vm_stat | grep "Pages speculative" | awk '{print $3}' | tr -d '.')
+        PAGES_WIRED=$(vm_stat | grep "Pages wired down" | awk '{print $4}' | tr -d '.')
+        
+        MEM_USED=$(( (PAGES_ACTIVE + PAGES_WIRED) * PAGE_SIZE / 1024 / 1024 / 1024 ))
+        MEM_PERCENT=$(( MEM_USED * 100 / MEM_TOTAL ))
+        
+        tekton_info "Memory Usage:"
+        echo -e "  ${MEM_USED}Gi used / ${MEM_TOTAL}.0Gi total (${MEM_PERCENT}.${MEM_PERCENT}%)"
+    fi
 fi
 
 # Show CPU usage
-if command -v top >/dev/null 2>&1; then
-    if [[ "$(uname)" == "Darwin" ]]; then
+if tekton_command_exists "top"; then
+    if [[ "$OS_TYPE" == "darwin" ]]; then
         # macOS
         CPU_USAGE=$(top -l 1 -n 0 | grep "CPU usage" | awk '{print $3, $5, $7}')
-        echo -e "${YELLOW}CPU Usage:${RESET}"
+        tekton_info "CPU Usage:"
         echo -e "  $CPU_USAGE"
     else
         # Linux
         CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1"%"}')
-        echo -e "${YELLOW}CPU Usage:${RESET}"
+        tekton_info "CPU Usage:"
         echo -e "  $CPU_USAGE"
     fi
 fi
 
 # Show disk usage
-if command -v df >/dev/null 2>&1; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-        # macOS
-        DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
-        DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
-        DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}')
-    else
-        # Linux
-        DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
-        DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
-        DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}')
-    fi
+if tekton_command_exists "df"; then
+    DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
+    DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
+    DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}')
     
-    echo -e "${YELLOW}Disk Usage:${RESET}"
+    tekton_info "Disk Usage:"
     echo -e "  ${DISK_USED} used / ${DISK_TOTAL} total (${DISK_PERCENT} used)"
 fi
 
 echo ""
-echo -e "${BLUE}${BOLD}=== Tekton Status Check Complete ===${RESET}"
+tekton_info "=== Tekton Status Check Complete ==="
