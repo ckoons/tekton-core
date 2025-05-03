@@ -97,7 +97,7 @@ echo ""
 
 # Check for Hermes lifecycle management mode
 tekton_info "Lifecycle Management Status:"
-if tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.*service_discovery"; then
+if tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.*service_discovery" || tekton_is_running "hermes.api.app" || tekton_is_running "uvicorn hermes.api.app"; then
     tekton_success "✓ Hermes is running and may be managing component lifecycle"
     
     # Check for specific components
@@ -105,7 +105,7 @@ if tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes/api
     if tekton_is_running "hermes.*database.manager"; then
         COMPONENTS_RUNNING="$COMPONENTS_RUNNING Database Manager"
     fi
-    if tekton_is_running "hermes/api/app.py"; then
+    if tekton_is_running "hermes/api/app.py" || tekton_is_running "hermes.api.app" || tekton_is_running "uvicorn hermes.api.app"; then
         if [ -n "$COMPONENTS_RUNNING" ]; then
             COMPONENTS_RUNNING="$COMPONENTS_RUNNING,"
         fi
@@ -128,10 +128,10 @@ if tekton_is_running "hermes.*database.manager" || tekton_is_running "hermes/api
         if [[ "$LIFECYCLE_STATUS" == *"true"* ]]; then
             tekton_success "✓ Hermes lifecycle management is ENABLED"
         else
-            tekton_warn "⚠ Hermes is running but lifecycle management is DISABLED"
+            tekton_info "Hermes lifecycle management is disabled (normal during testing)"
         fi
     else
-        tekton_warn "⚠ Hermes is running but lifecycle management is DISABLED"
+        tekton_info "Hermes lifecycle management API not detected (normal during testing)"
     fi
 else
     tekton_error_exit "✗ Hermes is not running. Component lifecycle management is unavailable" 0
@@ -139,89 +139,142 @@ fi
 
 echo ""
 tekton_info "Hermes Service Registry:"
-if tekton_is_port_responding "$HERMES_PORT" "localhost" "/api/registry/services"; then
-    tekton_success "Hermes service registry is accessible"
+if tekton_is_port_responding "$HERMES_PORT" "localhost" ""; then
+    tekton_success "✓ Hermes service registry is accessible"
     
-    # Display registered services
-    REGISTERED_SERVICES=$(curl -s "http://localhost:${HERMES_PORT}/api/registry/services" | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+    # Try Hermes registry directly
+    REGISTERED_SERVICES=$(curl -s -X POST "http://localhost:${HERMES_PORT}/api/query" -H "Content-Type: application/json" -d '{}' 2>/dev/null | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+    
+    # Check if empty, try the component registry endpoint as an alternative
+    if [ -z "$REGISTERED_SERVICES" ]; then
+        REGISTERED_SERVICES=$(curl -s "http://localhost:${HERMES_PORT}/api/registry/components" 2>/dev/null | tr -d '[]{}' | tr ',' '\n' | grep -o '"name":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+    fi
     
     if [ -n "$REGISTERED_SERVICES" ]; then
-        tekton_success "Registered services:"
+        tekton_success "✓ Registered services:"
         echo "$REGISTERED_SERVICES" | while read service; do
             echo -e "  - $service"
         done
     else
-        tekton_warn "No services currently registered"
+        # Not an error - just informational during testing
+        tekton_info "No services currently registered with Hermes"
+        tekton_info "This is expected during a testing session - registration happens during full deployment"
     fi
 else
     tekton_error_exit "Hermes service registry not accessible" 0
 fi
 
 echo ""
-tekton_info "Tekton Component Status:"
+tekton_info "MCP Protocol Status:"
 
-# List of components and their process patterns
-COMPONENTS=(
-    "engram:engram.api.consolidated_server:Engram Memory Service"
-    "hermes:hermes.*database.manager:Hermes Database Manager"
-    "hermes:hermes/api/app.py:Hermes API Server"
-    "hermes:hermes.*service_discovery:Hermes Service Registry"
-    "prometheus:prometheus.core:Prometheus Planning Engine"
-    "rhetor:rhetor.api.app:Rhetor LLM Manager"
-    "rhetor:rhetor.core:Rhetor Communication Engine"
-    "telos:telos.core:Telos User Interface"
-    "harmonia:harmonia.core:Harmonia Workflow Engine"
-    "athena:athena.core:Athena Knowledge Graph"
-    "llm_adapter:llm_adapter:LLM Adapter"
-    "hephaestus:Hephaestus/ui/server/server.py:Hephaestus UI Server"
-    "terma:terma.api.app:Terma API Server"
-)
-
-# Check each component
-for component in "${COMPONENTS[@]}"; do
-    component_id=$(echo "$component" | cut -d ":" -f1)
-    pattern=$(echo "$component" | cut -d ":" -f2)
-    name=$(echo "$component" | cut -d ":" -f3)
-    port=$(tekton_get_component_port "$component_id")
+# Check if Hermes is running
+if tekton_is_port_responding "$HERMES_PORT"; then
+    # Try Hermes MCP capabilities - central hub for MCP
+    MCP_RESPONSE=$(curl -s -X POST "http://localhost:${HERMES_PORT}/api/mcp/capabilities" -H "Content-Type: application/json" -d '{}' 2>/dev/null)
     
-    # Check if component is running
-    is_running=""
-    if tekton_is_running "$pattern"; then
-        tekton_success "✓ $name is running"
+    if [[ "$MCP_RESPONSE" == *"modalities"* ]]; then
+        tekton_success "✓ Hermes MCP protocol hub is available"
         
-        # Get PIDs
-        pids=$(tekton_get_pids "$pattern")
-        if [ -n "$pids" ]; then
-            echo "  PIDs: $pids"
+        # Extract the available modalities
+        MODALITIES=$(echo "$MCP_RESPONSE" | grep -o '"modalities":\[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"' | sort | uniq)
+        if [ -n "$MODALITIES" ]; then
+            echo -e "  Supported modalities:"
+            echo "$MODALITIES" | while read modality; do
+                echo -e "    - $modality"
+            done
         fi
         
-        # Check if port is being used
-        if [ -n "$port" ] && [ "$port" -ne 0 ]; then
-            if tekton_is_port_used "$port"; then
-                echo "  Port $port is in use"
-                
-                # Check if port is responding
-                if tekton_is_port_responding "$port"; then
-                    echo "  Service is responding on port $port"
+        # Inform that MCP is centralized through Hermes
+        tekton_info "Hermes provides centralized MCP capabilities for most components"
+    else
+        tekton_warn "⚠ Hermes MCP protocol hub is not responding properly"
+    fi
+    
+    # Only check Engram directly as it has its own MCP implementation
+    ENGRAM_PORT=$(tekton_get_component_port "engram")
+    if [ -n "$ENGRAM_PORT" ] && [ "$ENGRAM_PORT" -ne 0 ] && tekton_is_port_used "$ENGRAM_PORT"; then
+        # Try to access Engram MCP capabilities
+        MCP_RESPONSE=$(curl -s -X POST "http://localhost:${ENGRAM_PORT}/api/mcp/capabilities" -H "Content-Type: application/json" -d '{}' 2>/dev/null)
+        if [[ "$MCP_RESPONSE" == *"modalities"* ]]; then
+            tekton_success "✓ Engram direct MCP protocol is available"
+            
+            # Extract modalities if available
+            MODALITIES=$(echo "$MCP_RESPONSE" | grep -o '"modalities":\[[^]]*\]' | grep -o '"[^"]*"' | tr -d '"' | sort | uniq)
+            if [ -n "$MODALITIES" ]; then
+                echo -e "  Supported modalities: $(echo $MODALITIES | tr '\n' ' ')"
+            fi
+        else
+            tekton_info "Engram direct MCP access not detected (available through Hermes)"
+        fi
+    fi
+else
+    tekton_error_exit "✗ Hermes is not running - MCP hub not available" 0
+fi
+
+echo ""
+tekton_info "Tekton Component Status:"
+
+# Use simpler array approach with component:port:name format
+COMPONENTS=(
+    "engram:8000:Engram Memory System"
+    "hermes:8001:Hermes Messaging System"
+    "ergon:8002:Ergon Agent Framework"
+    "rhetor:8003:Rhetor LLM Manager"
+    "terma:8004:Terma CLI"
+    "athena:8005:Athena Knowledge Graph"
+    "prometheus:8006:Prometheus Planning System"
+    "harmonia:8007:Harmonia Workflow System"
+    "telos:8008:Telos Requirements System"
+    "synthesis:8009:Synthesis Execution Engine"
+    "tekton_core:8010:Tekton Core"
+    "hephaestus:8080:Hephaestus UI"
+)
+
+# Check each component by port
+for component in "${COMPONENTS[@]}"; do
+    component_id=$(echo "$component" | cut -d ":" -f1)
+    port=$(echo "$component" | cut -d ":" -f2)
+    name=$(echo "$component" | cut -d ":" -f3)
+    
+    # Check if port is in use
+    if tekton_is_port_used "$port"; then
+        # Get the process using this port
+        process_info=$(tekton_get_port_process "$port")
+        
+        # Check if port is responding
+        if tekton_is_port_responding "$port" "localhost" ""; then
+            tekton_success "✓ $name is running on port $port and responding"
+            
+            # Try to get health status
+            health_response=$(curl -s --max-time 1 "http://localhost:${port}/health" 2>/dev/null)
+            
+            if [[ "$health_response" == *"status"* ]]; then
+                status=$(echo "$health_response" | grep -o '"status":"[^"]*"' | cut -d ':' -f2 | tr -d '"')
+                if [[ "$status" == "ok" || "$status" == "healthy" ]]; then
+                    echo "  Health status: $status"
                 else
-                    tekton_warn "  Port $port is in use but not responding"
+                    tekton_warn "  Health status: $status"
                 fi
-            else
-                tekton_warn "  Process is running but port $port is not in use"
+            fi
+            
+            # Show process info
+            if [ -n "$process_info" ]; then
+                echo "  Process: ${process_info:0:80}"
+            fi
+        else
+            tekton_warn "✓ $name is running on port $port but not responding to HTTP requests"
+            
+            # Show process info
+            if [ -n "$process_info" ]; then
+                echo "  Process: ${process_info:0:80}"
             fi
         fi
     else
-        # Component is not running, check if the port is still in use
-        if [ -n "$port" ] && [ "$port" -ne 0 ] && tekton_is_port_used "$port"; then
-            tekton_warn "✗ $name is not running but port $port is in use"
-            
-            # Get the process using this port
-            process_info=$(tekton_get_port_process "$port")
-            if [ -n "$process_info" ]; then
-                echo "  Port $port is being used by: $process_info"
-            fi
+        # For essential components, report as error; for others, just info
+        if [[ "$component_id" == "engram" || "$component_id" == "hermes" || "$component_id" == "rhetor" ]]; then
+            tekton_error_exit "✗ $name is not running (port $port not in use)" 0
         else
-            tekton_error_exit "✗ $name is not running" 0
+            tekton_info "$name is not running (port $port not in use)"
         fi
     fi
 done
@@ -255,11 +308,11 @@ done
 
 echo ""
 tekton_info "UI Services:"
-if tekton_is_running "Hephaestus/ui/server/server.py"; then
+if tekton_is_port_used "$HEPHAESTUS_PORT" && tekton_is_port_responding "$HEPHAESTUS_PORT"; then
     tekton_success "✓ Hephaestus UI is running"
     echo -e "  Access the UI at: http://localhost:$HEPHAESTUS_PORT"
 else
-    tekton_error_exit "✗ Hephaestus UI is not running" 0
+    tekton_info "Hephaestus UI is not running (normal during component testing)"
 fi
 
 echo ""

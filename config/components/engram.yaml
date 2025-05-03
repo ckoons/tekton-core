@@ -1,13 +1,16 @@
 component:
-  id: "engram.memory"
+  id: "engram"
   name: "Engram Memory System"
   version: "0.1.0"
   description: "Advanced memory and vector database system"
   port: 8000
+  host: "localhost"
+  url: "http://localhost:8000"
+  health_endpoint: "/health"
   metadata:
     description: "Memory and knowledge storage system"
     version: "0.1.0"
-    dependencies: ["hermes.core.database"]
+    dependencies: ["hermes"]
 
 capabilities:
   - id: "memory_management"
