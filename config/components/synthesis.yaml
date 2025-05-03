@@ -3,7 +3,7 @@ component:
   name: "Synthesis"
   version: "1.0.0"
   description: "Execution and integration engine for Tekton"
-  port: 8010
+  port: 8009
   dependencies:
     - "prometheus.core"
     - "engram.memory"

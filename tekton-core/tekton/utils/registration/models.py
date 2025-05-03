@@ -48,8 +48,8 @@ class ComponentConfig:
     id: str
     name: str
     version: str
-    description: Optional[str] = None
     port: int
+    description: Optional[str] = None
     capabilities: List[CapabilityConfig] = field(default_factory=list)
     config: Dict[str, Any] = field(default_factory=dict)
 
@@ -113,8 +113,8 @@ def dict_to_component_config(data: Dict[str, Any]) -> ComponentConfig:
         id=component_data["id"],
         name=component_data["name"],
         version=component_data["version"],
-        description=component_data.get("description"),
         port=component_data["port"],
+        description=component_data.get("description"),
         capabilities=capabilities,
         config=config_data,
     )

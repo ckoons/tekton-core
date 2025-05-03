@@ -39,7 +39,7 @@ import asyncio
 import threading
 from enum import Enum
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union, Set, Tuple, TypeVar, Generic, cast
+from typing import Dict, Any, Optional, List, Union, Set, Tuple, TypeVar, Generic, cast, Callable
 
 # Thread-local storage for context
 _thread_local = threading.local()

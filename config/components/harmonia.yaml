@@ -1,9 +1,9 @@
 component:
-  id: "harmonia.workflow"
+  id: "harmonia"
   name: "Harmonia Workflow Engine"
   version: "0.1.0"
   description: "Workflow orchestration engine"
-  port: 5006
+  port: 8007
   metadata:
     description: "Workflow orchestration engine"
     version: "0.1.0"
