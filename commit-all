@@ -1,5 +1,6 @@
 #!/bin/bash
 # commit-all - Script to commit changes across all Tekton subprojects
+# Updated to handle branch management, merging, and cleanup
 
 # Save original directory
 ORIGINAL_DIR=$(pwd)
@@ -16,9 +17,17 @@ else
   cd "$TEKTON_DIR"
 fi
 
+# Color codes for better output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
 COMMIT_MSG="$1"
 if [ -z "$COMMIT_MSG" ]; then
-  echo "Usage: commit-all 'Your commit message'"
+  echo -e "${RED}Usage: commit-all 'Your commit message'${NC}"
   cd "$ORIGINAL_DIR"
   exit 1
 fi
@@ -43,6 +52,11 @@ PROJECTS=("Athena" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Pr
 # Track which projects were changed
 CHANGED=false
 
+# Get current branch
+cd "$TEKTON_DIR"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo -e "${BLUE}${BOLD}Current branch: ${CURRENT_BRANCH}${NC}"
+
 # Commit changes in each project
 for PROJECT in "${PROJECTS[@]}"; do
   if [ -d "$TEKTON_DIR/$PROJECT" ]; then
@@ -50,27 +64,28 @@ for PROJECT in "${PROJECTS[@]}"; do
     
     # Check if there are changes
     if [[ -n $(git status -s) ]]; then
-      echo "Committing changes in $PROJECT..."
+      echo -e "${BLUE}Committing changes in ${BOLD}$PROJECT${NC}..."
       git add .
       git commit -m "$FULL_COMMIT_MSG"
       
       # Check if branch has upstream
       if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
         # Branch has upstream, do normal push
+        echo -e "${GREEN}Pushing changes to remote...${NC}"
         git push
       else
         # No upstream, set it up
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
-        echo "Setting up upstream branch for $BRANCH..."
+        echo -e "${YELLOW}Setting up upstream branch for $BRANCH...${NC}"
         git push --set-upstream origin $BRANCH
       fi
       
       CHANGED=true
     else
-      echo "No changes in $PROJECT"
+      echo -e "${YELLOW}No changes in $PROJECT${NC}"
     fi
   else
-    echo "Warning: $PROJECT directory not found"
+    echo -e "${YELLOW}Warning: $PROJECT directory not found${NC}"
   fi
 done
 
@@ -90,20 +105,21 @@ if [[ -n "$GIT_STATUS" ]]; then
   
   # Check if the commit-all script is the only changed file
   if [[ "$NON_SCRIPT_CHANGES" -eq 0 ]] && [[ "$GIT_STATUS" == *"commit-all"* ]]; then
-    echo "Only the commit-all script has changed. Ignoring this change to avoid recursive commits."
+    echo -e "${YELLOW}Only the commit-all script has changed. Ignoring this change to avoid recursive commits.${NC}"
   else
-    echo "Committing changes in Tekton..."
+    echo -e "${BLUE}Committing changes in ${BOLD}Tekton${NC}..."
     git add .
     git commit -m "$FULL_COMMIT_MSG"
     
     # Check if branch has upstream
     if git rev-parse --abbrev-ref --symbolic-full-name @{u} &>/dev/null; then
       # Branch has upstream, do normal push
+      echo -e "${GREEN}Pushing changes to remote...${NC}"
       git push
     else
       # No upstream, set it up
       BRANCH=$(git rev-parse --abbrev-ref HEAD)
-      echo "Setting up upstream branch for $BRANCH..."
+      echo -e "${YELLOW}Setting up upstream branch for $BRANCH...${NC}"
       git push --set-upstream origin $BRANCH
     fi
     
@@ -113,9 +129,145 @@ fi
 
 echo ""
 if [ "$CHANGED" = true ]; then
-  echo "✅ Changes committed and pushed to repositories"
+  echo -e "${GREEN}${BOLD}✅ Changes committed and pushed to repositories${NC}"
 else
-  echo "ℹ️ No changes found in any project"
+  echo -e "${YELLOW}ℹ️ No changes found in any project${NC}"
+fi
+
+# Branch management section - only if we're on a non-main branch and changes were pushed
+if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
+  echo ""
+  echo -e "${BLUE}${BOLD}You are currently on branch: ${CURRENT_BRANCH}${NC}"
+  
+  # Ask if user wants to merge to main
+  read -p "$(echo -e "${YELLOW}Would you like to merge ${CURRENT_BRANCH} into main? [y/n]: ${NC}")" MERGE_RESPONSE
+  
+  if [[ "$MERGE_RESPONSE" =~ ^[Yy]$ ]]; then
+    echo -e "${BLUE}Merging $CURRENT_BRANCH into main for all repositories...${NC}"
+    
+    # Keep track of merge errors
+    MERGE_ERROR=false
+    
+    # Merge changes in each project
+    for PROJECT in "${PROJECTS[@]}"; do
+      if [ -d "$TEKTON_DIR/$PROJECT" ]; then
+        cd "$TEKTON_DIR/$PROJECT"
+        
+        # Check if the project has both branches
+        if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1 && git rev-parse --verify main >/dev/null 2>&1; then
+          echo -e "${BLUE}Merging $CURRENT_BRANCH into main for ${BOLD}$PROJECT${NC}..."
+          
+          # Switch to main
+          git checkout main
+          
+          # Pull latest changes
+          git pull origin main
+          
+          # Merge feature branch
+          if git merge --no-ff $CURRENT_BRANCH -m "Merge branch '$CURRENT_BRANCH'"; then
+            # Push changes
+            git push origin main
+            echo -e "${GREEN}Successfully merged $CURRENT_BRANCH into main for $PROJECT${NC}"
+          else
+            echo -e "${RED}Error: Merge conflict in $PROJECT. Please resolve manually.${NC}"
+            MERGE_ERROR=true
+            # Switch back to the original branch
+            git merge --abort >/dev/null 2>&1
+            git checkout $CURRENT_BRANCH
+          fi
+        else
+          echo -e "${YELLOW}Skipping $PROJECT: Either $CURRENT_BRANCH or main branch does not exist${NC}"
+        fi
+      fi
+    done
+    
+    # Now handle Tekton main repository
+    cd "$TEKTON_DIR"
+    
+    # Check if both branches exist
+    if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1 && git rev-parse --verify main >/dev/null 2>&1; then
+      echo -e "${BLUE}Merging $CURRENT_BRANCH into main for ${BOLD}Tekton${NC}..."
+      
+      # Switch to main
+      git checkout main
+      
+      # Pull latest changes
+      git pull origin main
+      
+      # Merge feature branch
+      if git merge --no-ff $CURRENT_BRANCH -m "Merge branch '$CURRENT_BRANCH'"; then
+        # Push changes
+        git push origin main
+        echo -e "${GREEN}Successfully merged $CURRENT_BRANCH into main for Tekton${NC}"
+      else
+        echo -e "${RED}Error: Merge conflict in Tekton. Please resolve manually.${NC}"
+        MERGE_ERROR=true
+        # Switch back to the original branch
+        git merge --abort >/dev/null 2>&1
+        git checkout $CURRENT_BRANCH
+      fi
+    else
+      echo -e "${YELLOW}Skipping Tekton: Either $CURRENT_BRANCH or main branch does not exist${NC}"
+    fi
+    
+    # Check if any merge errors occurred
+    if [ "$MERGE_ERROR" = true ]; then
+      echo -e "${RED}${BOLD}⚠️ Merge errors occurred in some repositories. Please resolve manually.${NC}"
+    else
+      echo -e "${GREEN}${BOLD}✅ All merges completed successfully${NC}"
+      
+      # Ask if user wants to delete the feature branch
+      read -p "$(echo -e "${YELLOW}Do you want to delete the ${CURRENT_BRANCH} branch locally and remotely? [y/n]: ${NC}")" DELETE_RESPONSE
+      
+      if [[ "$DELETE_RESPONSE" =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}Deleting branch $CURRENT_BRANCH from all repositories...${NC}"
+        
+        # Delete branch in each project
+        for PROJECT in "${PROJECTS[@]}"; do
+          if [ -d "$TEKTON_DIR/$PROJECT" ]; then
+            cd "$TEKTON_DIR/$PROJECT"
+            
+            # Check if project has the branch
+            if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1; then
+              # Make sure we're on main
+              git checkout main
+              
+              # Delete local branch
+              git branch -D $CURRENT_BRANCH
+              
+              # Delete remote branch if it exists
+              if git ls-remote --exit-code --heads origin $CURRENT_BRANCH >/dev/null 2>&1; then
+                git push origin --delete $CURRENT_BRANCH
+                echo -e "${GREEN}Deleted branch $CURRENT_BRANCH from $PROJECT${NC}"
+              else
+                echo -e "${YELLOW}Remote branch $CURRENT_BRANCH not found in $PROJECT${NC}"
+              fi
+            fi
+          fi
+        done
+        
+        # Delete branch in Tekton repository
+        cd "$TEKTON_DIR"
+        # Make sure we're on main
+        git checkout main
+        
+        # Delete local branch
+        git branch -D $CURRENT_BRANCH
+        
+        # Delete remote branch if it exists
+        if git ls-remote --exit-code --heads origin $CURRENT_BRANCH >/dev/null 2>&1; then
+          git push origin --delete $CURRENT_BRANCH
+          echo -e "${GREEN}Deleted branch $CURRENT_BRANCH from Tekton${NC}"
+        else
+          echo -e "${YELLOW}Remote branch $CURRENT_BRANCH not found in Tekton${NC}"
+        fi
+        
+        echo -e "${GREEN}${BOLD}✅ Branch $CURRENT_BRANCH has been deleted from all repositories${NC}"
+      fi
+    fi
+  else
+    echo -e "${YELLOW}Skipping merge to main${NC}"
+  fi
 fi
 
 # Return to original directory
