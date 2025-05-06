@@ -1,22 +1,22 @@
-# Fix GUI Sprint - Claude Code Prompt (REVISED STRATEGY)
+# Fix GUI Sprint - Claude Code Prompt (SESSION 2: ERGON COMPONENT)
 
 ## Overview
-This document serves as the revised prompt for Claude Code sessions working on the Fix GUI Sprint Development Sprint for the Tekton project. We're adopting a Direct HTML Injection approach to ensure more reliable component rendering and simplified debugging.
+This document serves as the prompt for the second Claude Code session working on the Fix GUI Sprint for the Tekton project. In our previous session, we successfully implemented the Athena component using the Direct HTML Injection approach. Now we'll focus on implementing the Ergon component using the same pattern and addressing some outstanding issues.
 
 Tekton is an intelligent orchestration system that coordinates multiple AI models and resources to efficiently solve complex software engineering problems. This Development Sprint focuses on simplifying and standardizing the Hephaestus UI architecture to create a more reliable component integration system.
 
-## Sprint Context
+## Current Progress
 
-We've identified critical issues with the Hephaestus UI component integration:
+We've made significant progress on our revised UI architecture:
 
-1. Components loading as complete HTML documents with `<!DOCTYPE>`, `<html>`, `<head>`, and `<body>` tags, causing the entire application to be duplicated in the component panel
-2. WebSocket connection issues with "invalid Connection header: keep-alive" errors
-3. Components loading in the wrong panels (HTML panel vs. terminal panel)
-4. Overcomplicated UI architecture with Shadow DOM and complex component loading
+1. **Direct HTML Injection Pattern**: Successfully implemented for the Athena component
+2. **WebSocket Connection**: Fixed WebSocket protocol handling in server.py
+3. **UI Refinements**: Created a compact, clean UI for Athena with improved chat interface
+4. **Component Structure**: Established a clear pattern for component implementation
 
-Our revised approach uses direct HTML injection within a clear two-panel layout:
-- **LEFT PANEL:** Navigation tabs and component selection
-- **RIGHT PANEL:** Main content area for component UIs (with direct HTML injection instead of loading external files)
+Our approach uses direct HTML injection within a clear two-panel layout:
+- **LEFT PANEL:** Navigation tabs and component selection (with corrected Ergon label: "Ergon - Agents/Tools/MCP")
+- **RIGHT PANEL:** Main content area for component UIs using direct HTML injection
 
 ## Implementation Strategy - Component-by-Component Approach
 
@@ -71,8 +71,10 @@ For each component (Ergon, Terma, Rhetor, etc.):
    - Get approval
 
 2. Chat Interface Integration
-   - Create chat template 
-   - Add to components as needed
+   - Create shared chat template for component-specific chats
+   - Add Team Chat to all components (always the last tab)
+   - Implement shared chat functionality for both component-specific and Team Chat
+   - Make Clear Chat button work contextually with the active chat
    - Connect to LLM adapter
    - Test and get approval
 
