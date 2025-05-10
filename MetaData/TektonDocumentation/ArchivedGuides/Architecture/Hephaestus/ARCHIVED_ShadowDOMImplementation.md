@@ -1,3 +1,9 @@
+# [ARCHIVED] - This document is no longer current
+
+> **NOTICE:** This documentation has been archived on 2025-05-10 as part of the Hephaestus UI simplification.
+> Please refer to the current documentation in [Hephaestus_UI_Implementation.md](/MetaData/TektonDocumentation/DeveloperGuides/Hephaestus_UI_Implementation.md).
+> Retained for historical reference only.
+
 # Shadow DOM Implementation
 
 **Last Updated:** May 10, 2025
