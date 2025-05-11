@@ -1,10 +1,275 @@
 # Tekton Shared Component Utilities
 
-This document describes the shared utilities available for Tekton components, how to use them, and best practices for incorporating them into your component development.
+This document describes the shared utilities available for Tekton components, using our new simplified UI approach with direct HTML injection and BEM naming conventions.
 
 ## Overview
 
 Tekton provides a set of shared utilities to standardize common functionality across components. These utilities help ensure consistent behavior, reduce code duplication, and simplify component development.
+
+## UI Component Utilities
+
+### Direct HTML Injection
+
+The new UI approach uses direct HTML injection instead of Shadow DOM:
+
+```javascript
+class ComponentUtilities {
+  /**
+   * Inject HTML into a container element
+   * @param {string} html - HTML content to inject
+   * @param {HTMLElement} container - Container element to inject into
+   * @returns {HTMLElement} - The container with injected content
+   */
+  static injectHTML(html, container) {
+    container.innerHTML = html;
+    return container;
+  }
+  
+  /**
+   * Load component HTML from a URL and inject it into a container
+   * @param {string} url - URL to load HTML from
+   * @param {HTMLElement} container - Container element to inject into
+   * @returns {Promise<HTMLElement>} - The container with injected content
+   */
+  static async loadAndInjectHTML(url, container) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to load HTML from ${url}: ${response.status}`);
+      }
+      const html = await response.text();
+      return this.injectHTML(html, container);
+    } catch (error) {
+      console.error('Error loading component HTML:', error);
+      container.innerHTML = `<div class="component-error">
+        <h3>Error Loading Component</h3>
+        <p>${error.message}</p>
+      </div>`;
+      throw error;
+    }
+  }
+}
+```
+
+### Component Class Pattern
+
+Each component follows a standard class-based pattern:
+
+```javascript
+/**
+ * Base component class for Tekton UI components
+ */
+class BaseComponent {
+  /**
+   * Create a new component
+   * @param {string} id - Component ID
+   * @param {HTMLElement} container - Container element to render into
+   */
+  constructor(id, container) {
+    this.id = id;
+    this.container = container;
+    this.state = {};
+    this.eventHandlers = [];
+    this.styleElement = null;
+    this.initialized = false;
+  }
+  
+  /**
+   * Initialize the component
+   * @returns {Promise<BaseComponent>} - The component instance
+   */
+  async init() {
+    if (this.initialized) return this;
+    
+    try {
+      // Load HTML
+      await ComponentUtilities.loadAndInjectHTML(
+        `/components/${this.id}/${this.id}-component.html`, 
+        this.container
+      );
+      
+      // Load and inject styles
+      await this.loadStyles();
+      
+      // Initialize event handlers
+      this.initEventHandlers();
+      
+      this.initialized = true;
+      
+      return this;
+    } catch (error) {
+      console.error(`Error initializing component ${this.id}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Load component styles
+   * @returns {Promise<HTMLStyleElement>} - The created style element
+   */
+  async loadStyles() {
+    try {
+      const response = await fetch(`/styles/${this.id}/${this.id}-component.css`);
+      if (!response.ok) {
+        throw new Error(`Failed to load styles: ${response.status}`);
+      }
+      
+      const css = await response.text();
+      
+      // Create or update style element
+      if (!this.styleElement) {
+        this.styleElement = document.createElement('style');
+        document.head.appendChild(this.styleElement);
+      }
+      
+      this.styleElement.textContent = css;
+      return this.styleElement;
+    } catch (error) {
+      console.error(`Error loading styles for ${this.id}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Initialize event handlers
+   * Must be implemented by subclasses
+   */
+  initEventHandlers() {
+    // To be implemented by subclasses
+  }
+  
+  /**
+   * Add an event handler
+   * @param {HTMLElement} element - Element to attach handler to
+   * @param {string} eventType - Event type (e.g., 'click')
+   * @param {Function} handler - Event handler function
+   */
+  addEventHandler(element, eventType, handler) {
+    element.addEventListener(eventType, handler);
+    
+    // Store for cleanup
+    this.eventHandlers.push({
+      element,
+      eventType,
+      handler
+    });
+  }
+  
+  /**
+   * Clean up the component
+   */
+  cleanup() {
+    // Remove event handlers
+    this.eventHandlers.forEach(({element, eventType, handler}) => {
+      element.removeEventListener(eventType, handler);
+    });
+    this.eventHandlers = [];
+    
+    // Remove style element
+    if (this.styleElement && this.styleElement.parentNode) {
+      this.styleElement.parentNode.removeChild(this.styleElement);
+      this.styleElement = null;
+    }
+    
+    // Clear container
+    this.container.innerHTML = '';
+    
+    this.initialized = false;
+  }
+  
+  /**
+   * Find an element within the component
+   * @param {string} selector - CSS selector
+   * @returns {HTMLElement} - The found element
+   */
+  $(selector) {
+    return this.container.querySelector(selector);
+  }
+  
+  /**
+   * Find all elements within the component
+   * @param {string} selector - CSS selector
+   * @returns {HTMLElement[]} - The found elements
+   */
+  $$(selector) {
+    return [...this.container.querySelectorAll(selector)];
+  }
+  
+  /**
+   * Update the component's state
+   * @param {Object} newState - New state to merge with current state
+   */
+  updateState(newState) {
+    this.state = {...this.state, ...newState};
+    this.render();
+  }
+  
+  /**
+   * Render the component based on current state
+   * Must be implemented by subclasses
+   */
+  render() {
+    // To be implemented by subclasses
+  }
+}
+```
+
+### BEM Utility Functions
+
+Helpers for working with BEM-style class names:
+
+```javascript
+/**
+ * Utilities for working with BEM-style class names
+ */
+class BEMUtilities {
+  /**
+   * Create a block class name
+   * @param {string} block - Block name
+   * @returns {string} - The block class name
+   */
+  static block(block) {
+    return block;
+  }
+  
+  /**
+   * Create an element class name
+   * @param {string} block - Block name
+   * @param {string} element - Element name
+   * @returns {string} - The element class name
+   */
+  static element(block, element) {
+    return `${block}__${element}`;
+  }
+  
+  /**
+   * Create a modifier class name
+   * @param {string} blockOrElement - Block or element class name
+   * @param {string} modifier - Modifier name
+   * @returns {string} - The modifier class name
+   */
+  static modifier(blockOrElement, modifier) {
+    return `${blockOrElement}--${modifier}`;
+  }
+  
+  /**
+   * Get class names for an element with optional modifiers
+   * @param {string} block - Block name
+   * @param {string} element - Element name
+   * @param {Object} modifiers - Object where keys are modifier names and values are booleans
+   * @returns {string} - Space-separated class names
+   */
+  static elementWithModifiers(block, element, modifiers = {}) {
+    const elementClass = this.element(block, element);
+    
+    return Object.entries(modifiers)
+      .filter(([_, active]) => active)
+      .reduce((classes, [modifier]) => {
+        return `${classes} ${this.modifier(elementClass, modifier)}`;
+      }, elementClass);
+  }
+}
+```
 
 ## Shell Utilities
 
@@ -80,73 +345,6 @@ tekton_wait_for_port_available 8080 30 "Hephaestus UI"
 
 # Wait for a port to start responding
 tekton_wait_for_port_responding 8080 30 "Hephaestus UI"
-```
-
-### Process Management (tekton-process.sh)
-
-Utilities for starting, stopping, and monitoring processes.
-
-```bash
-#!/bin/bash
-
-# Source the utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/tekton-utils.sh"
-source "${SCRIPT_DIR}/../lib/tekton-ports.sh"
-source "${SCRIPT_DIR}/../lib/tekton-process.sh"
-
-# Check if a process is running
-if tekton_is_running "hermes"; then
-    # Process is running
-fi
-
-# Get PIDs of matching processes
-PIDS=$(tekton_get_pids "hermes")
-
-# Kill processes
-tekton_kill_processes "hermes" "Hermes Service"
-
-# Start a Python script in the background
-PID=$(tekton_start_python_script "/path/to/script.py" "My Service" "--arg1" "--arg2")
-
-# Start a component server
-tekton_start_component_server "hermes" "hermes.api.app" "/path/to/Hermes" 8001
-
-# Use Hermes for graceful shutdown
-tekton_shutdown_via_hermes
-
-# Get process information for a component
-INFO=$(tekton_get_component_processes "hermes")
-```
-
-### Configuration Management (tekton-config.sh)
-
-Utilities for loading and managing configuration from files and environment variables.
-
-```bash
-#!/bin/bash
-
-# Source the utilities
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/tekton-utils.sh"
-source "${SCRIPT_DIR}/../lib/tekton-config.sh"
-
-# Initialize configuration
-tekton_init_config
-
-# Get configuration values
-VALUE=$(tekton_get_config "my-key" "default-value")
-BOOL_VALUE=$(tekton_get_config_bool "my-bool" "false")
-NUM_VALUE=$(tekton_get_config_number "my-num" "0")
-
-# Set configuration values
-tekton_set_config "my-key" "new-value"
-
-# Save configuration to file
-tekton_save_config "my-key" "saved-value"
-
-# Parse command-line arguments
-tekton_parse_args "$@"
 ```
 
 ## Python Utilities
@@ -227,178 +425,113 @@ async def main():
         print("Failed to register component")
 ```
 
-## Command-Line Tools
+## Best Practices for Simplified UI Components
 
-### tekton-register
+1. **HTML Structure**: Follow the standard RIGHT PANEL structure with HEADER, MENU BAR, WORKSPACE, and optional CHAT-INPUT-AREA.
 
-Registers Tekton components with the Hermes service registry.
+2. **BEM Naming Convention**: Use Block-Element-Modifier pattern for CSS class names.
+   ```css
+   /* Block */
+   .component-name {}
+   
+   /* Element */
+   .component-name__header {}
+   .component-name__menu {}
+   
+   /* Modifier */
+   .component-name__button--primary {}
+   .component-name__menu--collapsed {}
+   ```
 
-```bash
-# Register a component
-tekton-register register --component rhetor
+3. **Component Size**: Keep component files under 500 lines. Split files at 600+ lines with a hard limit of 1000 lines.
 
-# Check registration status
-tekton-register status --component rhetor
+4. **Direct HTML Injection**: Use direct HTML injection instead of Shadow DOM for simpler debugging and integration.
 
-# Generate a template configuration
-tekton-register generate --component my-component --port 8123 --output my-component.yaml
+5. **File Organization**: Follow the standard file organization:
+   ```
+   components/
+   ├── [component-name]/
+   │   └── [component-name]-component.html
+   ├── styles/
+   │   └── [component-name]/
+   │       └── [component-name]-component.css
+   └── scripts/
+       └── [component-name]/
+           ├── [component-name]-service.js (optional)
+           └── [component-name]-component.js
+   ```
 
-# List all registered components
-tekton-register list
+6. **Cleanup**: Always implement proper cleanup to prevent memory leaks:
+   ```javascript
+   // In your component class
+   cleanup() {
+     // Remove event listeners
+     this.eventHandlers.forEach(({element, eventType, handler}) => {
+       element.removeEventListener(eventType, handler);
+     });
+     
+     // Clear references
+     this.container.innerHTML = '';
+     this.eventHandlers = [];
+   }
+   ```
 
-# Unregister a component
-tekton-register unregister --component rhetor
-```
+7. **Event Delegation**: Use event delegation for efficient event handling:
+   ```javascript
+   // Instead of adding handlers to each button
+   this.$$('.my-component__button').forEach(button => {
+     button.addEventListener('click', this.handleClick.bind(this));
+   });
+   
+   // Use delegation on the container
+   this.container.addEventListener('click', event => {
+     const button = event.target.closest('.my-component__button');
+     if (button) {
+       this.handleClick(event);
+     }
+   });
+   ```
 
-### tekton-config-cli.py
-
-Provides access to configuration values from bash scripts.
-
-```bash
-# Get a configuration value
-value=$(tekton-config-cli.py get my-key default-value)
-
-# Set a configuration value
-tekton-config-cli.py set my-key "my value"
-
-# Get a component port
-port=$(tekton-config-cli.py get-port hephaestus)
-
-# Generate environment variables
-eval $(tekton-config-cli.py generate-env)
-```
-
-## New Shared Utilities
-
-### Prompt Templates
-
-A shared system for managing and rendering LLM prompt templates.
-
-```python
-from tekton_llm_client import PromptTemplateRegistry, load_template
-
-# Create a registry with default templates
-registry = PromptTemplateRegistry()
-
-# Register a custom template
-registry.register({
-    "name": "api_design",
-    "template": "Design a REST API for {{ service_name }} with these requirements:\n{{ requirements }}",
-    "description": "Template for API design tasks."
-})
-
-# Load a template from a file
-template = load_template("/path/to/templates/code_review.json")
-registry.register(template)
-
-# Render a template with variables
-prompt = registry.render("api_design",
-    service_name="User Management",
-    requirements="- User registration\n- Authentication\n- Profile management"
-)
-```
-
-### Response Handlers
-
-Utilities for parsing and processing LLM responses in different formats.
-
-```python
-from tekton_llm_client import (
-    parse_json, 
-    StructuredOutputParser, 
-    OutputFormat,
-    StreamHandler
-)
-
-# Parse JSON from LLM response
-try:
-    data = parse_json("```json\n{\"key\": \"value\"}\n```")
-    print(f"Parsed: {data}")
-except Exception as e:
-    print(f"Parsing error: {e}")
-
-# Parse different output formats
-parser = StructuredOutputParser(format=OutputFormat.LIST)
-items = parser.parse("1. First item\n2. Second item\n3. Third item")
-
-# Process streaming responses
-async def handle_stream():
-    stream = client.generate_text(prompt="Write a story", streaming=True)
-    handler = StreamHandler()
-    result = await handler.process_stream(stream)
-    print(f"Complete text: {result}")
-```
-
-### Configuration Utilities
-
-Utilities for managing configuration from environment variables and files.
-
-```python
-from tekton_llm_client.config import (
-    get_env, set_env, load_settings, save_settings,
-    ClientSettings, LLMSettings
-)
-
-# Get/set environment variables
-debug = get_env_bool("DEBUG", default=False)
-set_env("APP_MODE", "production")
-
-# Load settings from file and environment
-settings = load_settings(
-    component_id="my-component",
-    file_path="/path/to/settings.json",
-    load_from_env=True
-)
-
-# Create and save settings
-my_settings = ClientSettings(
-    component_id="my-component",
-    llm=LLMSettings(
-        provider="anthropic",
-        model="claude-3-haiku-20240307"
-    )
-)
-save_settings(my_settings, "/path/to/settings.json")
-```
-
-## Best Practices
-
-1. **Use Shared Utilities**: Always prefer shared utilities over custom implementations.
-
-2. **Port Management**: Use the standardized port assignments and environment variables rather than hardcoding port numbers.
-
-3. **Component Registration**: Register your component with Hermes using the `tekton-register` utility to enable lifecycle management and service discovery.
-
-4. **Error Handling**: Use the standardized error handling functions for consistent error reporting.
-
-5. **Configuration**: Use the configuration utilities to load configuration from files and environment variables.
-
-6. **Process Management**: Use the process management utilities for starting, stopping, and monitoring processes.
-
-7. **Cross-Platform Compatibility**: Use the cross-platform utilities for OS-specific operations.
-
-8. **LLM Integration**: Use the tekton-llm-client for all LLM interactions, including prompt templates and response handling.
+8. **Component Communication**: Use custom events for component communication:
+   ```javascript
+   // Dispatch an event
+   const event = new CustomEvent('componentStateChanged', {
+     bubbles: true,
+     detail: { 
+       componentId: this.id,
+       state: this.state
+     }
+   });
+   this.container.dispatchEvent(event);
+   
+   // Listen for events from other components
+   document.addEventListener('componentStateChanged', event => {
+     if (event.detail.componentId !== this.id) {
+       this.handleExternalStateChange(event.detail);
+     }
+   });
+   ```
 
 ## Migration Guide
 
-To migrate existing components to use the shared utilities:
+To migrate existing components to use the new simplified approach:
 
-1. Replace custom logging with `tekton_info`, `tekton_success`, `tekton_warn`, and `tekton_error_exit`.
+1. **Convert Shadow DOM components** to use direct HTML injection with the BaseComponent class.
 
-2. Replace port management code with `tekton_is_port_used`, `tekton_release_port`, etc.
+2. **Apply BEM naming conventions** to CSS classes for better organization and isolation.
 
-3. Replace process management code with `tekton_is_running`, `tekton_kill_processes`, etc.
+3. **Restructure the component** to follow the standard RIGHT PANEL layout.
 
-4. Replace configuration loading code with `tekton_get_config`, `tekton_set_config`, etc.
+4. **Move event handlers** from Shadow DOM delegation to standard delegation.
 
-5. Replace component registration code with the `tekton-register` utility.
+5. **Replace Shadow DOM event dispatch** with standard CustomEvents.
 
-6. Replace custom LLM integration with the `tekton-llm-client` package.
+6. **Update component loading** to use the new class-based pattern.
 
-7. Replace ad-hoc prompt templates with the shared prompt template system.
+7. **Clean up any Shadow DOM-specific code** that's no longer needed.
 
-8. Replace custom response parsing with the shared response handlers.
+8. **Verify component styling** works properly without Shadow DOM encapsulation.
 
 ## Examples
 
-See the `examples` directory for complete examples of using the shared utilities and the enhanced tekton-llm-client.
+See the `examples` directory for complete examples of using the shared utilities with the new direct HTML injection approach and BEM naming conventions.

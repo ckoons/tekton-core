@@ -63,7 +63,7 @@ Define CSS variables in the root or theme scope:
   --font-size-base: 1rem;
   --font-size-large: 1.25rem;
   
-  /* Colors */
+  /* Base Colors */
   --color-primary: #3b80f7;
   --color-secondary: #6c757d;
   --color-success: #28a745;
@@ -79,6 +79,118 @@ Define CSS variables in the root or theme scope:
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+}
+```
+
+## Component Color Scheme
+
+Tekton uses a consistent color scheme for component identification. Each component has a designated color that should be used for visual identification, borders, accents, and tab indicators.
+
+### Component Colors
+
+| Component       | Color Code | Color Name      | Usage                           |
+|-----------------|------------|-----------------|----------------------------------|
+| Hermes          | #4285F4    | Blue            | Core component for messaging    |
+| Engram          | #34A853    | Green           | Memory system                   |
+| Tekton Core     | #FBBC05    | Yellow/Gold     | Orchestration core              |
+| Athena          | #7B1FA2    | Purple          | Knowledge graph component       |
+| Ergon           | #0097A7    | Teal            | Agent framework                 |
+| Rhetor          | #D32F2F    | Red             | LLM management                  |
+| Harmonia        | #F57C00    | Orange          | Workflow engine                 |
+| Telos           | #00796B    | Dark Teal       | Requirements system             |
+| Prometheus      | #C2185B    | Pink            | Planning system                 |
+| Terma           | #5D4037    | Brown           | Terminal interface              |
+| Sophia          | #7CB342    | Light Green     | Machine Learning                |
+| Synthesis       | #3949AB    | Indigo          | Execution engine                |
+| Codex           | #00ACC1    | Light Blue      | Software engineering            |
+| LLM Adapter     | #8D6E63    | Light Brown     | LLM interface                   |
+| Hephaestus      | #616161    | Gray            | UI system                       |
+
+### Application Guidelines
+
+1. **Component Headers**: 
+   - Use the component color as a border or accent in component headers
+   - Example: `border: 2px solid var(--color-athena);` or `border-left: 4px solid var(--color-athena);`
+
+2. **Tab Indicators**:
+   - When showing component tabs in the left panel, use a colored dot with the component color
+   - Example: 
+     ```html
+     <div class="nav-item">
+       <span class="nav-item-text">Athena</span>
+       <div class="tab-indicator" style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-athena);"></div>
+     </div>
+     ```
+   - Complete example for left panel tabs:
+     ```html
+     <div class="nav-panel">
+       <div class="nav-item">
+         <span class="nav-item-text">Hermes</span>
+         <div class="tab-indicator" style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-hermes);"></div>
+       </div>
+       <div class="nav-item">
+         <span class="nav-item-text">Engram</span>
+         <div class="tab-indicator" style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-engram);"></div>
+       </div>
+       <div class="nav-item active">
+         <span class="nav-item-text">Athena</span>
+         <div class="tab-indicator" style="width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-athena);"></div>
+       </div>
+     </div>
+     ```
+
+3. **Icon Markers**:
+   - When using the Tekton hexagon icon, apply a colored border with the component color
+   - Example: 
+     ```html
+     <div style="position: relative;">
+       <img src="/images/hexagon.jpg" alt="Tekton">
+       <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid var(--color-athena);"></div>
+     </div>
+     ```
+
+4. **Team Chat Indicator**:
+   - All Tekton components should include a Team Chat tab as the last tab in their menu bar
+   - The Team Chat interface should be consistent across all components
+   - Example:
+     ```html
+     <div class="component-tabs">
+       <!-- Component-specific tabs here -->
+       <div class="component-tab">Component Tab 1</div>
+       <div class="component-tab">Component Tab 2</div>
+       <!-- Team Chat tab always appears last -->
+       <div class="component-tab team-chat-tab">Team Chat</div>
+     </div>
+     ```
+
+5. **Active States and Status Indicators**:
+   - Use the component color for active states, focus indicators, and selection highlights
+   - Example: `border-bottom: 3px solid var(--color-athena);` for active tabs
+   - Implement status indicators for component availability (refer to COMPONENT_STATUS_INDICATORS.md)
+   - Use the component colors for the status indicators in the left panel navigation
+
+### Implementation
+
+Include these color variables in your CSS:
+
+```css
+:root {
+  /* Component Colors */
+  --color-hermes: #4285F4;      /* Blue */
+  --color-engram: #34A853;      /* Green */
+  --color-tekton-core: #FBBC05; /* Yellow/Gold */
+  --color-athena: #7B1FA2;      /* Purple */
+  --color-ergon: #0097A7;       /* Teal */
+  --color-rhetor: #D32F2F;      /* Red */
+  --color-harmonia: #F57C00;    /* Orange */
+  --color-telos: #00796B;       /* Dark Teal */
+  --color-prometheus: #C2185B;  /* Pink */
+  --color-terma: #5D4037;       /* Brown */
+  --color-sophia: #7CB342;      /* Light Green */
+  --color-synthesis: #3949AB;   /* Indigo */
+  --color-codex: #00ACC1;       /* Light Blue */
+  --color-llm-adapter: #8D6E63; /* Light Brown */
+  --color-hephaestus: #616161;  /* Gray */
 }
 ```
 

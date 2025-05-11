@@ -33,7 +33,7 @@ Each component should follow the established implementation pattern:
 
 ### 2. Frontend Development
 
-- Implement Shadow DOM component with BEM naming convention
+- Implement component using direct HTML insertion with BEM naming conventions
 - Create component service layer extending BaseService
 - Implement State Management Pattern with subscriptions
 - Create responsive UI with appropriate visualizations
@@ -203,7 +203,7 @@ For each component, follow this sequence:
 2. **Implementation Phase**:
    - Develop backend functionality
    - Create service layer with State Management
-   - Implement UI with Shadow DOM
+   - Implement UI with BEM naming conventions
    - Build integration connectors
 
 3. **Testing Phase**:
@@ -235,7 +235,7 @@ Ensure all implementations follow these established standards:
    - Comprehensive commenting
 
 2. **UI Implementation**:
-   - Shadow DOM for component isolation
+   - Direct HTML insertion with proper DOM cleanup
    - BEM naming convention for CSS
    - Responsive design for all screen sizes
    - Accessibility compliance (WCAG)
@@ -269,3 +269,4 @@ The phased approach allows for incremental development and testing, with each co
 - [Component Integration Patterns](../Architecture/ComponentIntegrationPatterns.md)
 - [State Management Architecture](../Architecture/StateManagementArchitecture.md)
 - [BEM Naming Conventions](./BEMNamingConventions.md)
+- [UI Refactoring Guide](/Hephaestus/ui/REFACTORING.md)

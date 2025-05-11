@@ -415,10 +415,25 @@ Tekton components will implement consistent user interfaces:
   - All components must have well-designed command-line interfaces
   - CLI functionality will be prioritized for testing and maintenance
   - Complete functionality must be accessible via CLI
+
 - **Complementary GUI Interfaces**:
   - Simple, intuitive graphical interfaces for common operations
   - GUI updates may follow CLI implementations with lower priority
   - Consistent design language across all component GUIs
+  - Standardized RIGHT PANEL structure:
+    - HEADER for component identification
+    - MENU BAR for tab navigation 
+    - WORKSPACE for content display
+    - CHAT-INPUT-AREA (for LLM components only)
+
+- **UI Simplicity**:
+  - Follow the "Keep It Simple" philosophy
+  - Focus on functionality over visual complexity
+  - Use standard patterns and avoid unnecessary customizations
+  - Prefer clear, direct user interactions
+  - Maintain consistent component architecture
+  - Follow file size limitations (see [TEKTON_GUI_STYLING_RULES.md](/TEKTON_GUI_STYLING_RULES.md))
+
 - **Automated Interface Testing**:
   - Comprehensive automated testing for all CLI functionality
   - Automated GUI testing where possible to reduce human testing burden
