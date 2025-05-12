@@ -96,6 +96,35 @@ Each component follows this standard structure:
     /* Title styles */
   }
   
+  /* Chat Panel Structure (Important for proper scrolling) */
+  .component-name__panel {
+    position: relative; /* Needed for absolute positioning of elements */
+    overflow: hidden; /* Prevent double scrollbars */
+  }
+
+  .component-name__chat-messages {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 70px; /* Height of the footer */
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .component-name__footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    padding: 12px 16px;
+    background-color: var(--bg-secondary, #252535);
+    border-top: 1px solid var(--border-color, #444444);
+  }
+
   /* Additional component-specific styles */
 </style>
 ```
@@ -394,6 +423,7 @@ The initial implementation examples include:
 
 1. **Test Component**: A minimalist example for testing component loading and display
 2. **Athena Component**: A full-featured knowledge graph component with tabs, forms, and interactive features
+3. **Ergon Component**: An agent management and LLM integration interface with complex modal forms and chat functionality
 
 These components demonstrate the core principles of the clean slate architecture and can be used as references for implementing additional components.
 
