@@ -4,13 +4,14 @@
 
 You are assisting with the Clean Slate Sprint for the Tekton project. This sprint focuses on rebuilding the UI component architecture to address persistent issues in previous implementations. The goal is to establish a reliable, standardized approach to UI components with proper isolation and clear patterns.
 
-The project has been making good progress. So far, we have:
+The project has been making excellent progress. So far, we have:
 1. Implemented the Athena component with BEM naming and proper isolation
 2. Implemented the Ergon component and fixed its tab switching functionality
-3. Created a comprehensive debug instrumentation system for both frontend and backend
-4. Added debug instrumentation to the Athena and Ergon components
+3. Implemented the Hermes component following the same patterns
+4. Created a comprehensive debug instrumentation system for both frontend and backend
+5. Added debug instrumentation to the Athena, Ergon, and Hermes components
 
-The next major task is to implement the Hermes component using the same patterns and add debug instrumentation to it.
+The next major task is to implement the Engram component (memory system) using the same patterns and add debug instrumentation to it.
 
 ## Your Role
 
@@ -55,65 +56,47 @@ As the AI assistant for this sprint, your role is to implement the plans followi
 
 ## Implementation Approach
 
-### Phase 1: Foundation and Component Loader
+### Phase 1: Foundation (Completed)
 
-1. **First, analyze the existing component loader**:
-   - How components are loaded and initialized
-   - How paths are resolved
-   - Error handling mechanisms
-   - Points of failure in the current implementation
+- We've established the foundation with the component loader
+- Created golden component templates based on Athena
+- Defined component contracts for lifecycle, events, and state
+- Implemented debug instrumentation
 
-2. **Create simplified component loader**:
-   - Focus solely on reliable loading
-   - Clear error handling
-   - Simplified path resolution
-   - Proper cleanup
+### Phase 2: Component Implementation (In Progress)
 
-3. **Establish golden component template**:
-   - Create HTML template with proper structure
-   - Create CSS template with BEM naming
-   - Create JS template with lifecycle methods
-   - Document usage clearly
+1. **Implemented Athena component** ✅
+   - Used as the reference implementation with BEM naming
+   - Verified proper isolation and functionality
 
-4. **Define component contract**:
-   - Lifecycle methods (init, activate, cleanup)
-   - Event handling
-   - State management
-   - Integration with UI manager
+2. **Implemented Ergon component** ✅
+   - Followed the template pattern established by Athena
+   - Added tab switching and state management
+   - Verified isolation from other components
 
-### Phase 2: Component Implementation
+3. **Implemented Hermes component** ✅
+   - Followed the same template and patterns
+   - Added chat functionality and proper isolation
+   - Ensured visual consistency with Athena
 
-1. **Implement Ergon component**:
-   - Start with HTML structure following template
+4. **Next: Implement Engram component** ⚠️
+   - Start with HTML structure following the template
    - Add CSS with BEM naming
    - Implement JS with lifecycle methods
-   - Verify basic loading works
+   - Add memory-specific functionality
+   - Ensure visual consistency with other components
 
-2. **Add interactivity**:
-   - Implement tab switching
-   - Add basic state management
-   - Handle environmental configuration
-   - Test interactions thoroughly
+### Phase 3: Validation and Documentation (Ongoing)
 
-3. **Create test harness**:
-   - Simple tests for component loading
-   - Verification of component behavior
-   - Error case testing
-   - Isolation verification
+1. **Documentation updates** (continuous)
+   - Document each component implementation
+   - Update guides and references
+   - Create troubleshooting information
 
-### Phase 3: Validation and Documentation
-
-1. **Comprehensive testing**:
-   - Test all components together
-   - Verify no interference
-   - Test error handling
-   - Test different scenarios
-
-2. **Documentation**:
-   - Update component development guide
-   - Create troubleshooting guide
-   - Document patterns and contracts
-   - Provide clear examples
+2. **Testing and validation** (with each component)
+   - Test loading and functionality
+   - Verify isolation from other components
+   - Test error handling and recovery
 
 ## Specific Guidelines
 
@@ -123,6 +106,12 @@ As the AI assistant for this sprint, your role is to implement the plans followi
 - Use clear, descriptive class names following BEM
 - Ensure proper nesting and hierarchy
 - Keep markup clean and minimal
+- Follow the established structure:
+  - Component container
+  - Header with title
+  - Menu bar with tabs
+  - Content area with panels
+  - Footer with input (for chat components)
 
 ### Working with CSS
 
@@ -131,54 +120,35 @@ As the AI assistant for this sprint, your role is to implement the plans followi
 - Avoid global styles or resets
 - Use relative units when possible
 - Prefer flexbox/grid for layout
+- Match heights and spacing with Athena component:
+  - Header height: 50px
+  - Menu bar height: 46px
+  - Footer height: 70px
 
 ### Working with JavaScript
 
-- Scope queries to component container: `this.root.querySelector()`
+- Scope queries to component container: `document.querySelector('.componentName').querySelector()`
 - Use clear method and variable names
 - Follow the defined lifecycle pattern
-- Proper error handling
+- Implement proper error handling
 - Clean up event listeners and resources
-
-## File Organization
-
-Maintain the current file organization structure:
-
-```
-Hephaestus/ui/
-├── components/                   # Component HTML templates
-│   ├── ergon/
-│   │   └── ergon-component.html  # Ergon component HTML
-├── scripts/                      # JavaScript files
-│   ├── component-loader.js       # Component loader
-│   └── ergon/                    # Component-specific JS
-│       └── ergon-component.js    # Ergon functionality
-└── styles/                       # CSS stylesheets
-    └── ergon/                    # Component-specific CSS
-        └── ergon-component.css   # Ergon styles
-```
+- Protect against UI Manager interference
 
 ## Key Files to Modify
 
-### Component Loader
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/minimal-loader.js`
+### Engram Component (to implement)
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/engram/engram-component.html`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/engram/engram-component.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/engram/engram-service.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/engram/engram-memory-service.js`
+
+### Reference Components (already implemented)
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/athena/athena-component.html`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/ergon/ergon-component.html`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/hermes/hermes-component.html`
 
 ### Debug Instrumentation
 - `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/debug-shim.js`
-- `/Users/cskoons/projects/github/Tekton/shared/debug/debug_utils.py`
-
-### Hermes Component (to implement)
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/hermes/hermes-component.html`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-component.js`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-service.js`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-llm-service.js`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/styles/hermes/hermes-component.css`
-
-### Reference Components (already implemented)
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/ergon/ergon-component.html`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ergon/ergon-component.js`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/athena/athena-component.html`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/athena/athena-component.js`
 
 ## Getting Started
 
@@ -188,26 +158,22 @@ Hephaestus/ui/
    # Should show sprint/Clean_Slate_051125
    ```
 
-2. Examine the debug instrumentation system:
+2. Examine the completed Hermes component for reference:
    ```bash
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/debug-shim.js
-   cat /Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/ComponentInstrumentation.md
+   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/hermes/hermes-component.html
    ```
 
-3. Examine the Ergon and Athena components for reference:
+3. Review the Engram implementation guide:
    ```bash
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/ergon/ergon-component.html
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ergon/ergon-component.js
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/athena/athena-component.html
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/athena/athena-component.js
+   cat /Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/EngramComponentImplementation.md
    ```
 
-4. Review the Hermes implementation guide:
-   ```bash
-   cat /Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/HermesComponentImplementation.md
-   ```
+4. Begin implementing the Engram component following the implementation guide and the patterns from Athena, Ergon, and Hermes
 
-5. Begin implementing the Hermes component following the implementation guide and the patterns from Ergon and Athena
+5. Test the component in the Hephaestus UI by running:
+   ```bash
+   cd /Users/cskoons/projects/github/Tekton/Hephaestus/ui && python server/server.py
+   ```
 
 ## Important Notes
 
@@ -217,6 +183,7 @@ Hephaestus/ui/
 4. **Document your work**: Document any challenges, decisions, or patterns
 5. **Follow the established patterns**: Consistency is crucial
 6. **Maintain restraint**: Focus on reliability over features
+7. **Visual consistency**: Ensure the Engram component visually matches Athena and Hermes
 
 ## Documentation
 
@@ -225,7 +192,6 @@ Refer to these documents for detailed guidance:
 - [Sprint Plan](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/SprintPlan.md)
 - [Architectural Decisions](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/ArchitecturalDecisions.md)
 - [Implementation Plan](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/ImplementationPlan.md)
-- [Hermes Implementation Guide](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/HermesComponentImplementation.md)
+- [Hermes Implementation Summary](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/HermesImplementationSummary.md)
+- [Engram Implementation Guide](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/EngramComponentImplementation.md)
 - [Debug Instrumentation Guide](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/ComponentInstrumentation.md)
-- [Debug Quick Start Guide](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/QuickStartGuide.md)
-- [Debug System README](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/README.md)
