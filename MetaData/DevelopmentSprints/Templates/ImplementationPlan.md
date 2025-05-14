@@ -6,6 +6,52 @@ This document outlines the detailed implementation plan for the [Sprint Name] De
 
 Tekton is an intelligent orchestration system that coordinates multiple AI models and resources to efficiently solve complex software engineering problems. This Implementation Plan focuses on [brief description of the focus area].
 
+## Debug Instrumentation Requirements
+
+All code produced in this sprint **MUST** follow the [Debug Instrumentation Guidelines](/MetaData/TektonDocumentation/DeveloperGuides/Debugging/DebuggingInstrumentation.md). This section specifies the debug instrumentation requirements for this sprint's implementation.
+
+### JavaScript Components
+
+The following JavaScript components must be instrumented:
+
+| Component | Log Level | Notes |
+|-----------|-----------|-------|
+| [Component 1] | INFO | [Specific instrumentation notes] |
+| [Component 2] | DEBUG | [Specific instrumentation notes] |
+| [Component 3] | TRACE | [Specific instrumentation notes] |
+
+All instrumentation must use conditional checks:
+
+```javascript
+if (window.TektonDebug) TektonDebug.info('componentName', 'Message', optionalData);
+```
+
+### Python Components
+
+The following Python components must be instrumented:
+
+| Component | Log Level | Notes |
+|-----------|-----------|-------|
+| [Component 1] | INFO | [Specific instrumentation notes] |
+| [Component 2] | DEBUG | [Specific instrumentation notes] |
+| [Component 3] | TRACE | [Specific instrumentation notes] |
+
+All instrumentation must use the `debug_log` utility:
+
+```python
+from shared.debug.debug_utils import debug_log, log_function
+
+debug_log.info("component_name", "Message")
+```
+
+Key methods should use the `@log_function` decorator:
+
+```python
+@log_function()
+def important_method(param1, param2):
+    # Method implementation
+```
+
 ## Implementation Phases
 
 This sprint will be implemented in [X] phases:

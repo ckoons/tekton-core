@@ -79,14 +79,23 @@ For Claude Code sessions and development work during this sprint, follow these g
 - [x] Implement Ergon component HTML with BEM naming
 - [x] Implement Ergon component CSS with BEM naming
 - [x] Implement Ergon component JS with container-scoped queries
+- [x] Fix Ergon component tab switching functionality
+- [ ] Implement Hermes component with Clean Slate architecture
 - [ ] Create component test harness
 
-### Phase 3: Validation and Documentation
+### Phase 3: Debug Instrumentation & Validation
+- [x] Implement debug-shim.js for frontend instrumentation 
+- [x] Implement debug_utils.py for backend instrumentation
+- [x] Add debug instrumentation to Athena component
+- [x] Add debug instrumentation to Ergon component
+- [x] Create debug instrumentation documentation
+- [x] Create debug quick start guide
+- [ ] Add debug instrumentation to Hermes component
 - [x] Comprehensive component testing for Athena
 - [x] Comprehensive component testing for Ergon
 - [x] Update component development documentation
 - [x] Create implementation guide for Clean Slate architecture
-- [ ] Create troubleshooting guide
+- [x] Create troubleshooting guide for debug instrumentation
 
 ## Session Handoff
 

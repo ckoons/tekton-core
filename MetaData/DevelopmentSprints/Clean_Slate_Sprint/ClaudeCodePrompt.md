@@ -4,7 +4,13 @@
 
 You are assisting with the Clean Slate Sprint for the Tekton project. This sprint focuses on rebuilding the UI component architecture to address persistent issues in previous implementations. The goal is to establish a reliable, standardized approach to UI components with proper isolation and clear patterns.
 
-The project has already been reset to a clean state with the main branch, providing a solid foundation to build upon. The key architectural decisions and implementation plan have been documented in detail.
+The project has been making good progress. So far, we have:
+1. Implemented the Athena component with BEM naming and proper isolation
+2. Implemented the Ergon component and fixed its tab switching functionality
+3. Created a comprehensive debug instrumentation system for both frontend and backend
+4. Added debug instrumentation to the Athena and Ergon components
+
+The next major task is to implement the Hermes component using the same patterns and add debug instrumentation to it.
 
 ## Your Role
 
@@ -155,15 +161,24 @@ Hephaestus/ui/
 ## Key Files to Modify
 
 ### Component Loader
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/component-loader.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/minimal-loader.js`
 
-### UI Manager
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ui-manager-core.js`
+### Debug Instrumentation
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/debug-shim.js`
+- `/Users/cskoons/projects/github/Tekton/shared/debug/debug_utils.py`
 
-### Ergon Component
+### Hermes Component (to implement)
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/hermes/hermes-component.html`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-component.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-service.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/hermes/hermes-llm-service.js`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/styles/hermes/hermes-component.css`
+
+### Reference Components (already implemented)
 - `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/ergon/ergon-component.html`
 - `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ergon/ergon-component.js`
-- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/styles/ergon/ergon-component.css`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/athena/athena-component.html`
+- `/Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/athena/athena-component.js`
 
 ## Getting Started
 
@@ -173,19 +188,26 @@ Hephaestus/ui/
    # Should show sprint/Clean_Slate_051125
    ```
 
-2. Analyze the component loader and UI manager:
+2. Examine the debug instrumentation system:
    ```bash
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/component-loader.js
-   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ui-manager-core.js
+   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/debug-shim.js
+   cat /Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/ComponentInstrumentation.md
    ```
 
-3. Examine the Athena component for reference:
+3. Examine the Ergon and Athena components for reference:
    ```bash
+   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/ergon/ergon-component.html
+   cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/ergon/ergon-component.js
    cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/components/athena/athena-component.html
    cat /Users/cskoons/projects/github/Tekton/Hephaestus/ui/scripts/athena/athena-component.js
    ```
 
-4. Begin implementation following the phased approach in the implementation plan
+4. Review the Hermes implementation guide:
+   ```bash
+   cat /Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/HermesComponentImplementation.md
+   ```
+
+5. Begin implementing the Hermes component following the implementation guide and the patterns from Ergon and Athena
 
 ## Important Notes
 
@@ -198,8 +220,12 @@ Hephaestus/ui/
 
 ## Documentation
 
-Refer to these sprint documents for detailed guidance:
+Refer to these documents for detailed guidance:
 
 - [Sprint Plan](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/SprintPlan.md)
 - [Architectural Decisions](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/ArchitecturalDecisions.md)
 - [Implementation Plan](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/ImplementationPlan.md)
+- [Hermes Implementation Guide](/Users/cskoons/projects/github/Tekton/MetaData/DevelopmentSprints/Clean_Slate_Sprint/HermesComponentImplementation.md)
+- [Debug Instrumentation Guide](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/ComponentInstrumentation.md)
+- [Debug Quick Start Guide](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/QuickStartGuide.md)
+- [Debug System README](/Users/cskoons/projects/github/Tekton/MetaData/TektonDocumentation/DeveloperGuides/Debugging/README.md)

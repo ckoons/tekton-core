@@ -109,6 +109,16 @@ This architecture ensures consistent LLM access across all Tekton components whi
 
 ## Code Style and Conventions
 
+### UI Components
+
+- Follow the Component Implementation Standard in `/MetaData/UI/ComponentImplementationStandard.md`
+- Use self-contained components with no shared tab utilities
+- Use inline `onclick` handlers with component-specific functions
+- Add protection against UI Manager interference
+- Reference implementation in `/components/athena/athena-component.html` and `/components/ergon/ergon-component.html`
+- Always scope DOM queries to the component container
+- Use BEM naming convention for CSS classes
+
 ### Python
 
 - Use f-strings for string formatting
