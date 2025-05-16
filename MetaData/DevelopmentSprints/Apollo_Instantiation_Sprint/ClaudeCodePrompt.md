@@ -63,16 +63,26 @@ The Apollo component should follow the established Tekton component structure:
    - Manage protocol versions and transitions
    - Coordinate protocol implementation
 
-5. **CLI Tools:**
+5. **Bidirectional Messaging:**
+   - Create a flexible messaging interface for components
+   - Process incoming requests from any component
+   - Generate and send directive messages to components
+   - Ensure components can examine and respond to directives
+   - Route messages to appropriate Apollo modules
+   - Provide consistent response handling
+
+6. **CLI Tools:**
    - Provide commands for system status monitoring
    - Implement control commands for configuration
    - Create visualization tools for forecasting
    - Support debugging and diagnostics
 
-6. **Component Integration:**
+7. **Component Integration:**
    - Interface with Rhetor for LLM communication
    - Coordinate with Engram for memory operations
-   - Integrate with Synthesis for task execution
+   - Integrate with Harmonia for workflow orchestration
+   - Connect with Synthesis for task execution
+   - Enable any component to interface with Apollo as needed
    - Connect with other components via Hermes/MCP
 
 ## Implementation Approach
@@ -175,17 +185,27 @@ Your implementation should follow these principles:
    - Manage protocol versions
    - Coordinate protocol transitions
 
-6. **API Layer:**
+6. **Message Handler:**
+   - Process on-demand requests from components
+   - Generate and send directive messages to components
+   - Route messages to appropriate modules
+   - Format and return responses
+   - Track message delivery and acknowledgments
+   - Maintain messaging context and state
+
+7. **API Layer:**
    - Implement REST endpoints
    - Create WebSocket interface
    - Support MCP integration
    - Handle authentication and authorization
+   - Provide component-to-Apollo messaging endpoints
 
-7. **CLI Framework:**
+8. **CLI Framework:**
    - Parse and validate commands
    - Implement status and control commands
    - Create visualization tools
    - Provide comprehensive help
+   - Support component message simulation for testing
 
 ## Resources and References
 

@@ -117,20 +117,24 @@ The rule-first approach allows for immediate implementation of basic predictive 
 - **Evolution Path**: Clear path to incorporate learning components
 - **Configuration**: Rules can be adjusted without code changes
 
-## Decision 3: Protocol-Based Integration
+## Decision 3: Protocol-Based Integration with On-Demand Messaging
 
 ### Context
 
-Apollo needs to integrate with multiple Tekton components, each with its own implementation details. We need an approach that allows Apollo to influence component behavior without tight coupling.
+Apollo needs to integrate with multiple Tekton components, each with its own implementation details. We need an approach that allows Apollo to influence component behavior without tight coupling, while also enabling components to communicate with Apollo on an as-needed basis.
 
 ### Decision
 
-Implement protocol-based integration where:
+Implement protocol-based integration with bidirectional messaging where:
 1. Apollo defines clear protocols for component interactions
 2. Components like Rhetor implement these protocols, not Apollo-specific interfaces
 3. Protocols are version-tracked and follow Tekton naming conventions
 4. MCP is used as the primary transport mechanism
 5. Components can gradually adopt protocols without breaking changes
+6. Any component can send direct messages to Apollo using a flexible messaging interface
+7. Apollo provides response handlers for on-demand requests
+8. Apollo can proactively send directive messages to components
+9. Components examine and act on directive messages from Apollo
 
 ### Alternatives Considered
 
@@ -162,15 +166,18 @@ Implement protocol-based integration where:
 
 ### Decision Rationale
 
-Protocol-based integration provides the right balance of structure and flexibility. It allows Apollo to influence component behavior through well-defined interfaces without dictating implementation details. This approach also aligns with Tekton's architectural principles and the existing MCP integration pattern.
+Protocol-based integration with on-demand messaging provides the right balance of structure and flexibility. It allows Apollo to influence component behavior through well-defined interfaces without dictating implementation details, while also enabling components to communicate directly with Apollo when needed. This bidirectional approach ensures that Apollo can both proactively manage components and respond to their specific needs. The approach aligns with Tekton's architectural principles and extends the existing MCP integration pattern.
 
 ### Implications
 
 - **Coupling**: Reduced coupling between Apollo and components
 - **Flexibility**: Components can implement protocols in their preferred way
+- **Bidirectional Communication**: Components can both receive instructions from and send requests to Apollo
+- **Accessibility**: Any component can interface with Apollo as needed
 - **Compatibility**: Backward compatibility is easier to maintain
 - **Testing**: Protocols can be tested independently of specific implementations
 - **Documentation**: Protocol specifications serve as integration documentation
+- **Scalability**: New components can easily integrate with Apollo
 
 ## Decision 4: Tiered Model Support
 

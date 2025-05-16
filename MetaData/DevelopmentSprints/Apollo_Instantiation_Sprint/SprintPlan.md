@@ -11,8 +11,9 @@ Apollo will act as the executive function for Tekton's LLM ecosystem, monitoring
 1. **Establish Apollo Core Architecture**: Define and implement the core modules for context monitoring, token budgeting, predictive modeling, and protocol enforcement
 2. **Implement API Interfaces**: Create REST API and WebSocket endpoints for interacting with Apollo
 3. **Develop CLI Tools**: Build command-line tools for monitoring and controlling LLM operations
-4. **Enable Component Integration**: Establish interfaces with Rhetor, Engram, Synthesis, and other Tekton components
-5. **Define Protocol Standards**: Create standardized protocols for LLM context management and reliability
+4. **Enable Component Integration**: Establish interfaces with Rhetor, Engram, Harmonia, Synthesis, and other Tekton components
+5. **Implement On-Demand Messaging**: Create a flexible messaging system allowing any component to interface with Apollo as needed
+6. **Define Protocol Standards**: Create standardized protocols for LLM context management and reliability
 
 ## Key Principles
 
@@ -20,9 +21,12 @@ This sprint is guided by the following key principles:
 
 1. **Predictive Operation**: Apollo anticipates issues before they occur, rather than just responding reactively
 2. **Non-Invasive Coordination**: Apollo influences components through established interfaces rather than directly modifying their behavior
-3. **Reliable Communication**: Apollo uses standardized protocols for all component interactions
-4. **Progressive Implementation**: Core functionality is implemented and validated before adding more advanced features
-5. **Clean Data Flow**: Data interfaces between components are explicitly defined and documented
+3. **Bidirectional Communication**: Apollo both sends directives to components and responds to their on-demand requests
+4. **Component Responsiveness**: Components examine and act on directive messages from Apollo
+5. **Universal Accessibility**: Any Tekton component can interface with Apollo as needed
+6. **Reliable Communication**: Apollo uses standardized protocols for all component interactions
+7. **Progressive Implementation**: Core functionality is implemented and validated before adding more advanced features
+8. **Clean Data Flow**: Data interfaces between components are explicitly defined and documented
 
 ## Timeline
 

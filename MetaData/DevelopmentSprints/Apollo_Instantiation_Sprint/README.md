@@ -25,9 +25,12 @@ This sprint is guided by the following key principles:
 
 1. **Predictive Operation**: Apollo anticipates issues before they occur, rather than just responding reactively
 2. **Non-Invasive Coordination**: Apollo influences components through established interfaces rather than direct modification
-3. **Reliable Communication**: Apollo uses standardized protocols for all component interactions
-4. **Progressive Implementation**: Core functionality is implemented and validated before adding more advanced features
-5. **Clean Data Flow**: Data interfaces between components are explicitly defined and documented
+3. **Bidirectional Communication**: Apollo both sends directives to components and responds to their on-demand requests
+4. **Component Responsiveness**: Components examine and act on directive messages from Apollo
+5. **Universal Accessibility**: Any Tekton component can interface with Apollo as needed
+6. **Reliable Communication**: Apollo uses standardized protocols for all component interactions
+7. **Progressive Implementation**: Core functionality is implemented and validated before adding more advanced features
+8. **Clean Data Flow**: Data interfaces between components are explicitly defined and documented
 
 ## Working Guidelines for Development Sessions
 
@@ -81,6 +84,8 @@ For Claude Code sessions and development work during this sprint, follow these g
 - [ ] Create WebSocket support for real-time updates
 - [ ] Establish integration with Rhetor
 - [ ] Implement Engram integration for memory operations
+- [ ] Develop Harmonia integration for workflow orchestration
+- [ ] Implement bidirectional messaging system
 - [ ] Develop MCP endpoints
 
 ### Phase 3: CLI Tools and Protocol Enforcement

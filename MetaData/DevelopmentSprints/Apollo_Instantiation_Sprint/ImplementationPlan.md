@@ -82,13 +82,15 @@ This sprint will be implemented in 4 phases:
 **Objectives:**
 - Implement the Single Port Architecture API
 - Create WebSocket interface for real-time monitoring
-- Establish integration with Rhetor and Engram
-- Implement MCP endpoints
+- Establish integration with Rhetor, Engram, and Harmonia
+- Implement MCP endpoints and on-demand messaging interface
+- Enable component-to-Apollo direct communication
 
 **Components Affected:**
 - Apollo/apollo/api/
 - Apollo/apollo/core/interfaces/
 - Apollo/apollo/integrations/
+- Apollo/apollo/messaging/
 
 **Tasks:**
 
@@ -128,7 +130,25 @@ This sprint will be implemented in 4 phases:
    - **Acceptance Criteria:** Apollo can direct memory operations through Engram
    - **Dependencies:** Core module implementation
 
-7. **Develop MCP Endpoints**
+7. **Develop Harmonia Integration**
+   - **Description:** Create integration with Harmonia for workflow orchestration
+   - **Deliverables:** Harmonia client for state management and task coordination
+   - **Acceptance Criteria:** Apollo can coordinate with Harmonia for orchestrated workflows
+   - **Dependencies:** Core module implementation
+
+8. **Implement Bidirectional Messaging System**
+   - **Description:** Create a flexible messaging system for bidirectional communication between Apollo and components
+   - **Deliverables:** 
+     - Messaging interface that allows components to send direct requests to Apollo
+     - Directive system for Apollo to send messages to components
+     - Protocol for components to examine and act on Apollo directives
+   - **Acceptance Criteria:** 
+     - Components can send on-demand messages to Apollo and receive responses
+     - Apollo can send directive messages to components
+     - Components can process and respond to directive messages
+   - **Dependencies:** API implementation
+
+9. **Develop MCP Endpoints**
    - **Description:** Implement MCP-compatible endpoints for component integration
    - **Deliverables:** MCP handlers for Apollo services
    - **Acceptance Criteria:** Other components can discover and use Apollo via MCP
@@ -136,20 +156,25 @@ This sprint will be implemented in 4 phases:
 
 **Documentation Updates:**
 - Create API documentation with endpoint descriptions
-- Document integration protocols for Rhetor and Engram
+- Document integration protocols for Rhetor, Engram, and Harmonia
+- Document on-demand messaging interface for component-to-Apollo communication
 - Create MCP endpoint documentation
 
 **Testing Requirements:**
 - API endpoint tests using pytest
-- Integration tests with mock Rhetor and Engram
+- Integration tests with mock Rhetor, Engram, and Harmonia
 - WebSocket client tests
+- On-demand messaging system tests
 - MCP discovery tests
+- Component-to-Apollo communication tests
 
 **Phase Completion Criteria:**
 - All API endpoints are implemented and tested
 - WebSocket interface provides real-time updates
-- Integration with Rhetor and Engram is functional
+- Integration with Rhetor, Engram, and Harmonia is functional
+- On-demand messaging system allows component-to-Apollo communication
 - MCP endpoints are discoverable by other components
+- All components can interface with Apollo as needed
 - Documentation accurately reflects the implemented APIs
 
 ### Phase 3: CLI Tools and Protocol Enforcement
@@ -312,6 +337,7 @@ Apollo/
 │   │       ├── __init__.py
 │   │       ├── monitoring.py        # Monitoring endpoints
 │   │       ├── control.py           # Control endpoints
+│   │       ├── messaging.py         # Component messaging endpoints
 │   │       └── mcp.py               # MCP integration
 │   ├── cli/                         # CLI implementation
 │   │   ├── __init__.py
@@ -319,6 +345,7 @@ Apollo/
 │   │   │   ├── __init__.py
 │   │   │   ├── status.py            # Status commands
 │   │   │   ├── control.py           # Control commands
+│   │   │   ├── messaging.py         # Message simulation commands
 │   │   │   └── viz.py               # Visualization commands
 │   │   └── main.py                  # CLI entry point
 │   ├── core/                        # Core functionality
@@ -328,10 +355,12 @@ Apollo/
 │   │   ├── predictive_engine.py     # Prediction system
 │   │   ├── action_planner.py        # Action planning
 │   │   ├── protocol_enforcer.py     # Protocol enforcement
+│   │   ├── message_handler.py       # On-demand message handling
 │   │   └── interfaces/              # Component interfaces
 │   │       ├── __init__.py
 │   │       ├── rhetor.py            # Rhetor interface
 │   │       ├── engram.py            # Engram interface
+│   │       ├── harmonia.py          # Harmonia interface
 │   │       └── synthesis.py         # Synthesis interface
 │   ├── models/                      # Data models
 │   │   ├── __init__.py
@@ -398,6 +427,12 @@ Apollo/
    - Enforces protocol versions
    - Manages protocol transitions
 
+6. **Message Handler**
+   - Processes on-demand messages from components
+   - Routes requests to appropriate modules
+   - Formats and returns responses
+   - Maintains message context and state
+
 #### API Endpoints
 
 1. **Monitoring Endpoints**
@@ -452,11 +487,28 @@ Apollo/
    - Action is executed through component interfaces
    - Results are returned to user
 
-3. **Integration Flow**
+3. **Bidirectional Messaging Flow**
+   - Component-to-Apollo (On-Demand):
+     - Component sends request to Apollo's messaging endpoint
+     - Message Handler receives and processes the request
+     - Request is routed to the appropriate internal module
+     - Module processes the request and generates a response
+     - Response is formatted and returned to the requesting component
+   - Apollo-to-Component (Directive):
+     - Apollo's Action Planner determines a directive is needed
+     - Message Handler generates appropriate directive message
+     - Apollo sends directive to component via defined endpoints
+     - Component receives, examines, and acts on the directive
+     - Component may optionally send acknowledgment or result
+   - All interactions are logged for monitoring and analysis
+
+4. **Integration Flow**
    - Rhetor collects LLM metrics and sends to Apollo
    - Apollo directs Engram to prefetch relevant memory
+   - Apollo coordinates with Harmonia for workflow orchestration
    - Apollo coordinates with Synthesis for task execution
    - Apollo sends protocols to all components via MCP
+   - Components send direct requests to Apollo as needed
 
 ## Testing Strategy
 
