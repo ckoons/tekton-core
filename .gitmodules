@@ -52,3 +52,9 @@
 [submodule "Apollo"]
 	path = Apollo
 	url = https://github.com/ckoons/Apollo
+[submodule "Metis"]
+	path = Metis
+	url = https://github.com/ckoons/Metis.git
+[submodule "Budget"]
+	path = Budget
+	url = https://github.com/ckoons/Budget.git
