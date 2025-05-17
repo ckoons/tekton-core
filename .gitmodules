@@ -56,5 +56,5 @@
 	path = Metis
 	url = https://github.com/ckoons/Metis.git
 [submodule "Budget"]
-	path = Budget
+	path = Budget 
 	url = https://github.com/ckoons/Budget.git
