@@ -49,3 +49,6 @@
 [submodule "Terma"]
 	path = Terma
 	url = https://github.com/ckoons/Terma.git
+[submodule "Apollo"]
+	path = Apollo
+	url = https://github.com/ckoons/Apollo
