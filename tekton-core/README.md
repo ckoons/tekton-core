@@ -1,2 +1,0 @@
-# tekton-core
-tekton-core
