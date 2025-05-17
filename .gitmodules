@@ -58,6 +58,6 @@
 [submodule "Budget"]
 	path = Budget 
 	url = https://github.com/ckoons/Budget.git
-[submodule "tekton-core-new"]
-	path = tekton-core-new
+[submodule "tekton-core"]
+	path = tekton-core
 	url = https://github.com/ckoons/tekton-core.git
