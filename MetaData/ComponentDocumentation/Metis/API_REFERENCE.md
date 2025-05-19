@@ -52,7 +52,7 @@ GET /
 
 Returns basic information about the Metis service.
 
-**Response:**
+Response:
 ```json
 {
   "name": "Metis",
@@ -70,7 +70,7 @@ GET /health
 
 Returns the health status of the Metis service.
 
-**Response:**
+Response:
 ```json
 {
   "status": "healthy",
@@ -89,7 +89,7 @@ GET /api/v1/tasks
 
 List tasks with optional filtering.
 
-**Query Parameters:**
+Query Parameters:
 - `status` (optional) - Filter by status (pending, in_progress, review, done, blocked, cancelled)
 - `priority` (optional) - Filter by priority (high, medium, low)
 - `assignee` (optional) - Filter by assignee
@@ -98,7 +98,7 @@ List tasks with optional filtering.
 - `page` (optional, default: 1) - Page number
 - `page_size` (optional, default: 50) - Page size
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -138,7 +138,7 @@ GET /api/v1/tasks/{task_id}
 
 Get details of a specific task.
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -172,7 +172,7 @@ POST /api/v1/tasks
 
 Create a new task.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "title": "New Task",
@@ -195,7 +195,7 @@ Create a new task.
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "id": "task-123",
@@ -226,7 +226,7 @@ PUT /api/v1/tasks/{task_id}
 
 Update an existing task.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "title": "Updated Task Title",
@@ -235,7 +235,7 @@ Update an existing task.
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "id": "task-123",
@@ -266,7 +266,7 @@ DELETE /api/v1/tasks/{task_id}
 
 Delete a task.
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -284,7 +284,7 @@ POST /api/v1/tasks/{task_id}/subtasks
 
 Add a subtask to a task.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "title": "New Subtask",
@@ -294,7 +294,7 @@ Add a subtask to a task.
 }
 ```
 
-**Response:** The updated parent task with the new subtask included.
+Response: The updated parent task with the new subtask included.
 
 #### Update Subtask
 
@@ -304,7 +304,7 @@ PUT /api/v1/tasks/{task_id}/subtasks/{subtask_id}
 
 Update a subtask.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "title": "Updated Subtask",
@@ -312,7 +312,7 @@ Update a subtask.
 }
 ```
 
-**Response:** The updated parent task with the modified subtask.
+Response: The updated parent task with the modified subtask.
 
 #### Remove Subtask
 
@@ -322,7 +322,7 @@ DELETE /api/v1/tasks/{task_id}/subtasks/{subtask_id}
 
 Remove a subtask from a task.
 
-**Response:** The updated parent task with the subtask removed.
+Response: The updated parent task with the subtask removed.
 
 ### Requirement References
 
@@ -334,7 +334,7 @@ POST /api/v1/tasks/{task_id}/requirements
 
 Add a requirement reference to a task.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "requirement_id": "req-123",
@@ -346,7 +346,7 @@ Add a requirement reference to a task.
 }
 ```
 
-**Response:** The updated parent task with the new requirement reference included.
+Response: The updated parent task with the new requirement reference included.
 
 #### Update Requirement Reference
 
@@ -356,7 +356,7 @@ PUT /api/v1/tasks/{task_id}/requirements/{ref_id}
 
 Update a requirement reference.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "title": "Updated Requirement",
@@ -364,7 +364,7 @@ Update a requirement reference.
 }
 ```
 
-**Response:** The updated parent task with the modified requirement reference.
+Response: The updated parent task with the modified requirement reference.
 
 #### Remove Requirement Reference
 
@@ -374,7 +374,7 @@ DELETE /api/v1/tasks/{task_id}/requirements/{ref_id}
 
 Remove a requirement reference from a task.
 
-**Response:** The updated parent task with the requirement reference removed.
+Response: The updated parent task with the requirement reference removed.
 
 ### Dependencies
 
@@ -386,11 +386,11 @@ GET /api/v1/dependencies
 
 List dependencies with optional filtering.
 
-**Query Parameters:**
+Query Parameters:
 - `task_id` (optional) - Filter by source or target task ID
 - `dependency_type` (optional) - Filter by dependency type
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -417,7 +417,7 @@ GET /api/v1/tasks/{task_id}/dependencies
 
 List dependencies for a specific task.
 
-**Response:** Same as List Dependencies, filtered for the specified task.
+Response: Same as List Dependencies, filtered for the specified task.
 
 #### Create Dependency
 
@@ -427,7 +427,7 @@ POST /api/v1/dependencies
 
 Create a new dependency between tasks.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "source_task_id": "task-123",
@@ -437,7 +437,7 @@ Create a new dependency between tasks.
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "id": "dep-123",
@@ -458,7 +458,7 @@ GET /api/v1/dependencies/{dependency_id}
 
 Get details of a specific dependency.
 
-**Response:** The dependency object as shown above.
+Response: The dependency object as shown above.
 
 #### Update Dependency
 
@@ -468,7 +468,7 @@ PUT /api/v1/dependencies/{dependency_id}
 
 Update a dependency.
 
-**Request Body:**
+Request Body:
 ```json
 {
   "dependency_type": "depends_on",
@@ -476,7 +476,7 @@ Update a dependency.
 }
 ```
 
-**Response:** The updated dependency object.
+Response: The updated dependency object.
 
 #### Delete Dependency
 
@@ -486,7 +486,7 @@ DELETE /api/v1/dependencies/{dependency_id}
 
 Delete a dependency.
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -504,14 +504,14 @@ GET /api/v1/telos/requirements
 
 Search for requirements in the Telos system.
 
-**Query Parameters:**
+Query Parameters:
 - `query` (optional) - Search query
 - `status` (optional) - Filter by status
 - `category` (optional) - Filter by category
 - `page` (optional, default: 1) - Page number
 - `page_size` (optional, default: 50) - Page size
 
-**Response:**
+Response:
 ```json
 {
   "success": true,
@@ -540,7 +540,7 @@ POST /api/v1/telos/requirements/{requirement_id}/import
 
 Import a requirement from Telos as a new task.
 
-**Response:** The created task object.
+Response: The created task object.
 
 #### Add Telos Requirement Reference
 
@@ -550,7 +550,7 @@ POST /api/v1/tasks/{task_id}/telos/requirements/{requirement_id}
 
 Add a reference to a Telos requirement to a task.
 
-**Response:** The updated task object with the new requirement reference.
+Response: The updated task object with the new requirement reference.
 
 ## WebSocket Interface
 
@@ -573,7 +573,7 @@ After connecting, send a registration message:
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "type": "registration_success",
@@ -588,8 +588,6 @@ After connecting, send a registration message:
 
 You'll receive event messages based on your subscriptions:
 
-#### Task Created
-
 ```json
 {
   "type": "task_created",
@@ -601,8 +599,6 @@ You'll receive event messages based on your subscriptions:
 }
 ```
 
-#### Task Updated
-
 ```json
 {
   "type": "task_updated",
@@ -613,8 +609,6 @@ You'll receive event messages based on your subscriptions:
   }
 }
 ```
-
-#### Task Deleted
 
 ```json
 {
@@ -636,7 +630,7 @@ You can send a ping message to keep the connection alive:
 }
 ```
 
-**Response:**
+Response:
 ```json
 {
   "type": "pong",
@@ -648,8 +642,6 @@ You can send a ping message to keep the connection alive:
 
 You can update your subscriptions:
 
-#### Subscribe
-
 ```json
 {
   "type": "subscribe",
@@ -659,122 +651,12 @@ You can update your subscriptions:
 }
 ```
 
-#### Unsubscribe
-
 ```json
 {
   "type": "unsubscribe",
   "data": {
     "event_types": ["task_deleted"]
   }
-}
-```
-
-## API Models
-
-### Task
-
-The primary entity in the Metis system.
-
-```json
-{
-  "id": "string",
-  "title": "string",
-  "description": "string",
-  "status": "string (pending, in_progress, review, done, blocked, cancelled)",
-  "priority": "string (high, medium, low)",
-  "details": "string",
-  "test_strategy": "string",
-  "dependencies": ["string"],
-  "tags": ["string"],
-  "assignee": "string",
-  "due_date": "string (ISO date)",
-  "created_at": "string (ISO date)",
-  "updated_at": "string (ISO date)",
-  "subtasks": [Subtask],
-  "requirement_refs": [RequirementRef],
-  "complexity": ComplexityScore,
-  "progress": "number"
-}
-```
-
-### Subtask
-
-A smaller unit of work within a task.
-
-```json
-{
-  "id": "string",
-  "title": "string",
-  "description": "string",
-  "status": "string (pending, in_progress, review, done, blocked, cancelled)",
-  "order": "number",
-  "created_at": "string (ISO date)",
-  "updated_at": "string (ISO date)"
-}
-```
-
-### Dependency
-
-A relationship between two tasks.
-
-```json
-{
-  "id": "string",
-  "source_task_id": "string",
-  "target_task_id": "string",
-  "dependency_type": "string (blocks, depends_on, related_to)",
-  "description": "string",
-  "created_at": "string (ISO date)",
-  "updated_at": "string (ISO date)"
-}
-```
-
-### RequirementRef
-
-A reference to a requirement in Telos.
-
-```json
-{
-  "id": "string",
-  "requirement_id": "string",
-  "source": "string",
-  "requirement_type": "string",
-  "title": "string",
-  "relationship": "string (implements, related_to, blocks)",
-  "description": "string",
-  "created_at": "string (ISO date)",
-  "updated_at": "string (ISO date)"
-}
-```
-
-### ComplexityScore
-
-A score representing the complexity of a task.
-
-```json
-{
-  "id": "string",
-  "factors": [ComplexityFactor],
-  "overall_score": "number",
-  "level": "string (trivial, simple, moderate, complex, very_complex)",
-  "created_at": "string (ISO date)",
-  "updated_at": "string (ISO date)"
-}
-```
-
-### ComplexityFactor
-
-A factor contributing to task complexity.
-
-```json
-{
-  "id": "string",
-  "name": "string",
-  "description": "string",
-  "weight": "number",
-  "score": "number",
-  "notes": "string"
 }
 ```
 
@@ -789,32 +671,4 @@ The API uses standard HTTP status codes to indicate the success or failure of re
 - 422 Unprocessable Entity: The request was valid but contained invalid data
 - 500 Internal Server Error: An error occurred on the server
 
-Error responses include the error message and status code to help with debugging:
-
-```json
-{
-  "success": false,
-  "message": "Invalid status transition from pending to done",
-  "status_code": 400
-}
-```
-
-## API Versioning
-
-The Metis API uses a versioned URL scheme to ensure backward compatibility:
-
-- Current version: `/api/v1/...`
-- Future versions will use `/api/v2/...`, etc.
-
-## Rate Limiting
-
-The Metis API implements rate limiting to prevent abuse:
-
-- 100 requests per minute per client
-- 1000 requests per hour per client
-
-Rate limit information is included in response headers:
-
-- `X-Rate-Limit-Limit`: Maximum requests per minute
-- `X-Rate-Limit-Remaining`: Remaining requests in the current window
-- `X-Rate-Limit-Reset`: Time when the rate limit resets (Unix timestamp)
+Error responses include the error message and status code to help with debugging.

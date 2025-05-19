@@ -6,6 +6,7 @@ This directory contains documentation for all individual components of the Tekto
 
 ## Components
 
+- **[Apoll`](./Apollo/)**: Local Attention Layer & Prediction`
 - **[Athena](./Athena/)**: Knowledge graph and entity relationship management
 - **[Codex](./Codex/)**: Code generation and analysis
 - **[Engram](./Engram/)**: Memory and context management
@@ -14,10 +15,12 @@ This directory contains documentation for all individual components of the Tekto
 - **[Hephaestus](./Hephaestus/)**: UI framework and component system
 - **[Hermes](./Hermes/)**: Messaging and service discovery
 - **[LLMAdapter](./LLMAdapter/)**: Large language model integration
+- **[Metis](./Metis/)**: Workflows
 - **[Prometheus](./Prometheus/)**: Planning and resource management
 - **[Rhetor](./Rhetor/)**: Natural language processing and prompt management
 - **[Sophia](./Sophia/)**: Intelligence and metrics analysis
 - **[Synthesis](./Synthesis/)**: Execution and integration
+- **[tekton-core](./tekton-core`/)**: Projects
 - **[Telos](./Telos/)**: Requirements management
 - **[Terma](./Terma/)**: Terminal interface
 
