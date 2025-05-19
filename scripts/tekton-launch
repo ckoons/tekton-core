@@ -116,6 +116,8 @@ SOPHIA_DIR="${TEKTON_DIR}/Sophia"
 TELOS_DIR="${TEKTON_DIR}/Telos"
 SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
 TERMA_DIR="${TEKTON_DIR}/Terma"
+METIS_DIR="${TEKTON_DIR}/Metis"
+APOLLO_DIR="${TEKTON_DIR}/Apollo"
 LLM_ADAPTER_DIR="${TEKTON_DIR}/LLMAdapter"
 
 # Function to display usage information
@@ -268,6 +270,26 @@ detect_components() {
             tekton_warn "Sophia found but not fully implemented"
         fi
     fi
+
+    # Check for Metis
+    if [ -d "$METIS_DIR" ]; then
+        if [ -d "$METIS_DIR/metis" ] && [ -f "$METIS_DIR/metis/__init__.py" ]; then
+            components+=("metis")
+            tekton_success "Metis (Task Management)"
+        else
+            tekton_warn "Metis found but not fully implemented"
+        fi
+    fi
+
+    # Check for Apollo
+    if [ -d "$APOLLO_DIR" ]; then
+        if [ -d "$APOLLO_DIR/apollo" ] && [ -f "$APOLLO_DIR/apollo/__init__.py" ]; then
+            components+=("apollo")
+            tekton_success "Apollo (Attention System)"
+        else
+            tekton_warn "Apollo found but not fully implemented"
+        fi
+    fi
     
     # Return the list of components
     echo "${components[@]}"
@@ -361,6 +383,20 @@ select_components() {
     if [[ " ${all_components[*]} " == *" terma "* ]]; then
         if tekton_prompt_yes_no "Launch Terma (Terminal System)?" "n"; then
             selected_components+=("terma")
+        fi
+    fi
+
+    # Ask about Metis (Task Management)
+    if [[ " ${all_components[*]} " == *" metis "* ]]; then
+        if tekton_prompt_yes_no "Launch Metis (Task Management)?" "n"; then
+            selected_components+=("metis")
+        fi
+    fi
+
+    # Ask about Apollo (Attention System)
+    if [[ " ${all_components[*]} " == *" apollo "* ]]; then
+        if tekton_prompt_yes_no "Launch Apollo (Attention System)?" "n"; then
+            selected_components+=("apollo")
         fi
     fi
     
@@ -913,6 +949,10 @@ for comp in "${OTHER_COMPONENTS[@]}"; do
         launch_component "synthesis" "Synthesis Execution Engine" "$SYNTHESIS_DIR" "synthesis.api.app" "$SYNTHESIS_PORT"
     elif [ "$comp" = "terma" ]; then
         launch_component "terma" "Terma Terminal System" "$TERMA_DIR" "terma.api.app" "$TERMA_PORT"
+    elif [ "$comp" = "metis" ]; then
+        launch_component "metis" "Metis Task Management" "$METIS_DIR" "metis.api.app" "$METIS_PORT"
+    elif [ "$comp" = "apollo" ]; then
+        launch_component "apollo" "Apollo Attention System" "$APOLLO_DIR" "apollo.api.app" "$APOLLO_PORT"
     fi
 done
 

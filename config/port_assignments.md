@@ -23,6 +23,7 @@ Tekton uses a Single Port Architecture where each component exposes its services
 | Synthesis      | 8009 | Execution engine                          | `SYNTHESIS_PORT`       |
 | Tekton Core    | 8010 | Core orchestration                        | `TEKTON_CORE_PORT`     |
 | Metis          | 8011 | Task management system                    | `METIS_PORT`           |
+| Apollo         | 8012 | Local Attention/Prediction system         | `APOLLO_PORT`          |
 
 ## Specialized Services
 

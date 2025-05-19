@@ -6,51 +6,17 @@ This document provides guidance on integrating Metis with other Tekton component
 
 Metis is designed to work seamlessly with other Tekton components, especially Telos (requirements management) and Prometheus (planning system). This section outlines how to integrate Metis with these components.
 
-## Integration Patterns
-
 ### Hermes Integration
 
 Metis integrates with Hermes for service registration and discovery. This allows other Tekton components to discover and communicate with Metis.
 
-#### Service Registration
+Key integration points:
+- Metis registers with Hermes at startup
+- Metis announces its capabilities to Hermes
+- Metis discovers other components through Hermes
+- Metis sends periodic heartbeats to maintain registration
 
-At startup, Metis registers itself with Hermes:
-
-```python
-# Register with Hermes
-success = await hermes_client.register()
-if success:
-    # Start heartbeat task
-    asyncio.create_task(hermes_client.heartbeat_task())
-```
-
-#### Service Discovery
-
-Metis discovers other components through Hermes:
-
-```python
-# Discover Telos service
-telos_service = await hermes_client.get_service("Telos")
-if telos_service:
-    telos_url = f"{telos_service['protocol']}://{telos_service['host']}:{telos_service['port']}"
-```
-
-#### Capability Announcement
-
-Metis announces its capabilities to Hermes:
-
-```python
-# Announce capabilities
-capabilities = [
-    "task_management",
-    "dependency_management",
-    "task_tracking",
-    "websocket_updates"
-]
-```
-
-#### Configuration
-
+Configuration:
 - `HERMES_PORT`: Port for the Hermes service (default: 8001)
 - Service name: "Metis"
 - Capabilities: ["task_management", "dependency_management", "task_tracking", "websocket_updates"]
@@ -59,82 +25,29 @@ capabilities = [
 
 Metis integrates with Telos to import requirements as tasks and to maintain links between tasks and requirements.
 
-#### Requirement Import
+Key integration points:
+- Import requirements from Telos as tasks
+- Reference Telos requirements from tasks
+- Search for requirements in Telos
 
-Metis can import requirements from Telos as tasks:
-
-```python
-# Import requirement as task
-requirement = await telos_client.get_requirement(requirement_id)
-if requirement:
-    task_data = {
-        "title": requirement.get("title", "Untitled Requirement"),
-        "description": requirement.get("description", ""),
-        "status": TaskStatus.PENDING.value,
-        "priority": Priority.MEDIUM.value,
-        "tags": ["telos", "requirement", requirement.get("type", "unknown")]
-    }
-    task = await task_manager.create_task(task_data)
-```
-
-#### Requirement References
-
-Metis maintains references to requirements in Telos:
-
-```python
-# Add requirement reference to task
-req_ref = await telos_client.create_requirement_reference(requirement_id)
-if req_ref:
-    await task_manager.add_requirement_ref(task_id, req_ref.dict())
-```
-
-#### API Endpoints
-
+API Endpoints:
 - `GET /api/v1/telos/requirements`: Search for requirements in Telos
 - `POST /api/v1/telos/requirements/{requirement_id}/import`: Import a requirement as a task
 - `POST /api/v1/tasks/{task_id}/telos/requirements/{requirement_id}`: Add a reference to a requirement
 
-#### Configuration
-
+Configuration:
 - `TELOS_PORT`: Port for the Telos service (default: 8008)
 
 ### Prometheus Integration
 
 Metis provides task information to Prometheus for planning and scheduling.
 
-#### Task Information
+Key integration points:
+- Prometheus can query Metis for tasks and their dependencies
+- Prometheus can update task status based on planning decisions
+- Prometheus can add dependencies between tasks
 
-Prometheus can query Metis for tasks and their dependencies:
-
-```python
-# Get tasks for planning
-tasks = await metis_client.get_tasks(status="pending")
-```
-
-#### Task Updates
-
-Prometheus can update task status based on planning decisions:
-
-```python
-# Update task status
-await metis_client.update_task(task_id, {"status": "in_progress"})
-```
-
-#### Dependency Management
-
-Prometheus can add dependencies between tasks:
-
-```python
-# Add dependency between tasks
-await metis_client.create_dependency({
-    "source_task_id": task1_id,
-    "target_task_id": task2_id,
-    "dependency_type": "blocks"
-})
-```
-
-#### Configuration
-
+Configuration:
 - `PROMETHEUS_PORT`: Port for the Prometheus service (default: 8006)
 
 ## Client Integration
@@ -406,33 +319,7 @@ Complexity represents the difficulty level of a task. A ComplexityScore has:
 - `overall_score`: Calculated complexity score
 - `level`: Complexity level (trivial, simple, moderate, complex, very_complex)
 
-## Domain Workflow Integration
-
-### Task Lifecycle
-
-Tasks in Metis follow a specific lifecycle:
-
-1. **Creation**: Task is created with initial attributes
-2. **Planning**: Dependencies and complexity are defined
-3. **Assignment**: Task is assigned to a user
-4. **Execution**: Status transitions from "pending" to "in_progress"
-5. **Review**: Status transitions to "review" when ready for validation
-6. **Completion**: Status transitions to "done" when completed
-
-Components integrating with Metis should respect this lifecycle and use the appropriate status transitions.
-
-### Dependency Resolution
-
-When planning work, it's important to consider task dependencies:
-
-1. **Identify Dependencies**: Determine what tasks depend on others
-2. **Resolve Cycles**: Ensure there are no circular dependencies
-3. **Critical Path**: Calculate the critical path through dependencies
-4. **Parallel Work**: Identify tasks that can be worked on in parallel
-
-The DependencyResolver in Metis provides utilities for these operations.
-
-## Integration Best Practices
+## Best Practices
 
 1. **Use WebSockets for Real-time Updates**
    - Connect to the WebSocket endpoint to receive real-time updates
@@ -459,98 +346,6 @@ The DependencyResolver in Metis provides utilities for these operations.
    - Update subtask status independently
    - Track progress at the task level based on subtask completion
 
-6. **Handle Service Unavailability**
-   - Implement retry logic for API calls
-   - Cache task information for offline usage
-   - Reprocess failed operations when services recover
-
-7. **Bulk Operations for Performance**
-   - Use bulk create/update operations for multiple tasks
-   - Batch dependency updates
-   - Rate-limit WebSocket subscriptions
-
-## Tekton Component Integration Examples
-
-### Integrating with Telos
-
-```python
-# Import requirements from Telos as tasks
-from metis.core.telos_integration import telos_client
-
-async def import_requirements_as_tasks():
-    # Search for requirements in Telos
-    requirements, total = await telos_client.search_requirements(
-        status="approved",
-        category="core"
-    )
-    
-    # Import each requirement as a task
-    imported_tasks = []
-    for req in requirements:
-        task = await task_manager.import_requirement_as_task(req["id"])
-        if task:
-            imported_tasks.append(task)
-    
-    return imported_tasks
-```
-
-### Integrating with Prometheus
-
-```python
-# Provide task information to Prometheus for planning
-from metis.core.task_manager import task_manager
-
-async def provide_tasks_for_planning():
-    # Get pending tasks
-    tasks, total = await task_manager.list_tasks(status="pending")
-    
-    # Get dependencies for these tasks
-    dependencies = []
-    for task in tasks:
-        task_dependencies = await task_manager.list_dependencies(task_id=task.id)
-        dependencies.extend(task_dependencies)
-    
-    # Calculate critical path
-    from metis.core.dependency import DependencyResolver
-    critical_path = DependencyResolver.get_critical_path(tasks)
-    
-    return {
-        "tasks": tasks,
-        "dependencies": dependencies,
-        "critical_path": critical_path
-    }
-```
-
-### Integrating with Hermes
-
-```python
-# Register with Hermes and discover other services
-from metis.utils.hermes_helper import hermes_client
-
-async def setup_hermes_integration():
-    # Register with Hermes
-    success = await hermes_client.register()
-    if not success:
-        raise RuntimeError("Failed to register with Hermes")
-    
-    # Discover other services
-    telos_service = await hermes_client.get_service("Telos")
-    prometheus_service = await hermes_client.get_service("Prometheus")
-    
-    # Update service URLs
-    if telos_service:
-        telos_url = f"{telos_service['protocol']}://{telos_service['host']}:{telos_service['port']}"
-        # Update Telos client configuration
-    
-    if prometheus_service:
-        prometheus_url = f"{prometheus_service['protocol']}://{prometheus_service['host']}:{prometheus_service['port']}"
-        # Update Prometheus client configuration
-    
-    # Start heartbeat task
-    import asyncio
-    asyncio.create_task(hermes_client.heartbeat_task())
-```
-
 ## Troubleshooting
 
 ### Common Issues
@@ -572,11 +367,6 @@ async def setup_hermes_integration():
    - Check for cycles in dependency relationships
    - Resolve by removing or rearranging dependencies
 
-5. **Service Discovery Failures**
-   - Ensure Hermes is running
-   - Check that Metis is properly registered with Hermes
-   - Verify service names and capabilities
-
 ### Debugging
 
 1. **Enable Detailed Logging**
@@ -594,139 +384,3 @@ async def setup_hermes_integration():
 4. **Monitor WebSocket Connection**
    - Use browser developer tools to monitor WebSocket traffic
    - Check for connection drops or errors
-
-5. **Check Hermes Registration**
-   - Verify that Metis is registered with Hermes
-   - Check that Metis is announcing the correct capabilities
-
-## Additional Integration Patterns
-
-### Event-Driven Integration
-
-Metis supports event-driven integration through its WebSocket interface. Components can subscribe to events and react to changes in real-time.
-
-```javascript
-// Example: React to task status changes
-const ws = new WebSocket("ws://localhost:8011/ws");
-
-ws.onopen = () => {
-  ws.send(JSON.stringify({
-    client_id: "component_x",
-    subscribe_to: ["task_updated"]
-  }));
-};
-
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data);
-  if (data.type === "task_updated") {
-    const task = data.data;
-    if (task.status === "done") {
-      // Trigger follow-up action
-      notifyTaskCompletion(task);
-    }
-  }
-};
-```
-
-### Microservice Communication
-
-Metis follows the Tekton microservice communication patterns, including:
-
-1. **Direct API Communication**: Synchronous RESTful API calls
-2. **Event-Based Communication**: Asynchronous events via WebSockets
-3. **Service Discovery**: Hermes-based service registration and discovery
-
-```python
-# Example: Discover and communicate with Metis
-async def communicate_with_metis():
-    # Discover Metis through Hermes
-    metis_service = await hermes_client.get_service("Metis")
-    if metis_service:
-        metis_url = f"{metis_service['protocol']}://{metis_service['host']}:{metis_service['port']}"
-        
-        # Create a client
-        metis_client = MetisClient(base_url=metis_url)
-        
-        # Communicate with Metis
-        tasks = await metis_client.list_tasks(status="pending")
-        return tasks
-    else:
-        raise ServiceNotFoundError("Metis service not found")
-```
-
-### Integration with External Systems
-
-Metis can be integrated with external systems using its REST API:
-
-1. **Issue Tracking Systems**: Map tasks to issues in systems like Jira or GitHub Issues
-2. **CI/CD Pipelines**: Update task status based on build/deployment results
-3. **Project Management Tools**: Sync tasks with external project management tools
-
-```python
-# Example: Sync with external issue tracker
-async def sync_with_issue_tracker():
-    # Get tasks from Metis
-    metis_tasks = await metis_client.list_tasks(updated_since=last_sync_time)
-    
-    # For each task, update the corresponding issue
-    for task in metis_tasks:
-        # Find or create the issue in the external system
-        issue_id = task.metadata.get("external_issue_id")
-        if issue_id:
-            # Update existing issue
-            await issue_tracker.update_issue(issue_id, {
-                "status": map_status(task.status),
-                "priority": map_priority(task.priority),
-                "description": task.description
-            })
-        else:
-            # Create new issue
-            issue = await issue_tracker.create_issue({
-                "title": task.title,
-                "description": task.description,
-                "status": map_status(task.status),
-                "priority": map_priority(task.priority)
-            })
-            
-            # Store the reference to the external issue
-            await metis_client.update_task(task.id, {
-                "metadata": {
-                    "external_issue_id": issue.id,
-                    "external_issue_url": issue.url
-                }
-            })
-```
-
-### Integration Testing
-
-When integrating with Metis, it's important to test the integration thoroughly:
-
-1. **API Contract Testing**: Ensure your client handles API responses correctly
-2. **Event Handling Testing**: Verify proper handling of WebSocket events
-3. **Error Handling Testing**: Test behavior when Metis is unavailable
-4. **Authentication Testing**: Verify proper handling of authentication errors
-5. **Performance Testing**: Test behavior under load
-
-```python
-# Example: Integration test for task creation
-async def test_task_creation():
-    # Setup test environment
-    metis_client = MetisClient(base_url="http://localhost:8011")
-    
-    # Create a test task
-    task_data = {
-        "title": "Test Task",
-        "description": "This is a test task",
-        "status": "pending",
-        "priority": "medium"
-    }
-    response = await metis_client.create_task(task_data)
-    
-    # Verify the response
-    assert response["success"] == True
-    assert "task" in response
-    assert response["task"]["title"] == "Test Task"
-    
-    # Cleanup
-    await metis_client.delete_task(response["task"]["id"])
-```
