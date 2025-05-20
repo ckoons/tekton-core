@@ -22,6 +22,7 @@ As of April 26, 2025, Tekton has moved to a consolidated, single-port-per-compon
 | Tekton Core | 8010 | TEKTON_CORE_PORT | Core orchestration - HTTP, Events |
 | Metis | 8011 | METIS_PORT | Workflows - HTTP, Events |
 | Apollo | 8012 | APOLLO_PORT | Local Attention/Prediction layer - HTTP, Events |
+| Budget | 8013 | BUDGET_PORT | Token/cost management system - HTTP, Events |
 
 ## Design Rationale
 

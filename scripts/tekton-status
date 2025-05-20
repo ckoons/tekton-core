@@ -229,6 +229,7 @@ COMPONENTS=(
     "tekton_core:8010:Tekton Core"
     "metis:8011:Metis Task Management"
     "apollo:8012:Apollo Attention System"
+    "budget:8013:Budget Token/Cost Management"
     "hephaestus:8080:Hephaestus UI"
 )
 
@@ -285,7 +286,7 @@ echo ""
 tekton_info "Port Status:"
 
 # Get all component ports and check their status
-for component_id in engram hermes ergon rhetor terma athena prometheus harmonia telos synthesis metis apollo hephaestus tekton-core llm-adapter; do
+for component_id in engram hermes ergon rhetor terma athena prometheus harmonia telos synthesis metis apollo budget hephaestus tekton-core llm-adapter; do
     port=$(tekton_get_component_port "$component_id")
     
     if [ -n "$port" ] && [ "$port" -ne 0 ]; then
