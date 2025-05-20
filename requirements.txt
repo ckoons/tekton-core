@@ -15,3 +15,7 @@ py-cpuinfo>=8.0.0
 
 # Dashboard dependencies
 chart.js>=3.7.0  # JS library loaded via CDN
+
+# MCP dependencies
+fastmcp>=1.0.0  # Decorator-based MCP implementation
+pydantic>=2.0.0  # Data validation for MCP schema
