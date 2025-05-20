@@ -118,6 +118,7 @@ SYNTHESIS_DIR="${TEKTON_DIR}/Synthesis"
 TERMA_DIR="${TEKTON_DIR}/Terma"
 METIS_DIR="${TEKTON_DIR}/Metis"
 APOLLO_DIR="${TEKTON_DIR}/Apollo"
+BUDGET_DIR="${TEKTON_DIR}/Budget"
 LLM_ADAPTER_DIR="${TEKTON_DIR}/LLMAdapter"
 
 # Function to display usage information
@@ -130,7 +131,7 @@ show_usage() {
     echo "  --components COMP        Comma-separated list of components to launch:"
     echo "                           all: All available components"
     echo "                           Individual: engram,hermes,ergon,rhetor,athena,prometheus,"
-    echo "                                       harmonia,sophia,telos,hephaestus"
+    echo "                                       harmonia,sophia,telos,budget,hephaestus"
     echo "  --launch-all             Launch all available components (equivalent to --components all)"
     echo "  --model-type TYPE        Type of model to launch: claude, ollama (default: claude)"
     echo "  --model MODEL            Specific model to use (defaults depend on model type)"
@@ -291,6 +292,16 @@ detect_components() {
         fi
     fi
     
+    # Check for Budget
+    if [ -d "$BUDGET_DIR" ]; then
+        if [ -d "$BUDGET_DIR/budget" ] && [ -f "$BUDGET_DIR/budget/__init__.py" ]; then
+            components+=("budget")
+            tekton_success "Budget (Token/Cost Management)"
+        else
+            tekton_warn "Budget found but not fully implemented"
+        fi
+    fi
+    
     # Return the list of components
     echo "${components[@]}"
 }
@@ -397,6 +408,13 @@ select_components() {
     if [[ " ${all_components[*]} " == *" apollo "* ]]; then
         if tekton_prompt_yes_no "Launch Apollo (Attention System)?" "n"; then
             selected_components+=("apollo")
+        fi
+    fi
+    
+    # Ask about Budget (Token/Cost Management)
+    if [[ " ${all_components[*]} " == *" budget "* ]]; then
+        if tekton_prompt_yes_no "Launch Budget (Token/Cost Management)?" "n"; then
+            selected_components+=("budget")
         fi
     fi
     
@@ -953,6 +971,8 @@ for comp in "${OTHER_COMPONENTS[@]}"; do
         launch_component "metis" "Metis Task Management" "$METIS_DIR" "metis.api.app" "$METIS_PORT"
     elif [ "$comp" = "apollo" ]; then
         launch_component "apollo" "Apollo Attention System" "$APOLLO_DIR" "apollo.api.app" "$APOLLO_PORT"
+    elif [ "$comp" = "budget" ]; then
+        launch_component "budget" "Budget Token/Cost Management" "$BUDGET_DIR" "budget.api.app" "$BUDGET_PORT"
     fi
 done
 

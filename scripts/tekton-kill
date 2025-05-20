@@ -184,6 +184,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         tekton_kill_processes_safe "telos.core" "Telos (User Interface)"
         tekton_kill_processes_safe "metis.core" "Metis (Task Management)"
         tekton_kill_processes_safe "apollo.core" "Apollo (Attention System)"
+        tekton_kill_processes_safe "budget.core" "Budget (Token/Cost Management)"
         
         # Kill Rhetor processes with comprehensive pattern matching
         tekton_kill_processes_safe "rhetor.api.app" "Rhetor LLM Manager"
@@ -276,7 +277,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     
     # Final sweep for any remaining Tekton component processes
-    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis metis apollo hephaestus llm_adapter; do
+    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis metis apollo budget hephaestus llm_adapter; do
         component_pids=$(pgrep -f "$component" | grep -v -E "$EXCLUDE_PATTERN" 2>/dev/null || echo "")
         if [ -n "$component_pids" ]; then
             tekton_warn "Killing remaining $component processes (excluding Claude processes)..."
