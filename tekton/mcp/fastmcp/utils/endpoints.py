@@ -72,10 +72,10 @@ def include_mcp_router(
 
 def add_standard_mcp_endpoints(
     router: APIRouter,
-    get_capabilities_func: Any,
-    get_tools_func: Any,
-    process_request_func: Any,
-    component_manager_dependency: Depends
+    get_capabilities_func: Any = None,
+    get_tools_func: Any = None,
+    process_request_func: Any = None,
+    component_manager_dependency: Depends = None
 ) -> APIRouter:
     """
     Add standard MCP endpoints to a router.
@@ -97,42 +97,65 @@ def add_standard_mcp_endpoints(
         return {"status": "healthy", "message": "MCP service is running"}
     
     @router.get("/capabilities")
-    async def get_capabilities(
-        manager = Depends(component_manager_dependency)
-    ):
+    async def get_capabilities():
         """Get component MCP capabilities."""
-        capabilities = get_capabilities_func(manager)
-        return {
-            "capabilities": [cap.dict() for cap in capabilities],
-            "count": len(capabilities)
-        }
+        if get_capabilities_func and component_manager_dependency:
+            manager = await component_manager_dependency()
+            capabilities = get_capabilities_func(manager)
+            return {
+                "capabilities": [cap.dict() for cap in capabilities],
+                "count": len(capabilities)
+            }
+        else:
+            return {
+                "capabilities": [],
+                "count": 0,
+                "message": "No capabilities available - component manager not configured"
+            }
     
     @router.get("/tools")
-    async def get_tools(
-        manager = Depends(component_manager_dependency)
-    ):
+    async def get_tools():
         """Get component MCP tools."""
-        tools = get_tools_func(manager)
-        return {
-            "tools": [tool.dict() for tool in tools],
-            "count": len(tools)
-        }
+        if get_tools_func and component_manager_dependency:
+            manager = await component_manager_dependency()
+            tools = get_tools_func(manager)
+            return {
+                "tools": [tool.dict() for tool in tools],
+                "count": len(tools)
+            }
+        else:
+            return {
+                "tools": [],
+                "count": 0,
+                "message": "No tools available - component manager not configured"
+            }
     
-    @router.post("/process", response_model=MCPResponse)
+    @router.post("/process")
     async def process_request(
-        request: MCPRequest = Body(...),
-        manager = Depends(component_manager_dependency)
+        request: MCPRequest = Body(...)
     ):
         """Process an MCP request."""
         try:
-            response = await process_request_func(manager, request)
-            return response
+            if process_request_func and component_manager_dependency:
+                manager = await component_manager_dependency()
+                response = await process_request_func(manager, request)
+                return response
+            else:
+                return {
+                    "status": "error",
+                    "error": "MCP request processing not configured",
+                    "result": None
+                }
         except Exception as e:
             logger.error(f"Error processing MCP request: {e}")
-            return MCPResponse(
-                status="error",
-                error=f"Error processing request: {str(e)}",
-                result=None
-            )
+            return {
+                "status": "error",
+                "error": f"Error processing request: {str(e)}",
+                "result": None
+            }
     
     return router
+
+
+# Alias for backward compatibility
+add_mcp_endpoints = add_standard_mcp_endpoints
