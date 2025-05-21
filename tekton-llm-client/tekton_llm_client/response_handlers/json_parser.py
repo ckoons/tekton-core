@@ -192,7 +192,7 @@ class JSONParser:
             data = JSONParser.parse(text)
             
             # Now validate with the model
-            return model_class.parse_obj(data)
+            return model_class.model_validate(data)
             
         except ValidationError as e:
             logger.error(f"JSON validation failed: {str(e)}")

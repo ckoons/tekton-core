@@ -540,9 +540,10 @@ launch_engram() {
         
         # Wait for service to be ready
         tekton_info "Waiting for Engram service to be ready..."
-        tekton_wait_for_port_responding "$ENGRAM_PORT" 60 "Engram Memory Service" || {
-            tekton_error_exit "Engram memory service failed to start. Check logs at $HOME/.tekton/logs/engram.log"
-        }
+        if ! tekton_wait_for_port_responding "$ENGRAM_PORT" 60 "Engram Memory Service"; then
+            tekton_error "Engram memory service failed to start. Check logs at $HOME/.tekton/logs/engram.log"
+            return 1
+        fi
         
         tekton_success "Engram memory service is online!"
         return 0
@@ -583,9 +584,10 @@ launch_hermes() {
     
     # Wait for service to be ready
     tekton_info "Waiting for Hermes service to be ready..."
-    tekton_wait_for_port_responding "$HERMES_PORT" 30 "Hermes Service" || {
-        tekton_warn "Hermes may not be fully ready, but continuing..."
-    }
+    if ! tekton_wait_for_port_responding "$HERMES_PORT" 30 "Hermes Service"; then
+        tekton_error "Hermes failed to start - check logs at $HOME/.tekton/logs/hermes.log"
+        return 1
+    fi
     
     return 0
 }
@@ -624,11 +626,12 @@ launch_component() {
         # Start the component server
         tekton_start_component_server "$component" "$module" "$component_dir" "$port"
         
-        # Wait for service to be ready (with a shorter timeout)
+        # Wait for service to be ready (with a reasonable timeout)
         tekton_info "Waiting for $description to be ready..."
-        tekton_wait_for_port_responding "$port" 10 "$description" || {
-            tekton_warn "$description may not be fully ready, but continuing..."
-        }
+        if ! tekton_wait_for_port_responding "$port" 20 "$description"; then
+            tekton_error "$description failed to start - check logs at $HOME/.tekton/logs/${component}.log"
+            return 1
+        fi
         
         tekton_success "$description initialized"
         return 0
@@ -669,9 +672,10 @@ launch_llm_adapter() {
 
         # Wait for the adapter to start
         tekton_info "Waiting for LLM Adapter to initialize..."
-        tekton_wait_for_port_responding "$LLM_ADAPTER_HTTP_PORT" 15 "LLM Adapter" || {
-            tekton_warn "LLM Adapter may not be fully ready, but continuing..."
-        }
+        if ! tekton_wait_for_port_responding "$LLM_ADAPTER_HTTP_PORT" 20 "LLM Adapter"; then
+            tekton_error "LLM Adapter failed to start - check logs at $HOME/.tekton/logs/llm_adapter.log"
+            return 1
+        fi
         
         tekton_success "LLM Adapter started successfully"
         return 0

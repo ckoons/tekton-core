@@ -23,10 +23,13 @@ from .config import (
     save_settings, get_default_settings
 )
 
+# Aliases for backward compatibility
+Client = TektonLLMClient
+
 __version__ = '0.2.0'
 __all__ = [
     # Core clients
-    'TektonLLMClient', 'TektonLLMWebSocketClient', 
+    'TektonLLMClient', 'TektonLLMWebSocketClient', 'Client',
     
     # Exceptions
     'TektonLLMError', 'ConnectionError', 'TimeoutError', 'AuthenticationError', 'FormatError',

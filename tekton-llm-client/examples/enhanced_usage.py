@@ -166,7 +166,7 @@ function processData(data) {
             logger.info(json.dumps(parsed_data, indent=2))
             
             # Validate with Pydantic model
-            review = CodeReview.parse_obj(parsed_data)
+            review = CodeReview.model_validate(parsed_data)
             logger.info("\nValidated with Pydantic model:")
             logger.info(f"Found {len(review.issues)} issues")
             logger.info(f"Overall quality: {review.overall_quality}")

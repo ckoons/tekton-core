@@ -260,7 +260,7 @@ Only include the requested information in your response, formatted according to 
             
         try:
             with open(file_path, 'w') as f:
-                json.dump(template.dict(), f, indent=2)
+                json.dump(template.model_dump(), f, indent=2)
             return True
         except Exception as e:
             logger.error(f"Error saving template to {file_path}: {str(e)}")

@@ -82,9 +82,9 @@ class StructuredOutputParser(Generic[T]):
             if self.model is not None:
                 try:
                     if isinstance(result, dict):
-                        return self.model.parse_obj(result)
+                        return self.model.model_validate(result)
                     elif isinstance(result, list):
-                        return [self.model.parse_obj(item) if isinstance(item, dict) else item for item in result]
+                        return [self.model.model_validate(item) if isinstance(item, dict) else item for item in result]
                     else:
                         # Can't validate non-dict/list against a model
                         raise FormatError(f"Cannot validate {type(result)} against model {self.model.__name__}")

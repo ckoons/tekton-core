@@ -9,7 +9,7 @@ import os
 import json
 import logging
 from typing import Dict, List, Any, Optional, Union, TypeVar, Type, cast
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel, Field, ConfigDict
 
 from .environment import (
     get_env, get_env_bool, get_env_int, get_env_float, 
@@ -47,9 +47,7 @@ class LLMSettings(BaseModel):
     fallback_provider: Optional[str] = Field(default=None, description="Fallback provider to use")
     fallback_model: Optional[str] = Field(default=None, description="Fallback model to use")
     
-    class Config:
-        extra = Extra.allow
-        env_prefix = "TEKTON_LLM_"
+    model_config = ConfigDict(extra='allow', env_prefix='TEKTON_LLM_')
 
 class ClientSettings(BaseModel):
     """Settings for Tekton LLM Client."""
@@ -65,8 +63,7 @@ class ClientSettings(BaseModel):
     context_id: Optional[str] = Field(default=None, description="Context ID for tracking conversations")
     additional_options: Dict[str, Any] = Field(default_factory=dict, description="Additional component-specific options")
     
-    class Config:
-        extra = Extra.allow
+    model_config = ConfigDict(extra='allow')
 
 def load_settings(
     component_id: str,
@@ -94,7 +91,7 @@ def load_settings(
                 file_settings = json.load(f)
                 
             # Merge with existing settings
-            settings = ClientSettings(**{**settings.dict(), **file_settings})
+            settings = ClientSettings(**{**settings.model_dump(), **file_settings})
             
         except Exception as e:
             logger.error(f"Error loading settings from {file_path}: {str(e)}")
@@ -123,7 +120,7 @@ def load_settings(
             nested_settings["component_id"] = component_id
             
             # Merge the settings
-            current_dict = settings.dict()
+            current_dict = settings.model_dump()
             merged_dict = _deep_merge(current_dict, nested_settings)
             
             # Create a new settings object
@@ -144,7 +141,7 @@ def save_settings(settings: ClientSettings, file_path: str) -> bool:
     """
     try:
         with open(file_path, 'w') as f:
-            json.dump(settings.dict(), f, indent=2)
+            json.dump(settings.model_dump(), f, indent=2)
         return True
     except Exception as e:
         logger.error(f"Error saving settings to {file_path}: {str(e)}")

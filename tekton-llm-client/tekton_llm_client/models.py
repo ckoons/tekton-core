@@ -4,7 +4,7 @@ Data models for the Tekton LLM Client.
 
 from enum import Enum
 from typing import Dict, List, Optional, Any, Union
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageRole(str, Enum):
@@ -21,7 +21,8 @@ class Message(BaseModel):
     content: str
     name: Optional[str] = None
     
-    @validator('role', pre=True)
+    @field_validator('role', mode='before')
+    @classmethod
     def validate_role(cls, v):
         """Validates the role and converts string to enum."""
         if isinstance(v, str):
@@ -102,3 +103,7 @@ class AvailableProviders(BaseModel):
     providers: Dict[str, Provider]
     default_provider: str
     default_model: str
+
+
+# Alias for backward compatibility
+ChatMessage = Message
