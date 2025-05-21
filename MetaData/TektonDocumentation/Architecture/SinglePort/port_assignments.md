@@ -23,6 +23,7 @@ As of April 26, 2025, Tekton has moved to a consolidated, single-port-per-compon
 | Metis | 8011 | METIS_PORT | Workflows - HTTP, Events |
 | Apollo | 8012 | APOLLO_PORT | Local Attention/Prediction layer - HTTP, Events |
 | Budget | 8013 | BUDGET_PORT | Token/cost management system - HTTP, Events |
+| Sophia | 8014 | SOPHIA_PORT | Machine learning system - HTTP, Events |
 
 ## Design Rationale
 

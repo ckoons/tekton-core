@@ -277,7 +277,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     fi
     
     # Final sweep for any remaining Tekton component processes
-    for component in engram hermes ergon rhetor telos athena prometheus sophia harmonia synthesis metis apollo budget hephaestus llm_adapter; do
+    for component in engram hermes ergon rhetor terma telos athena prometheus sophia harmonia synthesis metis apollo budget hephaestus llm_adapter; do
         component_pids=$(pgrep -f "$component" | grep -v -E "$EXCLUDE_PATTERN" 2>/dev/null || echo "")
         if [ -n "$component_pids" ]; then
             tekton_warn "Killing remaining $component processes (excluding Claude processes)..."

@@ -25,6 +25,7 @@ Tekton uses a Single Port Architecture where each component exposes its services
 | Metis          | 8011 | Task management system                    | `METIS_PORT`           |
 | Apollo         | 8012 | Local Attention/Prediction system         | `APOLLO_PORT`          |
 | Budget         | 8013 | Token/cost management system              | `BUDGET_PORT`          |
+| Sophia         | 8014 | Machine learning system                   | `SOPHIA_PORT`          |
 
 ## Specialized Services
 
