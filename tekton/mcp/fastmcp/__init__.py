@@ -25,6 +25,10 @@ from tekton.mcp.fastmcp.schema import (
     MessageSchema,
     ResponseSchema,
     ContentSchema,
+    MCPRequest,
+    MCPResponse,
+    MCPTool,
+    MCPCapability,
     validate_schema
 )
 from tekton.mcp.fastmcp.client import (
@@ -32,6 +36,18 @@ from tekton.mcp.fastmcp.client import (
     register_component,
     get_capabilities,
     execute_tool
+)
+from tekton.mcp.fastmcp.server import (
+    FastMCPServer,
+    register_tool_from_fn
+)
+from tekton.mcp.fastmcp.exceptions import (
+    FastMCPError,
+    MCPProcessingError,
+    MCPValidationError,
+    MCPConnectionError,
+    MCPTimeoutError,
+    MCPAuthenticationError
 )
 
 __all__ = [
@@ -43,8 +59,16 @@ __all__ = [
     
     # Schema
     "ToolSchema", "ProcessorSchema", "CapabilitySchema", "ContextSchema",
-    "MessageSchema", "ResponseSchema", "ContentSchema", "validate_schema",
+    "MessageSchema", "ResponseSchema", "ContentSchema", "MCPRequest", "MCPResponse",
+    "MCPTool", "MCPCapability", "validate_schema",
     
     # Client
-    "MCPClient", "register_component", "get_capabilities", "execute_tool"
+    "MCPClient", "register_component", "get_capabilities", "execute_tool",
+    
+    # Server
+    "FastMCPServer", "register_tool_from_fn",
+    
+    # Exceptions
+    "FastMCPError", "MCPProcessingError", "MCPValidationError", 
+    "MCPConnectionError", "MCPTimeoutError", "MCPAuthenticationError"
 ]

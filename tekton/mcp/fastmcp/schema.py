@@ -207,3 +207,29 @@ def validate_schema(schema_type: str, data: Dict[str, Any]) -> bool:
         return True
     except Exception:
         return False
+
+# MCP Request/Response schemas for API endpoints
+class MCPRequest(BaseModel):
+    """Schema for MCP API requests."""
+    tool_name: str
+    arguments: Dict[str, Any] = Field(default_factory=dict)
+    context: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    
+    class Config:
+        """Pydantic configuration."""
+        extra = "allow"
+
+class MCPResponse(BaseModel):
+    """Schema for MCP API responses."""
+    success: bool
+    result: Optional[Any] = None
+    error: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    
+    class Config:
+        """Pydantic configuration."""
+        extra = "allow"
+
+# Aliases for backward compatibility and external API consistency
+MCPTool = ToolSchema
+MCPCapability = CapabilitySchema
