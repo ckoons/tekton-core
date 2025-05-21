@@ -80,6 +80,7 @@ Tekton is built on several foundational principles:
 
 ### Unified Configuration
 - Common configuration is shared across services for simplified management
+- Three-tier environment variable system (user, project, secrets)
 - Environment-based configuration with sensible defaults
 - Central data directories for consistent storage
 
@@ -150,7 +151,17 @@ Then set up individual or all Tekton components:
 
 ### Environment Setup
 
-Before running Tekton, you need to set the `TEKTON_ROOT` environment variable to the root directory of your Tekton repository:
+Tekton uses a three-tier environment variable system for configuration management:
+
+1. **`~/.env`** - User-wide settings shared across applications
+2. **`.env.tekton`** - Project settings (tracked in git)
+3. **`.env.local`** - Local secrets and API keys (gitignored)
+
+Variables are loaded in priority order, with later files overriding earlier ones.
+
+#### Basic Setup
+
+Set the `TEKTON_ROOT` environment variable:
 
 ```bash
 # Set TEKTON_ROOT in your current shell
@@ -160,7 +171,17 @@ export TEKTON_ROOT="$(pwd)"
 echo 'export TEKTON_ROOT="/path/to/your/tekton/repository"' >> ~/.bashrc
 ```
 
-The `TEKTON_ROOT` environment variable is required by various Tekton utilities, particularly the GitHub utilities, to locate resources and libraries correctly regardless of where they're executed from.
+#### Configuration Files
+
+The `.env.tekton` file contains all Tekton settings and is already configured with sensible defaults. For local development with secrets, copy the template:
+
+```bash
+# Create local environment file for secrets (optional)
+cp .env.local.template .env.local
+# Edit .env.local with your API keys (this file is gitignored)
+```
+
+See [ENVIRONMENT_MANAGEMENT.md](./ENVIRONMENT_MANAGEMENT.md) for complete documentation.
 
 ### Running Tekton
 
