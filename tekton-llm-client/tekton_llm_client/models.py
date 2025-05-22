@@ -6,6 +6,8 @@ from enum import Enum
 from typing import Dict, List, Optional, Any, Union
 from pydantic import BaseModel, Field, field_validator
 
+from shared.debug.debug_utils import debug_log, log_function
+
 
 class MessageRole(str, Enum):
     """Message role in a conversation."""
@@ -103,6 +105,46 @@ class AvailableProviders(BaseModel):
     providers: Dict[str, Provider]
     default_provider: str
     default_model: str
+
+
+class ChatCompletionOptions(BaseModel):
+    """Options for chat completion requests."""
+    messages: List[Message]
+    temperature: float = 0.7
+    max_tokens: Optional[int] = None
+    stop_sequences: Optional[List[str]] = None
+    top_p: Optional[float] = None
+    top_k: Optional[int] = None
+    presence_penalty: Optional[float] = None
+    frequency_penalty: Optional[float] = None
+    fallback_provider: Optional[str] = None
+    fallback_model: Optional[str] = None
+    stream: bool = False
+    timeout: int = 120
+    retry_count: int = 3
+    retry_delay: int = 1000  # milliseconds
+    tools: Optional[List[Dict[str, Any]]] = None
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = None
+    system_message: Optional[str] = None
+    
+    @field_validator('messages')
+    @classmethod
+    def validate_messages(cls, v):
+        """Validates that there is at least one message in the list."""
+        if not v or len(v) == 0:
+            raise ValueError("At least one message is required for chat completion")
+        return v
+    
+    def add_system_message(self, content: str) -> None:
+        """Adds a system message at the beginning of the messages list."""
+        if content:
+            # Check if there's already a system message at the beginning
+            if self.messages and self.messages[0].role == MessageRole.SYSTEM:
+                self.messages[0].content = content
+                debug_log.debug("tekton_llm_client", "Updated existing system message")
+            else:
+                self.messages.insert(0, Message(role=MessageRole.SYSTEM, content=content))
+                debug_log.debug("tekton_llm_client", "Added new system message")
 
 
 # Alias for backward compatibility
