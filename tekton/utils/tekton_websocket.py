@@ -39,7 +39,7 @@ import asyncio
 import logging
 import uuid
 from enum import Enum
-from typing import Dict, Any, Optional, Callable, List, Union, Set, Tuple, cast
+from typing import Dict, Any, Optional, Callable, List, Union, Set, Tuple, cast, Awaitable
 from datetime import datetime, timedelta
 
 # Import tekton errors
@@ -730,7 +730,7 @@ if FASTAPI_AVAILABLE:
         def register_handler(
             self,
             message_type: str,
-            handler: Callable[[WebSocket, Dict[str, Any]], asyncio.coroutine]
+            handler: Callable[[WebSocket, Dict[str, Any]], Awaitable[Any]]
         ) -> None:
             """
             Register a handler for a specific message type.
@@ -743,7 +743,7 @@ if FASTAPI_AVAILABLE:
         
         def register_default_handler(
             self,
-            handler: Callable[[WebSocket, Dict[str, Any]], asyncio.coroutine]
+            handler: Callable[[WebSocket, Dict[str, Any]], Awaitable[Any]]
         ) -> None:
             """
             Register a default handler for messages with no specific handler.
@@ -755,7 +755,7 @@ if FASTAPI_AVAILABLE:
         
         def register_connect_handler(
             self,
-            handler: Callable[[WebSocket], asyncio.coroutine]
+            handler: Callable[[WebSocket], Awaitable[Any]]
         ) -> None:
             """
             Register a handler for new connections.
@@ -767,7 +767,7 @@ if FASTAPI_AVAILABLE:
         
         def register_disconnect_handler(
             self,
-            handler: Callable[[WebSocket], asyncio.coroutine]
+            handler: Callable[[WebSocket], Awaitable[Any]]
         ) -> None:
             """
             Register a handler for disconnections.
@@ -779,7 +779,7 @@ if FASTAPI_AVAILABLE:
         
         def register_auth_handler(
             self,
-            handler: Callable[[WebSocket, Dict[str, Any]], asyncio.coroutine]
+            handler: Callable[[WebSocket, Dict[str, Any]], Awaitable[Any]]
         ) -> None:
             """
             Register an authentication handler.
