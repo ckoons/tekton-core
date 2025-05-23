@@ -6,7 +6,19 @@ from enum import Enum
 from typing import Dict, List, Optional, Any, Union
 from pydantic import BaseModel, Field, field_validator
 
-from shared.debug.debug_utils import debug_log, log_function
+# Temporary fix - create dummy functions if import fails
+try:
+    from shared.debug.debug_utils import debug_log, log_function
+except ImportError:
+    # Fallback implementations
+    def debug_log(message, level="info"):
+        import logging
+        getattr(logging, level)(f"[DEBUG] {message}")
+    
+    def log_function(operation=None):
+        def decorator(func):
+            return func
+        return decorator
 
 
 class MessageRole(str, Enum):

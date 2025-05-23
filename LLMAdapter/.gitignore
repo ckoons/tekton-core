@@ -36,11 +36,6 @@ env/
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Testing
@@ -49,56 +44,23 @@ Thumbs.db
 .tox/
 htmlcov/
 *.cover
-.hypothesis/
-.mypy_cache/
-.dmypy.json
-dmypy.json
 
 # Logs
 *.log
 logs/
-*.log.*
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
-*.db-journal
-*.db-wal
-*.db-shm
 
 # Backups
 *.bak
 *.backup
 *.orig
 *.tmp
-*~
 
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment files
+# Project specific
 .env.local
 *.local
 *.local.*
-
-# Tekton specific
-CLAUDE.md
-**/CLAUDE.md
-**/.claude/settings.local.json
-
-# Temporary files
-.gitignore.template
-
-# Vector stores and ML artifacts
-vector_store/
-*.index
-*.faiss
-*.pkl
-documents.pkl
-
-# UV package manager
-.uv/
