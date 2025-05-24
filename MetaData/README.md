@@ -2,6 +2,21 @@
 
 This directory contains the centralized documentation for the Tekton project. The structure is organized as follows:
 
+## 🎯 Critical Configuration Files
+
+**IMPORTANT**: When adding or modifying Tekton components, these are the ONLY files that need to be updated:
+
+1. **`/config/tekton_components.yaml`** - Single source of truth for ALL component definitions
+   - Component names, ports, descriptions, categories
+   - Startup priorities and dependencies
+   - Used by all Python scripts and tools
+
+2. **`/config/port_assignments.md`** - Official port assignments document
+   - Port numbers and environment variables
+   - Read by `/tekton/utils/port_config.py`
+
+See `/config/CENTRALIZED_CONFIG.md` for detailed usage instructions.
+
 ## Directory Structure
 
 - **ComponentDocumentation/**: Documentation specific to individual Tekton components

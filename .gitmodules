@@ -57,3 +57,6 @@
 [submodule "tekton-core"]
 	path = tekton-core
 	url = https://github.com/ckoons/tekton-core.git
+[submodule "Codex"]
+	path = Codex
+	url = https://github.com/ckoons/Codex.git

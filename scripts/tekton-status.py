@@ -9,29 +9,18 @@ import aiohttp
 import argparse
 import json
 import sys
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from tabulate import tabulate
 import psutil
 
+# Add parent directory to path to import tekton modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Component port mapping
-COMPONENT_PORTS = {
-    "engram": 8000,
-    "hermes": 8001,
-    "ergon": 8002,
-    "rhetor": 8003,
-    "athena": 8005,
-    "prometheus": 8006,
-    "harmonia": 8007,
-    "telos": 8008,
-    "synthesis": 8009,
-    "metis": 8011,
-    "apollo": 8012,
-    "budget": 8013,
-    "sophia": 8014,
-    "hephaestus": 8080
-}
+# Import centralized configuration
+from tekton.utils.component_config import get_component_config, ComponentInfo
+from tekton.utils.port_config import load_port_assignments
 
 
 class ComponentStatus:
@@ -130,16 +119,23 @@ def check_port_process(port: int) -> Optional[Dict[str, Any]]:
 
 async def check_all_components() -> List[ComponentStatus]:
     """Check health of all components"""
+    # Use centralized component configuration
+    config = get_component_config()
+    components = config.get_all_components()
+    
     async with aiohttp.ClientSession() as session:
         tasks = []
-        for name, port in COMPONENT_PORTS.items():
-            tasks.append(check_component_health(session, name, port))
+        for comp_id, comp_info in components.items():
+            tasks.append(check_component_health(session, comp_id, comp_info.port))
         
         return await asyncio.gather(*tasks)
 
 
-def format_table_output(components: List[ComponentStatus]) -> str:
+def format_table_output(components: List[ComponentStatus], verbose: bool = False) -> str:
     """Format component status as a table"""
+    # Get component configuration for descriptions
+    config = get_component_config()
+    
     # Prepare data for table
     table_data = []
     for comp in components:
@@ -165,20 +161,32 @@ def format_table_output(components: List[ComponentStatus]) -> str:
         else:
             process_str = "-"
         
-        table_data.append([
-            comp.name.upper(),
+        # Get component info for name and description
+        comp_info = config.get_component(comp.name)
+        display_name = comp_info.name if comp_info else comp.name.upper()
+        
+        row = [
+            display_name,
             comp.port,
             f"{status_symbol} {comp.status}",
             comp.version,
-            f"{registered_symbol} {'Yes' if comp.registered else 'No'}",
-            response_str,
-            process_str
-        ])
+            f"{registered_symbol}",
+            response_str
+        ]
+        
+        if verbose:
+            row.append(process_str)
+            if comp_info:
+                row.append(comp_info.description[:40] + "..." if len(comp_info.description) > 40 else comp_info.description)
+        
+        table_data.append(row)
     
     # Sort by port
     table_data.sort(key=lambda x: x[1])
     
-    headers = ["Component", "Port", "Status", "Version", "Registered", "Response", "Process"]
+    headers = ["Component", "Port", "Status", "Version", "Reg", "Response"]
+    if verbose:
+        headers.extend(["Process", "Description"])
     
     return tabulate(table_data, headers=headers, tablefmt="grid")
 
@@ -226,12 +234,17 @@ async def main():
     
     # Check components
     if args.component:
-        if args.component.lower() not in COMPONENT_PORTS:
+        # Use centralized component configuration
+        config = get_component_config()
+        component_name = args.component.lower().replace("-", "_")
+        
+        if not config.get_component(component_name):
             print(f"❌ Unknown component: {args.component}")
+            print(f"Available components: {', '.join(sorted(config.get_all_components().keys()))}")
             sys.exit(1)
         
         components = await check_all_components()
-        components = [c for c in components if c.name == args.component.lower()]
+        components = [c for c in components if c.name == component_name]
     else:
         components = await check_all_components()
     
@@ -239,7 +252,7 @@ async def main():
     if args.json:
         print(format_json_output(components))
     else:
-        print(format_table_output(components))
+        print(format_table_output(components, verbose=args.verbose))
         
         # Print summary
         stats = calculate_system_stats(components)
@@ -254,14 +267,36 @@ async def main():
         if enhanced:
             print(f"\n🚀 Enhanced Components:")
             for comp in enhanced:
-                print(f"   - {comp.name.upper()} v{comp.version}")
+                comp_info = get_component_config().get_component(comp.name)
+                name = comp_info.name if comp_info else comp.name.upper()
+                print(f"   - {name} v{comp.version}")
+        
+        # Show categories if verbose
+        if args.verbose:
+            config = get_component_config()
+            categories = {}
+            for comp in components:
+                comp_info = config.get_component(comp.name)
+                if comp_info:
+                    cat = comp_info.category
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(comp)
+            
+            print(f"\n📋 Components by Category:")
+            for cat in sorted(categories.keys()):
+                healthy = sum(1 for c in categories[cat] if c.status == "healthy")
+                total = len(categories[cat])
+                print(f"   {cat.title()}: {healthy}/{total} healthy")
         
         # Issues
         issues = [c for c in components if c.status not in ["healthy", "not_running"]]
         if issues:
             print(f"\n⚠️  Components with Issues:")
             for comp in issues:
-                print(f"   - {comp.name.upper()}: {comp.status}")
+                comp_info = get_component_config().get_component(comp.name)
+                name = comp_info.name if comp_info else comp.name.upper()
+                print(f"   - {name}: {comp.status}")
                 if comp.error and args.verbose:
                     print(f"     Error: {comp.error}")
 

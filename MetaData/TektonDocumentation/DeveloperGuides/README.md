@@ -6,13 +6,21 @@ This directory contains developer guides and standards for working with the Tekt
 
 ## Available Guides
 
+### Component Management
+
+- [Component Management Guide](./ComponentManagement.md): **CRITICAL** - How to add, modify, and manage Tekton components using centralized configuration
+
 ### UI Development
 
 - [BEM Naming Conventions](./BEMNamingConventions.md): Standardized CSS naming conventions for components
 
+### Configuration
+
+- [Shared Utilities](./SharedUtilities.md): Common utilities and patterns
+- [Standardized Error Handling](./StandardizedErrorHandling.md): Error handling patterns
+
 ### To Be Created
 
-- Component Development Guide
 - Testing Standards
 - Code Style Guide
 - Contribution Workflow
