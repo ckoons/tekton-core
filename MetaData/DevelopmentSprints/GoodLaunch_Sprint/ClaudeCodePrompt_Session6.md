@@ -1,12 +1,16 @@
 # GoodLaunch Sprint - Session 6 Prompt
 
 ## Critical Context - READ FIRST
-You are continuing the GoodLaunch Sprint. The previous sessions have been thrashing the code with band-aid fixes. This session's goal is to make WORKING code that actually launches, not just code that avoids errors.
+You are continuing the GoodLaunch Sprint. The previous sessions have been applying temporary fixes to get components launching. This session's goal is to:
+1. **FIRST** - Consolidate port configuration to prevent drift and errors
+2. **SECOND** - Make components actually functional, not just "launching" with disabled features
+3. **THIRD** - Ensure the system is ready for real development use
 
-## Current Status
-- **Unknown number of components working** (Session 5 ended without a final test)
-- Multiple components have had their functionality commented out just to make them "launch"
-- The system is full of inconsistencies and half-implemented features
+## Current Status as of January 23, 2025
+- **Session 5 ended at 93% working (13/14 components)**
+- Multiple components have had functionality commented out (especially Rhetor's MCP tools)
+- Port configuration is scattered across 10+ duplicate files causing maintenance issues
+- The system needs architectural cleanup before adding more features
 
 ## Session 5 Key Discovery - Rhetor's Real Problem
 
@@ -161,3 +165,109 @@ Never hardcode ports or create new port configuration files.
 5. Create a systematic plan to fix each failing component properly
 
 Remember: The goal is a WORKING system, not just one that launches with disabled features.
+
+## Current State Verification (January 23, 2025)
+
+### What Has Been Done
+1. **Rhetor's tools.py** - MCPTool instantiations are commented out (lines 1164-1340)
+2. **Multiple components fixed in Session 5** - Sophia, Telos, Harmonia, Budget
+
+### What Still Needs To Be Done
+1. **Port Configuration Consolidation** - CRITICAL
+   - 10 duplicate port_config.py files still exist:
+     ```
+     ./Apollo/apollo/utils/port_config.py
+     ./Engram/engram/utils/port_config.py
+     ./Harmonia/harmonia/utils/port_config.py
+     ./Hermes/hermes/utils/port_config.py
+     ./Metis/metis/utils/port_config.py
+     ./Prometheus/prometheus/utils/port_config.py
+     ./Rhetor/rhetor/utils/port_config.py
+     ./Synthesis/synthesis/utils/port_config.py
+     ./Telos/telos/utils/port_config.py
+     ./Terma/terma/utils/port_config.py
+     ```
+   - Centralized `/tekton/utils/port_config.py` does NOT exist yet
+   
+2. **Rhetor MCP Tools** - Need proper decorator implementation
+   - Tools are defined but not decorated with @mcp_tool
+   - MCPTool manual instantiations are commented out
+   - Tools are non-functional currently
+
+3. **Test Script Port Fixes** - Various hardcoded ports need updating
+   - Example: `/Sophia/examples/run_fastmcp_test.sh` line 17 uses port 8009 (should be 8014)
+   - Search all shell scripts and Python files for hardcoded ports
+
+## Recommended Session 6 Action Plan
+
+### Phase 1: Port Configuration (Do This FIRST)
+1. Create `/Users/cskoons/projects/github/Tekton/tekton/utils/port_config.py`
+   ```python
+   """Centralized port configuration for all Tekton components."""
+   import os
+   from pathlib import Path
+   
+   # Read port assignments from the official source
+   def load_port_assignments():
+       config_path = Path(__file__).parent.parent.parent / "config" / "port_assignments.md"
+       # Parse the markdown file and extract port assignments
+       # Return a dictionary of component_name -> port
+   
+   # Component-specific helper functions
+   def get_component_port(component_name=None):
+       """Get port for a specific component or current component."""
+       if component_name is None:
+           # Detect current component from module path
+           pass
+       ports = load_port_assignments()
+       return ports.get(component_name, 8000)
+   
+   # Legacy compatibility functions
+   def get_rhetor_port(): return get_component_port("rhetor")
+   def get_hermes_port(): return get_component_port("hermes")
+   # ... etc for all components
+   ```
+
+2. Make it read from `/config/port_assignments.md` dynamically
+3. Delete all individual component port_config.py files
+4. Update all imports to use the centralized version
+5. Fix any hardcoded ports in test scripts
+
+### Phase 2: Fix Rhetor Properly
+1. Add @mcp_tool decorators to all tool functions
+2. Remove the commented MCPTool instantiations completely
+3. Ensure proper imports from tekton.mcp.fastmcp.decorators
+4. Test that tools are actually registered and functional
+
+### Phase 3: System Verification
+1. Run `tekton-launch --launch-all`
+2. Verify all 14 components start
+3. Test actual functionality, not just launch status
+4. Document any remaining issues clearly
+
+This structured approach will prevent further code thrashing and establish a solid foundation for future development.
+
+## Priority Summary
+
+**DO FIRST (Critical Architecture Fix):**
+1. Create centralized port configuration at `/tekton/utils/port_config.py`
+2. Delete all 10 duplicate port_config.py files
+3. Update all imports throughout the codebase
+
+**DO SECOND (Restore Functionality):**
+1. Fix Rhetor's MCP tools with proper @mcp_tool decorators
+2. Remove commented-out code blocks
+3. Verify tools are actually working
+
+**DO THIRD (System Health):**
+1. Run full system test with `tekton-launch --launch-all`
+2. Verify all 14 components start AND function
+3. Document any remaining issues for future sessions
+
+**Time Estimate:** 
+- Phase 1: 1-2 hours (mostly mechanical changes)
+- Phase 2: 30-45 minutes (focused on Rhetor)
+- Phase 3: 15-30 minutes (testing and documentation)
+
+**Expected Outcome:**
+A fully functional Tekton system with clean architecture, no duplicate configuration files, and all components working with their intended features enabled.

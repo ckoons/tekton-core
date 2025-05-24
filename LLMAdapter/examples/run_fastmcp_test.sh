@@ -12,7 +12,7 @@ export PYTHONPATH="$COMPONENT_PATH:${PYTHONPATH:-}"
 
 # Set LLM Adapter configuration
 export LLM_ADAPTER_LOG_LEVEL="${LLM_ADAPTER_LOG_LEVEL:-info}"
-export LLM_ADAPTER_PORT="${LLM_ADAPTER_PORT:-8006}"
+export LLM_ADAPTER_PORT="${LLM_ADAPTER_PORT:-8300}"
 
 echo "========================================"
 echo "LLM Adapter FastMCP Test Suite"
