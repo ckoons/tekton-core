@@ -213,22 +213,18 @@ The launch script supports various options:
 - `--non-interactive`: Run in non-interactive mode
 - `--launch-all`: Launch all available components (equivalent to --components all)
 
-### Port Assignments
+### Port Assignments and Component Configuration
 
-Tekton components use a single port per component for all operations:
+**IMPORTANT**: Component definitions and port assignments are centrally managed:
 
-| Component      | Port      | Description                                       |
-|----------------|-----------|---------------------------------------------------|
-| Hephaestus UI  | 8080      | User interface (HTTP, WebSocket, Events)          |
-| Engram         | 8000      | Memory system (REST API, WebSocket, Events)       |
-| Hermes         | 8100      | Service registry and database (REST, Events)      |
-| Ergon          | 8200      | Agent system (REST API, WebSocket, Events)        |
-| LLM Adapter    | 8300      | LLM communication (REST API, WebSocket)           |
-| Synthesis      | 5005      | Execution engine (REST API, WebSocket, Events)    |
-| Rhetor         | 8400      | LLM management (REST API, WebSocket, Events)      |
-| Athena         | 8500      | Knowledge graph (REST API, Events)                |
-| Prometheus     | 8600      | Planning system (REST API, Events)                |
-| Telos          | 8700      | Requirements system (REST API, Events)            |
+1. **Component Definitions**: `/config/tekton_components.yaml` - Single source of truth for ALL components
+2. **Port Assignments**: `/config/port_assignments.md` - Official port assignment document
+3. **Documentation**: `/config/CENTRALIZED_CONFIG.md` - Usage instructions
+
+To add or modify components:
+- Edit `/config/tekton_components.yaml` for component metadata
+- Update `/config/port_assignments.md` if changing ports
+- All tools automatically use the updated configuration
 
 **Single Port Architecture**: Each component consolidates all communication (REST API, WebSocket connections, and event-based messaging) on a single port using path-based routing:
 - REST API endpoints use `/api/v1/...` paths
