@@ -101,7 +101,7 @@ class ToolSchema(BaseModel):
     id: Optional[str] = None
     name: str
     description: str
-    schema: Union[Dict[str, Any], ToolSchemaContents]
+    input_schema: Union[Dict[str, Any], ToolSchemaContents] = Field(alias="schema")
     tags: Optional[List[str]] = Field(default_factory=list)
     category: Optional[str] = "utility"
     version: Optional[str] = "1.0.0"
@@ -109,14 +109,15 @@ class ToolSchema(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(default_factory=dict)
     registered_at: Optional[float] = None
     
+    class Config:
+        """Pydantic configuration."""
+        populate_by_name = True  # Allow both field name and alias
+        extra = "allow"  # Allow extra fields
+    
     @validator("id", pre=True, always=True)
     def set_id(cls, v):
         """Set tool ID if not provided."""
         return v or f"tool-{uuid.uuid4()}"
-        
-    class Config:
-        """Pydantic configuration."""
-        extra = "allow"  # Allow extra fields
 
 class CapabilitySchema(BaseModel):
     """Schema for MCP capabilities."""
