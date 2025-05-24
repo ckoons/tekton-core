@@ -2,10 +2,6 @@
 	path = Hephaestus
 	url = https://github.com/ckoons/Hephaestus.git
 
-[submodule "Codex"]
-	path = Codex
-	url = https://github.com/ckoons/Codex.git
-
 [submodule "Engram"]
 	path = Engram
 	url = https://github.com/ckoons/Engram.git
