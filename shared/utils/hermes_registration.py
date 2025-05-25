@@ -45,7 +45,7 @@ class HermesRegistration:
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.hermes_url}/api/components/register",
+                    f"{self.hermes_url}/api/register",
                     json=self.registration_data,
                     timeout=5
                 ) as resp:
@@ -79,7 +79,7 @@ class HermesRegistration:
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.hermes_url}/api/components/heartbeat",
+                    f"{self.hermes_url}/api/heartbeat",
                     json=heartbeat_data,
                     timeout=2
                 ) as resp:
@@ -96,8 +96,9 @@ class HermesRegistration:
             
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.delete(
-                    f"{self.hermes_url}/api/components/{component_name}",
+                async with session.post(
+                    f"{self.hermes_url}/api/unregister",
+                    json={"component_name": component_name},
                     timeout=2
                 ) as resp:
                     if resp.status == 200:
