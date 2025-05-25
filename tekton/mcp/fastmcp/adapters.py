@@ -15,60 +15,94 @@ from tekton.mcp.fastmcp.decorators import MCPToolMeta, mcp_tool, mcp_processor
 
 logger = logging.getLogger(__name__)
 
-def adapt_tool(tool_spec: Dict[str, Any]) -> Callable:
+def adapt_tool(tool_func_or_spec: Union[Callable, Dict[str, Any]], component_manager: Optional[Any] = None) -> Callable:
     """
-    Adapt an existing tool specification to the decorator pattern.
-    
-    This function creates a decorated function from an existing tool
-    specification, enabling backward compatibility.
-    
+    Adapt an existing tool specification or function to the decorator pattern.
+
+    This function creates a decorated function from either:
+    1. An existing tool specification dictionary (legacy)
+    2. A function with MCP metadata (new pattern)
+
     Args:
-        tool_spec: Existing tool specification
-        
+        tool_func_or_spec: Either a function with MCP metadata or existing tool specification
+        component_manager: Optional component manager for dependency injection
+
     Returns:
         Decorated function
     """
-    # Extract tool metadata
-    tool_id = tool_spec.get("id")
-    name = tool_spec.get("name", "Unnamed Tool")
-    description = tool_spec.get("description", "")
-    schema = tool_spec.get("schema", {})
-    tags = tool_spec.get("tags", [])
-    metadata = tool_spec.get("metadata", {})
-    function = tool_spec.get("function")
-    
-    # Check if function is provided
-    if not function:
-        logger.warning(f"Tool {name} does not have a function")
-        
-        # Create a dummy function
-        async def dummy_function(**kwargs):
-            logger.warning(f"Dummy function called for tool {name}")
-            return {
-                "error": "This is a dummy function for an adapted tool"
-            }
-            
-        function = dummy_function
-    
-    # Create decorated function
-    @mcp_tool(
-        name=name,
-        description=description,
-        tags=tags,
-        metadata=metadata
-    )
-    async def adapted_tool(**kwargs):
-        # Call original function
-        return await function(**kwargs) if inspect.iscoroutinefunction(function) else function(**kwargs)
-        
-    # Manually set ID to maintain identity
-    if tool_id:
-        adapted_tool._mcp_tool_meta.id = tool_id
-        
-    # Copy schema
-    adapted_tool._mcp_tool_meta.schema = schema
-    
-    return adapted_tool
+    # Handle both function and tool_spec inputs
+    if callable(tool_func_or_spec):
+        # New pattern: function with MCP metadata
+        function = tool_func_or_spec
+
+        # Check if function has MCP metadata
+        if hasattr(function, "_mcp_tool_meta"):
+            # Function already decorated, just inject component manager if needed
+            if component_manager and hasattr(function, '__self__') is False:
+                # Create a wrapper that preserves metadata and injects component_manager
+                import functools
+
+                @functools.wraps(function)
+                async def wrapped_function(*args, **kwargs):
+                    # Inject component_manager if the function expects it
+                    import inspect
+                    sig = inspect.signature(function)
+                    if 'component_manager' in sig.parameters:
+                        kwargs['component_manager'] = component_manager
+                    return await function(*args, **kwargs) if inspect.iscoroutinefunction(function) else function(*args, **kwargs)
+
+                # Preserve the MCP metadata
+                wrapped_function._mcp_tool_meta = function._mcp_tool_meta
+                return wrapped_function
+            return function
+        else:
+            # Function lacks metadata, can't adapt
+            logger.error(f"Function {function.__name__} missing MCP metadata, cannot adapt")
+            raise ValueError(f"Function {function.__name__} missing MCP metadata")
+
+    else:
+        # Legacy pattern: tool specification dictionary
+        tool_spec = tool_func_or_spec
+        tool_id = tool_spec.get("id")
+        name = tool_spec.get("name", "Unnamed Tool")
+        description = tool_spec.get("description", "")
+        schema = tool_spec.get("schema", {})
+        tags = tool_spec.get("tags", [])
+        metadata = tool_spec.get("metadata", {})
+        function = tool_spec.get("function")
+
+        # Check if function is provided
+        if not function:
+            logger.warning(f"Tool {name} does not have a function")
+
+            # Create a dummy function
+            async def dummy_function(**kwargs):
+                logger.warning(f"Dummy function called for tool {name}")
+                return {
+                    "error": "This is a dummy function for an adapted tool"
+                }
+
+            function = dummy_function
+
+        # Create decorated function for legacy pattern
+        @mcp_tool(
+            name=name,
+            description=description,
+            tags=tags,
+            metadata=metadata
+        )
+        async def adapted_tool(**kwargs):
+            # Call original function
+            return await function(**kwargs) if inspect.iscoroutinefunction(function) else function(**kwargs)
+
+        # Manually set ID to maintain identity
+        if tool_id:
+            adapted_tool._mcp_tool_meta.id = tool_id
+
+        # Copy schema
+        adapted_tool._mcp_tool_meta.schema = schema
+
+        return adapted_tool
 
 def adapt_processor(processor_spec: Dict[str, Any]) -> Type:
     """

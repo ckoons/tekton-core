@@ -104,6 +104,28 @@ class ContextFilter(logging.Filter):
         return True
 
 
+class RobustFormatter(logging.Formatter):
+    """
+    A formatter that gracefully handles missing component_id.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Format a log record, adding component_id if missing.
+
+        Args:
+            record: Log record to format
+
+        Returns:
+            Formatted string
+        """
+        # Add component_id if missing
+        if not hasattr(record, 'component_id'):
+            record.component_id = record.name
+
+        return super().format(record)
+
+
 class JsonFormatter(logging.Formatter):
     """
     Format log records as JSON.
@@ -122,24 +144,25 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """
         Format a log record as JSON.
-        
+
         Args:
             record: Log record to format
-            
+
         Returns:
             JSON string
         """
         log_data: Dict[str, Any] = {}
-        
+
         # Add standard fields if requested
         if "timestamp" in self.fields:
             log_data["timestamp"] = datetime.fromtimestamp(record.created).isoformat()
-            
+
         if "level" in self.fields:
             log_data["level"] = record.levelname
-            
-        if "component_id" in self.fields and hasattr(record, 'component_id'):
-            log_data["component_id"] = record.component_id
+
+        if "component_id" in self.fields:
+            # Use component_id if available, otherwise use logger name as fallback
+            log_data["component_id"] = getattr(record, 'component_id', record.name)
             
         if "message" in self.fields:
             log_data["message"] = record.getMessage()
@@ -263,12 +286,12 @@ def setup_logging(
     else:
         if format_string is None:
             format_string = DEFAULT_FORMAT
-            
+
         if not include_timestamp and '%(asctime)s' in format_string:
             # Remove timestamp from format
             format_string = format_string.replace('%(asctime)s', '').strip()
-            
-        formatter = logging.Formatter(format_string)
+
+        formatter = RobustFormatter(format_string)
     
     # Create and add context filter
     context_filter = ContextFilter(component_id, include_correlation_id)

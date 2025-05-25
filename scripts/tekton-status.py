@@ -22,6 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tekton.utils.component_config import get_component_config, ComponentInfo
 from tekton.utils.port_config import load_port_assignments
 
+# Setup logging
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ComponentStatus:
     """Represents the status of a single component"""
@@ -124,11 +128,42 @@ async def check_all_components() -> List[ComponentStatus]:
     components = config.get_all_components()
     
     async with aiohttp.ClientSession() as session:
+        # First, get registration info from Hermes
+        hermes_registrations = await check_hermes_registrations(session)
+        
         tasks = []
         for comp_id, comp_info in components.items():
             tasks.append(check_component_health(session, comp_id, comp_info.port))
         
-        return await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+        
+        # Update registration status from Hermes data
+        for component in results:
+            if component.name in hermes_registrations:
+                component.registered = True
+        
+        return results
+
+
+async def check_hermes_registrations(session: aiohttp.ClientSession) -> Dict[str, bool]:
+    """Query Hermes for registered components"""
+    try:
+        async with session.get(
+            "http://localhost:8001/api/components",
+            timeout=aiohttp.ClientTimeout(total=3)
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                # Create a mapping of component name to registration status
+                registrations = {}
+                for comp in data.get("components", []):
+                    comp_name = comp.get("name", "").lower()
+                    registrations[comp_name] = True
+                return registrations
+    except Exception as e:
+        logger.debug(f"Failed to query Hermes registrations: {e}")
+    
+    return {}
 
 
 def format_table_output(components: List[ComponentStatus], verbose: bool = False) -> str:
