@@ -6,20 +6,26 @@ This sprint standardizes API patterns across all Tekton components, building on 
 
 ## Current State
 
-Inconsistent patterns observed:
+Inconsistent patterns observed during GoodLaunch debugging:
 - Different health check implementations (or missing entirely)
+- Web UI servers returning HTML instead of JSON (Hephaestus issue)
+- Missing main() functions causing startup failures (Athena, Sophia)
 - Varied error response formats
 - Mixed approaches to MCP tool/capability registration
 - No standard timeout handling
 - Inconsistent API versioning
+- Components launched successfully but not actually running (process vs server binding issues)
 
 ## Goals
 
 1. **Standardize Endpoints**: Consistent API patterns across components
-2. **Unified Error Handling**: Same error format everywhere
-3. **Registration Patterns**: Standard MCP registration approach
-4. **Health Monitoring**: Reliable health checks for all components
-5. **API Documentation**: OpenAPI/Swagger for all endpoints
+2. **Fix Startup Patterns**: All components must have working main() functions with uvicorn
+3. **JSON-Only Health Checks**: Web UI and API servers both return JSON health responses
+4. **Unified Error Handling**: Same error format everywhere
+5. **Registration Patterns**: Standard MCP registration approach
+6. **Health Monitoring**: Reliable health checks for all components
+7. **Configuration Hierarchy**: Clear precedence for port/config resolution
+8. **API Documentation**: OpenAPI/Swagger for all endpoints
 
 ## Implementation Plan
 
@@ -48,10 +54,13 @@ tekton-core/tekton/shared/api/
 ### Phase 3: Component Updates (2 sessions)
 
 Update all components to use standard patterns:
-- Add missing health checks
+- **CRITICAL**: Add missing main() functions (Athena, Sophia pattern)
+- Add missing health checks using shared utilities
+- Fix web UI servers to return JSON health responses (Hephaestus pattern)
 - Standardize error responses
 - Unify MCP registration
 - Implement service discovery
+- Establish configuration hierarchy (CLI → env → config → defaults)
 
 ### Phase 4: Documentation (0.5 sessions)
 

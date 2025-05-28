@@ -3,7 +3,7 @@ component:
   name: "Ergon Memory Service"
   version: "0.1.0"
   description: "Document and memory management for agents"
-  port: 8008
+  port: 8002
   metadata:
     component_type: "service"
 

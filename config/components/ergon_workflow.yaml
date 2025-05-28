@@ -3,7 +3,7 @@ component:
   name: "Ergon Workflow Engine"
   version: "0.1.0"
   description: "AI workflow planning and execution"
-  port: 8007
+  port: 8002
   metadata:
     component_type: "core"
 
