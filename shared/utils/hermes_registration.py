@@ -32,21 +32,29 @@ class HermesRegistration:
     ) -> bool:
         """Register a component with Hermes"""
         try:
-            self.registration_data = {
+            # Prepare registration data matching the API schema
+            registration_request = {
                 "name": component_name,
-                "port": port,
                 "version": version,
+                "type": component_name,  # Use component name as type
+                "endpoint": f"http://localhost:{port}",
                 "capabilities": capabilities,
+                "metadata": metadata or {}
+            }
+            
+            # Store additional data for internal use
+            self.registration_data = {
+                **registration_request,
+                "port": port,
                 "health_endpoint": health_endpoint,
                 "status": "active",
-                "registered_at": datetime.now().isoformat(),
-                "metadata": metadata or {}
+                "registered_at": datetime.now().isoformat()
             }
             
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     f"{self.hermes_url}/api/register",
-                    json=self.registration_data,
+                    json=registration_request,
                     timeout=5
                 ) as resp:
                     if resp.status == 200:
@@ -72,9 +80,8 @@ class HermesRegistration:
             
         try:
             heartbeat_data = {
-                "component": component_name,
-                "status": status,
-                "timestamp": datetime.now().isoformat()
+                "component_id": component_name,
+                "status": {"health": status}
             }
             
             async with aiohttp.ClientSession() as session:

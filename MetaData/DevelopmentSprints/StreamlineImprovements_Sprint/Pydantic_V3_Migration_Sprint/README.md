@@ -6,8 +6,12 @@ This sprint focuses on migrating all Tekton components from Pydantic v1/v2 to Py
 
 ## Current State
 
+Issues discovered during GoodLaunch debugging:
 - Mix of Pydantic v1 and v2 patterns across components
 - Persistent warning: "Field name 'schema' shadows an attribute in parent 'BaseModel'"
+- Field annotation errors causing startup failures (Terma MCP capabilities)
+- Missing type annotations on inherited fields
+- NumPy 2.x compatibility breaking transformers imports (Engram)
 - Inconsistent model configuration patterns
 - Legacy validation decorators
 
@@ -20,9 +24,11 @@ This sprint focuses on migrating all Tekton components from Pydantic v1/v2 to Py
 
 ## Implementation Plan
 
-### Phase 1: Assessment (0.5 sessions)
+### Phase 1: Assessment & Dependency Audit (0.5 sessions)
 - Audit all Pydantic usage across components
+- **CRITICAL**: Fix NumPy 2.x compatibility issues (`uv pip install "numpy<2"`)
 - Identify v1-specific patterns that need updating
+- Pin dependency versions to prevent compatibility issues
 - Document breaking changes that affect Tekton
 
 ### Phase 2: Core Migration (1 session)
@@ -32,8 +38,10 @@ This sprint focuses on migrating all Tekton components from Pydantic v1/v2 to Py
 
 ### Phase 3: Component Updates (2 sessions)
 - Migrate each component systematically
+- **Fix Terma-style field annotation errors**: Add type annotations to all inherited fields
 - Update model configurations to v3 patterns
 - Fix validation decorators and field validators
+- Ensure MCP capability classes use proper Pydantic patterns
 
 ### Phase 4: Testing & Validation (0.5 sessions)
 - Comprehensive testing of all components
@@ -55,6 +63,27 @@ class ToolSchema(BaseModel):
         fields={'tool_schema': {'alias': 'schema'}}
     )
     tool_schema: Dict[str, Any]
+```
+
+### Missing Type Annotations (Terma pattern fix)
+```python
+# Old (causing "Field 'name' defined on a base class was overridden" errors)
+class TerminalCapability(MCPCapability):
+    name = "terminal_management"
+    description = "Terminal management capability"
+
+# New (Pydantic v3 with proper annotations)
+class TerminalCapability(MCPCapability):
+    name: str = "terminal_management"
+    description: str = "Terminal management capability"
+```
+
+### Dependency Compatibility
+```python
+# requirements.txt updates
+numpy<2  # Fix transformers compatibility (Engram issue)
+pydantic>=3.0.0,<4.0.0
+transformers>=4.0.0  # Compatible with numpy<2
 ```
 
 ### Model Configuration

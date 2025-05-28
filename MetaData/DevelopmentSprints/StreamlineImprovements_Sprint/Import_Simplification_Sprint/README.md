@@ -6,28 +6,34 @@ This sprint simplifies and standardizes import patterns across Tekton, eliminati
 
 ## Current State
 
-Import-related issues observed:
+Import-related issues discovered during GoodLaunch debugging:
+- **Phantom imports**: `tekton.utils.port_config` imported everywhere but doesn't exist
 - Circular dependencies between modules
-- Missing modules (e.g., `athena.api.dependencies`)
+- Missing modules causing startup failures
 - Inconsistent import patterns
 - Deep import chains
 - Unclear module boundaries
+- Logging import issues causing component_id formatting errors (Sophia)
 
 ## Goals
 
-1. **Eliminate Circular Dependencies**: Clean module hierarchy
-2. **Simplify Import Paths**: Shorter, clearer imports
-3. **Standard Patterns**: Consistent import organization
-4. **Clear Boundaries**: Well-defined module interfaces
-5. **Import Performance**: Faster startup times
+1. **Eliminate Phantom Imports**: Create missing modules (tekton.utils.port_config)
+2. **Eliminate Circular Dependencies**: Clean module hierarchy
+3. **Fix Logging Imports**: Resolve component_id formatting issues
+4. **Simplify Import Paths**: Shorter, clearer imports
+5. **Standard Patterns**: Consistent import organization
+6. **Clear Boundaries**: Well-defined module interfaces
+7. **Import Performance**: Faster startup times
 
 ## Implementation Plan
 
-### Phase 1: Dependency Analysis (0.5 sessions)
+### Phase 1: Dependency Analysis & Missing Module Creation (0.5 sessions)
 
 - Map current import dependencies
+- **PRIORITY**: Create missing `tekton.utils.port_config` module (affects 8+ components)
 - Identify circular dependencies
-- Document module relationships
+- Document phantom imports across all components
+- Fix logging import chains causing component_id errors
 - Plan refactoring approach
 
 ### Phase 2: Core Refactoring (1 session)

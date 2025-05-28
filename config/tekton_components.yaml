@@ -8,7 +8,7 @@ components:
     port: 8010
     description: "Core orchestration and startup management"
     category: "infrastructure"
-    startup_priority: 0
+    startup_priority: 6  # Move to end - utility component
     dependencies: []
     
   hermes:

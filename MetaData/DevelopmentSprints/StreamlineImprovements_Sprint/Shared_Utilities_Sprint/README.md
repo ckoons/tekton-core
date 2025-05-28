@@ -29,12 +29,13 @@ Create core utility modules:
 ```
 tekton-core/tekton/shared/
 ├── __init__.py
-├── logging.py      # Standardized logger setup
+├── config.py       # Port & configuration management (PRIORITY #1)
+├── logging.py      # Standardized logger setup (fixes component_id errors)
+├── health.py       # Health check & diagnostic utilities
 ├── mcp.py          # FastMCP registration helpers
-├── health.py       # Health check utilities
+├── startup.py      # Component startup helpers with main() templates
 ├── errors.py       # Common error classes
-├── startup.py      # Component startup helpers
-└── config.py       # Configuration utilities
+└── templates.py    # Component scaffolding and templates
 ```
 
 ### Phase 2: Integration (2 sessions)
@@ -63,13 +64,79 @@ def get_component_version(component_name: str) -> str:
     return __tekton_version__
 ```
 
+### 0. Port Configuration Management
+```python
+# tekton/shared/config.py
+"""Port and configuration management for all Tekton components."""
+
+class PortConfig:
+    """Centralized port configuration with environment fallbacks."""
+
+    # Standard port assignments
+    COMPONENT_PORTS = {
+        'engram': 8000,
+        'hermes': 8001,
+        'ergon': 8002,
+        'rhetor': 8003,
+        'terma': 8004,
+        'athena': 8005,
+        'prometheus': 8006,
+        'harmonia': 8007,
+        'telos': 8008,
+        'synthesis': 8009,
+        'tekton_core': 8010,
+        'metis': 8011,
+        'apollo': 8012,
+        'budget': 8013,
+        'sophia': 8014,
+        'hephaestus': 8080  # Web UI convention
+    }
+
+    @classmethod
+    def get_component_port(cls, component_name: str) -> int:
+        """Get port for component with environment override."""
+        env_var = f"{component_name.upper()}_PORT"
+        return int(os.environ.get(env_var, cls.COMPONENT_PORTS.get(component_name, 8000)))
+
+    @classmethod
+    def get_component_url(cls, component_name: str, host: str = "localhost") -> str:
+        """Get full URL for component."""
+        port = cls.get_component_port(component_name)
+        return f"http://{host}:{port}"
+
+# Backward compatibility functions (fixes phantom import errors)
+def get_engram_port() -> int:
+    return PortConfig.get_component_port('engram')
+
+def get_hermes_port() -> int:
+    return PortConfig.get_component_port('hermes')
+
+def get_terma_port() -> int:
+    return PortConfig.get_component_port('terma')
+
+def get_athena_port() -> int:
+    return PortConfig.get_component_port('athena')
+
+# Add functions for all components to eliminate phantom imports
+# This fixes the #1 issue encountered during GoodLaunch debugging
+```
+
 ### 1. Logger Setup
 ```python
 # tekton/shared/logging.py
 def setup_component_logger(component_name: str, level: str = "INFO") -> logging.Logger:
     """Standard logger setup for all Tekton components."""
     logger = logging.getLogger(f"tekton.{component_name}")
-    # Standard configuration
+
+    # Fix component_id formatting issues (from Sophia debugging)
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+    )
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(getattr(logging, level.upper()))
+
     return logger
 
 # Usage in components
@@ -98,18 +165,82 @@ def register_mcp_tools(server: FastMCPServer, tools: List[Callable]):
             logger.error(f"Failed to register {tool.__name__}: {e}")
 ```
 
-### 3. Health Check
+### 3. Health Check & Diagnostic Tools
 ```python
 # tekton/shared/health.py
-def create_health_endpoint(router: APIRouter, component_name: str):
+from typing import Dict, Any, Optional
+from datetime import datetime
+from pydantic import BaseModel
+
+class HealthResponse(BaseModel):
+    """Standardized health response format."""
+    status: str  # "healthy", "degraded", "unhealthy"
+    component: str
+    version: str
+    timestamp: datetime
+    port: int
+    uptime: Optional[float] = None
+    checks: Optional[Dict[str, Any]] = None
+    message: Optional[str] = None
+
+def create_health_response(
+    component_name: str,
+    port: int,
+    version: str = "0.1.0",
+    status: str = "healthy",
+    registered: bool = False,
+    details: Optional[Dict[str, Any]] = None
+) -> HealthResponse:
+    """Create standardized health response (fixes Hephaestus HTML issue)."""
+    return HealthResponse(
+        status=status,
+        component=component_name,
+        version=version,
+        timestamp=datetime.utcnow(),
+        port=port,
+        checks=details or {}
+    )
+
+def create_health_endpoint(router: APIRouter, component_name: str, port: int):
     """Add standardized health check endpoint."""
     @router.get("/health")
     async def health_check():
-        return {
-            "status": "healthy",
-            "component": component_name,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        return create_health_response(component_name, port)
+
+    @router.get("/api/health")  # Alternative path for consistency
+    async def api_health_check():
+        return create_health_response(component_name, port)
+
+# Enhanced diagnostic tools (based on enhanced_tekton_status.py success)
+class ComponentDiagnostics:
+    """Diagnostic utilities for component health monitoring."""
+
+    @staticmethod
+    async def check_component_health(component_name: str, port: int) -> Dict[str, Any]:
+        """Comprehensive health check with multiple endpoint attempts."""
+        import aiohttp
+        import asyncio
+
+        endpoints = ["/health", "/api/health", "/status", "/"]
+
+        for endpoint in endpoints:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(f"http://localhost:{port}{endpoint}", timeout=5) as response:
+                        if response.status == 200:
+                            content_type = response.headers.get('content-type', '')
+                            if 'application/json' in content_type:
+                                data = await response.json()
+                                return {
+                                    "status": "healthy",
+                                    "endpoint": endpoint,
+                                    "response_time": response.headers.get('x-response-time'),
+                                    "data": data
+                                }
+            except Exception as e:
+                continue
+
+        return {"status": "unhealthy", "error": "No healthy endpoints found"}
 ```
 
 ### 4. Error Classes
@@ -131,7 +262,41 @@ class RegistrationError(TektonError):
     pass
 ```
 
-### 5. Startup Helpers with Metrics
+### 5. Component Templates
+```python
+# tekton/shared/templates.py
+"""Component scaffolding and standardized patterns."""
+
+def create_main_function_template(component_name: str, default_port: int) -> str:
+    """Generate standard main function (fixes Athena/Sophia missing main issue)."""
+    return f'''
+if __name__ == "__main__":
+    import argparse
+    import uvicorn
+
+    parser = argparse.ArgumentParser(description="{component_name.title()} API Server")
+    parser.add_argument("--port", type=int,
+                       default=int(os.environ.get("{component_name.upper()}_PORT", {default_port})),
+                       help="Port to run the server on")
+    parser.add_argument("--host", type=str, default="0.0.0.0",
+                       help="Host to bind the server to")
+    args = parser.parse_args()
+
+    logger.info(f"Starting {component_name.title()} server on {{args.host}}:{{args.port}}")
+    uvicorn.run(app, host=args.host, port=args.port)
+'''
+
+def create_component_scaffolding(component_name: str, port: int) -> Dict[str, str]:
+    """Create complete component scaffolding."""
+    return {{
+        "app.py": create_fastapi_template(component_name, port),
+        "main.py": create_main_function_template(component_name, port),
+        "health.py": create_health_template(component_name),
+        "requirements.txt": create_requirements_template()
+    }}
+```
+
+### 6. Startup Helpers with Metrics
 ```python
 # tekton/shared/startup.py
 import time

@@ -1,5 +1,5 @@
 component:
-  id: "athena.knowledge"
+  id: "athena_knowledge"
   name: "Athena Knowledge Graph"
   version: "0.1.0"
   description: "Knowledge graph service for semantic entity management and queries"
