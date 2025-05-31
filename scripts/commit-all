@@ -5,17 +5,21 @@
 # Save original directory
 ORIGINAL_DIR=$(pwd)
 
-# Determine if we're in the Tekton directory or need to navigate to it
-if [[ $(basename "$ORIGINAL_DIR") == "Tekton" ]]; then
-  TEKTON_DIR="$ORIGINAL_DIR"
-else
-  TEKTON_DIR="/Users/cskoons/projects/github/Tekton"
-  if [ ! -d "$TEKTON_DIR" ]; then
-    echo "❌ Error: Tekton directory not found at $TEKTON_DIR"
-    exit 1
-  fi
-  cd "$TEKTON_DIR"
+# Check if TEKTON_ROOT is set
+if [ -z "$TEKTON_ROOT" ]; then
+  echo "❌ Error: TEKTON_ROOT environment variable is not set"
+  echo "Please set TEKTON_ROOT before running $(basename $0)"
+  exit 1
 fi
+
+# Verify the directory exists
+if [ ! -d "$TEKTON_ROOT" ]; then
+  echo "❌ Error: TEKTON_ROOT points to non-existent directory: $TEKTON_ROOT"
+  exit 1
+fi
+
+# Navigate to Tekton directory
+cd "$TEKTON_ROOT"
 
 # Color codes for better output
 RED='\033[0;31m'
@@ -79,8 +83,8 @@ fi
 
 # Check submodules
 for PROJECT in "Apollo" "Athena" "Budget" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Metis" "Prometheus" "Rhetor" "Sophia" "Synthesis" "Telos" "Terma" "tekton-core"; do
-    if [ -d "$TEKTON_DIR/$PROJECT" ]; then
-        cd "$TEKTON_DIR/$PROJECT"
+    if [ -d "$TEKTON_ROOT/$PROJECT" ]; then
+        cd "$TEKTON_ROOT/$PROJECT"
         if [[ -n $(git status -s) ]]; then
             HAS_CHANGES=true
             break
@@ -88,7 +92,7 @@ for PROJECT in "Apollo" "Athena" "Budget" "Codex" "Engram" "Ergon" "Harmonia" "H
     fi
 done
 
-cd "$TEKTON_DIR"
+cd "$TEKTON_ROOT"
 
 if [ "$HAS_CHANGES" = false ]; then
     echo -e "${YELLOW}ℹ️  No changes detected in any repository. Nothing to commit.${NC}"
@@ -126,7 +130,7 @@ CHANGED=false
 PROJECTS_WITH_CHANGES=()
 
 # Get current branch
-cd "$TEKTON_DIR"
+cd "$TEKTON_ROOT"
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo -e "${BLUE}${BOLD}Current branch: ${CURRENT_BRANCH}${NC}"
 echo ""
@@ -134,8 +138,8 @@ echo ""
 # First pass: identify all projects with changes
 echo -e "${BLUE}Identifying changed projects...${NC}"
 for PROJECT in "${PROJECTS[@]}"; do
-  if [ -d "$TEKTON_DIR/$PROJECT" ]; then
-    cd "$TEKTON_DIR/$PROJECT"
+  if [ -d "$TEKTON_ROOT/$PROJECT" ]; then
+    cd "$TEKTON_ROOT/$PROJECT"
     if [[ -n $(git status -s) ]]; then
       PROJECTS_WITH_CHANGES+=("$PROJECT")
       echo -e "  ${GREEN}✓${NC} $PROJECT has changes"
@@ -144,7 +148,7 @@ for PROJECT in "${PROJECTS[@]}"; do
 done
 
 # Check Tekton main repo
-cd "$TEKTON_DIR"
+cd "$TEKTON_ROOT"
 GIT_STATUS=$(git status -s)
 if [[ -n "$GIT_STATUS" ]]; then
   NON_SCRIPT_CHANGES=$(echo "$GIT_STATUS" | grep -v "commit-all" | wc -l | tr -d '[:space:]')
@@ -159,7 +163,7 @@ echo ""
 # Commit and push changes in each project with changes
 for PROJECT in "${PROJECTS_WITH_CHANGES[@]}"; do
   if [ "$PROJECT" == "Tekton" ]; then
-    cd "$TEKTON_DIR"
+    cd "$TEKTON_ROOT"
     echo -e "${BLUE}Committing changes in ${BOLD}Tekton${NC}..."
     git add .
     git commit -m "$FULL_COMMIT_MSG"
@@ -172,7 +176,7 @@ for PROJECT in "${PROJECTS_WITH_CHANGES[@]}"; do
     fi
     CHANGED=true
   else
-    cd "$TEKTON_DIR/$PROJECT"
+    cd "$TEKTON_ROOT/$PROJECT"
     echo -e "${BLUE}Committing changes in ${BOLD}$PROJECT${NC}..."
     git add .
     git commit -m "$FULL_COMMIT_MSG"
@@ -207,7 +211,7 @@ if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
     
     # Pre-authenticate for merge operations
     echo -e "${BLUE}Authenticating for merge operations...${NC}"
-    cd "$TEKTON_DIR"
+    cd "$TEKTON_ROOT"
     git fetch origin main --dry-run >/dev/null 2>&1
     
     # Keep track of merge errors
@@ -215,8 +219,8 @@ if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
     
     # Merge changes in each project
     for PROJECT in "${PROJECTS[@]}"; do
-      if [ -d "$TEKTON_DIR/$PROJECT" ]; then
-        cd "$TEKTON_DIR/$PROJECT"
+      if [ -d "$TEKTON_ROOT/$PROJECT" ]; then
+        cd "$TEKTON_ROOT/$PROJECT"
         
         # Check if the project has both branches
         if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1 && git rev-parse --verify main >/dev/null 2>&1; then
@@ -251,7 +255,7 @@ if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
     done
     
     # Now handle Tekton main repository
-    cd "$TEKTON_DIR"
+    cd "$TEKTON_ROOT"
     
     # Check if both branches exist
     if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1 && git rev-parse --verify main >/dev/null 2>&1; then
@@ -297,8 +301,8 @@ if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
         
         # Delete branch in each project
         for PROJECT in "${PROJECTS[@]}"; do
-          if [ -d "$TEKTON_DIR/$PROJECT" ]; then
-            cd "$TEKTON_DIR/$PROJECT"
+          if [ -d "$TEKTON_ROOT/$PROJECT" ]; then
+            cd "$TEKTON_ROOT/$PROJECT"
             
             # Check if project has the branch
             if git rev-parse --verify $CURRENT_BRANCH >/dev/null 2>&1; then
@@ -320,7 +324,7 @@ if [ "$CURRENT_BRANCH" != "main" ] && [ "$CHANGED" = true ]; then
         done
         
         # Delete branch in Tekton repository
-        cd "$TEKTON_DIR"
+        cd "$TEKTON_ROOT"
         # Make sure we're on main
         git checkout main >/dev/null 2>&1
         

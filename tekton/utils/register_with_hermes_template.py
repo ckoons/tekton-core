@@ -41,12 +41,12 @@ script_dir = Path(__file__).parent.absolute()
 
 # Add parent directories to path (specific to your component's structure)
 component_dir = os.path.abspath(os.path.join(script_dir, "../.."))
-tekton_dir = os.path.abspath(os.path.join(component_dir, ".."))
-tekton_core_dir = os.path.join(tekton_dir, "tekton-core")
+tekton_root = os.path.abspath(os.path.join(component_dir, ".."))
+tekton_core_dir = os.path.join(tekton_root, "tekton-core")
 
 # Add to Python path
 sys.path.insert(0, str(component_dir))
-sys.path.insert(0, str(tekton_dir))
+sys.path.insert(0, str(tekton_root))
 sys.path.insert(0, str(tekton_core_dir))
 
 # Check if we're in a virtual environment

@@ -31,7 +31,7 @@ def find_config_file(component_id: str) -> Optional[str]:
         return f"{component_id}.yml"
     
     # Check in the config directory
-    tekton_dir = os.environ.get("TEKTON_DIR")
+    tekton_dir = os.environ.get("TEKTON_ROOT")
     if tekton_dir:
         # Check in Tekton config directory
         config_dir = os.path.join(tekton_dir, "config", "components")

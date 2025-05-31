@@ -7,10 +7,10 @@
 
 # Find Tekton root directory and script directories
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+TEKTON_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Load shared libraries
-LIB_DIR="${TEKTON_DIR}/scripts/lib"
+LIB_DIR="${TEKTON_ROOT}/scripts/lib"
 source "${LIB_DIR}/tekton-utils.sh"
 source "${LIB_DIR}/tekton-ports.sh"
 source "${LIB_DIR}/tekton-process.sh"
@@ -168,12 +168,12 @@ YAML
         tekton_info "Checking if Hermes is available..."
         if tekton_is_port_responding "$HERMES_PORT" "localhost" "/api/health"; then
             tekton_success "Hermes is available, registering component..."
-            "${TEKTON_DIR}/scripts/tekton-register" status --component "$COMPONENT_ID"
+            "${TEKTON_ROOT}/scripts/tekton-register" status --component "$COMPONENT_ID"
             
             # Only continue registration if user confirms
             if tekton_prompt_yes_no "Register component with Hermes?" "y"; then
                 tekton_info "Registering component with Hermes..."
-                "${TEKTON_DIR}/scripts/tekton-register" register --component "$COMPONENT_ID" --config "$CONFIG_FILE" &
+                "${TEKTON_ROOT}/scripts/tekton-register" register --component "$COMPONENT_ID" --config "$CONFIG_FILE" &
                 REGISTER_PID=$!
                 
                 # Give it a moment to register
@@ -181,7 +181,7 @@ YAML
                 
                 # Check registration status
                 tekton_info "Checking registration status..."
-                "${TEKTON_DIR}/scripts/tekton-register" status --component "$COMPONENT_ID"
+                "${TEKTON_ROOT}/scripts/tekton-register" status --component "$COMPONENT_ID"
             fi
         else
             tekton_warn "Hermes is not available, skipping registration"
@@ -206,7 +206,7 @@ YAML
         if [ -n "${REGISTER_PID:-}" ]; then
             tekton_info "Unregistering component from Hermes..."
             kill "$REGISTER_PID" 2>/dev/null || true
-            "${TEKTON_DIR}/scripts/tekton-register" unregister --component "$COMPONENT_ID"
+            "${TEKTON_ROOT}/scripts/tekton-register" unregister --component "$COMPONENT_ID"
         fi
         
         # Clean up temporary files

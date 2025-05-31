@@ -30,10 +30,10 @@ The following is an example of a simple component startup script using shared ut
 
 # Find Tekton root directory and script directories
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEKTON_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
+TEKTON_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Load shared libraries
-LIB_DIR="${TEKTON_DIR}/scripts/lib"
+LIB_DIR="${TEKTON_ROOT}/scripts/lib"
 source "${LIB_DIR}/tekton-utils.sh"
 source "${LIB_DIR}/tekton-ports.sh"
 source "${LIB_DIR}/tekton-process.sh"
@@ -59,7 +59,7 @@ tekton-register register --component "$COMPONENT_ID" &
 REGISTER_PID=$!
 
 # Start the component
-tekton_start_component_server "$COMPONENT_ID" "example.api.app" "$TEKTON_DIR/Example" "$PORT"
+tekton_start_component_server "$COMPONENT_ID" "example.api.app" "$TEKTON_ROOT/Example" "$PORT"
 
 # Set up signal handlers
 trap cleanup SIGTERM SIGINT
