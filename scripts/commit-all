@@ -30,6 +30,9 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# List of project directories
+PROJECTS=("Apollo" "Athena" "Budget" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Metis" "Prometheus" "Rhetor" "Sophia" "Synthesis" "Telos" "Terma" "tekton-core")
+
 # Function to check if push is needed
 needs_push() {
     # Check if there are commits to push
@@ -56,8 +59,47 @@ safe_push() {
     fi
 }
 
-# Pre-flight authentication check
+# Pre-flight checks
 echo -e "${BLUE}Performing pre-flight checks...${NC}"
+
+# Check parent repo is on a branch (not detached)
+PARENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ "$PARENT_BRANCH" = "HEAD" ]; then
+    echo -e "${RED}❌ ERROR: Tekton repository has detached HEAD${NC}"
+    echo -e "${YELLOW}Fix: git checkout main (or git checkout -b new-branch-name)${NC}"
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+# Check all submodules are on main branch (not detached or other branches)
+SUBMODULE_ERRORS=()
+for PROJECT in "${PROJECTS[@]}"; do
+    if [ -d "$TEKTON_ROOT/$PROJECT" ]; then
+        cd "$TEKTON_ROOT/$PROJECT"
+        BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [ "$BRANCH" = "HEAD" ]; then
+            SUBMODULE_ERRORS+=("${RED}❌ ERROR: $PROJECT has detached HEAD${NC}")
+            SUBMODULE_ERRORS+=("${YELLOW}   Fix: cd $PROJECT && git checkout main${NC}")
+        elif [ "$BRANCH" != "main" ]; then
+            SUBMODULE_ERRORS+=("${RED}❌ ERROR: $PROJECT is on branch '$BRANCH' (expected: main)${NC}")
+            SUBMODULE_ERRORS+=("${YELLOW}   Fix: cd $PROJECT && git checkout main${NC}")
+        fi
+    fi
+done
+
+# If any errors found, display them all and exit
+if [ ${#SUBMODULE_ERRORS[@]} -gt 0 ]; then
+    echo -e "${RED}Submodule errors found:${NC}"
+    for ERROR in "${SUBMODULE_ERRORS[@]}"; do
+        echo -e "$ERROR"
+    done
+    cd "$ORIGINAL_DIR"
+    exit 1
+fi
+
+cd "$TEKTON_ROOT"
+echo -e "${GREEN}✅ All submodules on main branch${NC}"
+echo -e "${GREEN}✅ Parent repository on branch: $PARENT_BRANCH${NC}"
 
 # Check if we can access the remote without prompting
 if ! git ls-remote origin HEAD >/dev/null 2>&1; then
@@ -122,8 +164,6 @@ Co-Authored-By: Casey Koons <cskoons@gmail.com> & Claude <noreply@anthropic.com>
 EOF
 )
 
-# List of project directories
-PROJECTS=("Apollo" "Athena" "Budget" "Codex" "Engram" "Ergon" "Harmonia" "Hephaestus" "Hermes" "Metis" "Prometheus" "Rhetor" "Sophia" "Synthesis" "Telos" "Terma" "tekton-core")
 
 # Track which projects were changed
 CHANGED=false
