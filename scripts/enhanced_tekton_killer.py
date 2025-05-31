@@ -79,7 +79,13 @@ class EnhancedComponentKiller:
     def __init__(self, verbose: bool = False, dry_run: bool = False):
         self.verbose = verbose
         self.dry_run = dry_run
-        self.config = get_component_config()
+        try:
+            self.config = get_component_config()
+        except Exception as e:
+            print(f"❌ Error: Could not load component config: {e}")
+            print("   This usually means Hermes is not running.")
+            print("   Please start Hermes first: tekton-launch hermes")
+            sys.exit(1)
         self.termination_results: Dict[str, TerminationResult] = {}
         self.session: Optional[aiohttp.ClientSession] = None
         
