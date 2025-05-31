@@ -1,0 +1,132 @@
+# Tekton Master Development Backlog
+
+This document serves as the master task list for Tekton development. Progress tracking happens in each individual sprint directory, with this document providing the high-level overview of completion status.
+
+## Instructions
+
+- **Status tracking**: Detailed progress is maintained in each sprint's directory
+- **Checkoff procedure**: Only mark tasks as complete in this master list when approved by Casey
+- **Order of execution**: Follow the sequence outlined below
+- **Documentation**: Each sprint has its own documentation in its directory
+
+## Development Sequence
+
+### 1. CleanRequirements_Sprint Phase 2
+
+**Directory**: `/MetaData/DevelopmentSprints/CleanRequirements_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: None (Phase 1 already completed)  
+**Priority**: Highest
+
+**Key Objectives**:
+- [ ] Create shared requirements structure
+- [ ] Consolidate web framework dependencies (15+ components)
+- [ ] Consolidate LLM integration stack (4+ components)
+- [ ] Consolidate vector processing stack (5+ components) 
+- [ ] Consolidate data science stack (4+ components)
+- [ ] Create development/testing requirements separation
+
+### 2. StreamlineImprovements_Sprint: Shared_Utilities_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/StreamlineImprovements_Sprint/Shared_Utilities_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: CleanRequirements_Sprint Phase 2  
+**Priority**: High
+
+**Key Objectives**:
+- [ ] Create port configuration management (fix phantom imports)
+- [ ] Implement standardized logger setup
+- [ ] Create FastMCP helper utilities
+- [ ] Implement health check & diagnostic utilities
+- [ ] Develop component templates and standard patterns
+
+### 3. StreamlineImprovements_Sprint: Pydantic_V3_Migration_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/StreamlineImprovements_Sprint/Pydantic_V3_Migration_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: CleanRequirements_Sprint Phase 2, Shared_Utilities_Sprint  
+**Priority**: High
+
+**Key Objectives**:
+- [ ] Update tekton-core to Pydantic v3
+- [ ] Fix BaseModel field shadowing issues
+- [ ] Update model configurations to v3 patterns
+- [ ] Fix Terma-style field annotation errors
+- [ ] Eliminate all Pydantic-related warnings
+
+### 4. StreamlineImprovements_Sprint: API_Consistency_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/StreamlineImprovements_Sprint/API_Consistency_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: Shared_Utilities_Sprint, Pydantic_V3_Migration_Sprint  
+**Priority**: Medium-High
+
+**Key Objectives**:
+- [ ] Define standard API patterns
+- [ ] Create shared API utilities
+- [ ] Add missing main() functions (Athena, Sophia)
+- [ ] Standardize health checks and error responses
+- [ ] Implement service discovery
+
+### 5. StreamlineImprovements_Sprint: Import_Simplification_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/StreamlineImprovements_Sprint/Import_Simplification_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: Shared_Utilities_Sprint, API_Consistency_Sprint  
+**Priority**: Medium
+
+**Key Objectives**:
+- [ ] Create missing modules (tekton.utils.port_config)
+- [ ] Eliminate circular dependencies
+- [ ] Simplify deep import chains
+- [ ] Fix logging import chains
+- [ ] Create clear module boundaries
+
+### 6. YetAnotherMCP_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/YetAnotherMCP_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: API_Consistency_Sprint  
+**Priority**: Medium
+
+**Key Objectives**:
+- [ ] Fix Hermes MCP service initialization bug
+- [ ] Create shared MCP library
+- [ ] Standardize on `/api/mcp/v2` endpoint
+- [ ] Enhance Hermes as central MCP aggregator
+- [ ] Update component registration to include MCP tools
+
+### 7. MCP_External_Integration_Sprint
+
+**Directory**: `/MetaData/DevelopmentSprints/MCP_External_Integration_Sprint/`  
+**Status**: [ ] Not Started  
+**Dependencies**: YetAnotherMCP_Sprint  
+**Priority**: Medium-Low
+
+**Key Objectives**:
+- [ ] Phase 1: Open-MCP Integration
+- [ ] Phase 2: Pluggedin-MCP-Proxy Implementation
+- [ ] Phase 3: Pipedream Integration and Security
+
+## Working Instructions for Claude Code
+
+When working on a sprint:
+
+1. Read the sprint's documentation in its directory to understand detailed requirements
+2. Track progress in the sprint's own status files
+3. Follow the implementation plan in the sprint documentation
+4. Create commits with meaningful messages as defined in CLAUDE.md
+5. DO NOT mark tasks as complete in this master list - only Casey should do this
+6. Inform Casey when a sprint is complete for verification and master list update
+
+## Success Criteria Summary
+
+The development backlog will be considered successfully implemented when:
+
+1. **Dependencies**: 60-70% reduction in total dependency footprint
+2. **Code Duplication**: 30-40% reduction in duplicated code
+3. **Startup Reliability**: 100% component startup success rate 
+4. **API Consistency**: All components follow standard API patterns
+5. **Import Clarity**: Zero circular dependencies and phantom imports
+6. **MCP Standardization**: All components use standardized MCP endpoints
+7. **External Integration**: Successful integration with external MCP servers
