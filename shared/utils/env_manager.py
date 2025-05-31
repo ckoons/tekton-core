@@ -111,6 +111,10 @@ class TektonEnvManager:
         # Store original environment
         self._original_env = dict(os.environ)
         
+        # Always set TEKTON_ROOT to the detected Tekton root
+        os.environ['TEKTON_ROOT'] = str(self.tekton_root.absolute())
+        logger.info(f"Set TEKTON_ROOT to: {os.environ['TEKTON_ROOT']}")
+        
         # Load files in priority order (later files override earlier ones)
         env_files = [
             (self.user_env, "user"),

@@ -99,9 +99,9 @@ config:
 The library searches for component configuration files in the following locations:
 
 1. Current directory: `component_id.yaml` or `component_id.yml`
-2. Tekton configuration directory: `$TEKTON_DIR/config/components/component_id.yaml`
-3. Component directory: `$TEKTON_DIR/component_id/component_id.yaml`
-4. Component configuration directory: `$TEKTON_DIR/component_id/config/component_id.yaml`
+2. Tekton configuration directory: `$TEKTON_ROOT/config/components/component_id.yaml`
+3. Component directory: `$TEKTON_ROOT/component_id/component_id.yaml`
+4. Component configuration directory: `$TEKTON_ROOT/component_id/config/component_id.yaml`
 
 ## Heartbeat Management
 
@@ -119,7 +119,7 @@ await client.stop_heartbeat()
 ## Environment Variables
 
 - `HERMES_URL`: URL of the Hermes API (defaults to `http://localhost:8001/api`)
-- `TEKTON_DIR`: Path to the Tekton directory (used for configuration resolution)
+- `TEKTON_ROOT`: Path to the Tekton directory (used for configuration resolution)
 
 ## Error Handling
 

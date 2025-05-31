@@ -54,8 +54,8 @@ class MetricsManager:
             # Store in tekton directory
             import os
             from pathlib import Path
-            tekton_dir = Path(__file__).parent.parent.parent.parent.absolute()
-            db_path = os.path.join(tekton_dir, "tekton_metrics.db")
+            tekton_root = Path(__file__).parent.parent.parent.parent.absolute()
+            db_path = os.path.join(tekton_root, "tekton_metrics.db")
             self.storage = SQLiteMetricsStorage(db_path)
         
         # Initialize collector and analyzer
