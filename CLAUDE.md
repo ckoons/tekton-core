@@ -43,24 +43,25 @@ Tekton is an intelligent orchestration system that coordinates multiple AI model
 
 ### LLM Architecture
 
-Tekton employs a layered LLM integration architecture to provide unified, flexible access to various AI models:
+Tekton employs a unified LLM integration architecture to provide consistent access to various AI models:
 
-1. **LLM Adapter Layer**: Serves as the centralized interface for all LLM interactions through:
-   - HTTP API: Synchronous requests for immediate responses via `/api/` endpoints
-   - WebSocket API: Asynchronous streaming for real-time interactions via `/ws` endpoint
+1. **Rhetor Service**: The centralized LLM service (port 8003) that manages all AI model interactions:
+   - HTTP API: Synchronous requests for immediate responses
+   - WebSocket API: Asynchronous streaming for real-time interactions
    - Model-agnostic interface supporting multiple providers and models
 
-2. **Component Integration**: Components like Terma connect to the LLM Adapter through:
-   - Provider/model selection with a unified dropdown interface
-   - Automatic adapter detection and connection
-   - Graceful fallback when the adapter is unavailable
+2. **tekton-llm-client Library**: All components use this standardized client library to:
+   - Connect to Rhetor for LLM operations
+   - Handle provider/model selection with unified interfaces
+   - Manage streaming responses and structured outputs
+   - Provide consistent error handling and retries
 
-3. **Startup Management**: The `tekton-launch` script automatically:
-   - Checks for LLM Adapter availability before launching components
-   - Starts the adapter if not running, regardless of component selection
-   - Ensures correct port configuration and availability
+3. **Consistent Integration**: Every Tekton component uses the same pattern:
+   - Import `tekton_llm_client` for LLM operations
+   - Connect to Rhetor at port 8003
+   - Use standardized request/response formats
 
-This architecture ensures consistent LLM access across all Tekton components while allowing easy switching between different AI models based on task requirements.
+This architecture ensures consistent LLM access across all Tekton components while maintaining a single point of configuration and management through Rhetor.
 
 ## Architecture Principles
 

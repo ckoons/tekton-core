@@ -474,7 +474,7 @@ class EnhancedComponentLauncher:
         
         dir_mappings = {
             "tekton_core": "tekton-core",
-            "llm_adapter": "LLMAdapter",
+            # "llm_adapter": "LLMAdapter", # Removed - use Rhetor with tekton-llm-client
         }
         
         if component_name in dir_mappings:

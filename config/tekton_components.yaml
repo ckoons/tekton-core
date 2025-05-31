@@ -152,13 +152,8 @@ components:
     
 # Specialized Services (not primary components)
 services:
-  llm_adapter:
-    name: "LLM Adapter"
-    http_port: 8300
-    ws_port: 8301
-    description: "Unified LLM interface adapter"
-    category: "service"
-    
+  # LLMAdapter removed - use Rhetor (port 8003) with tekton-llm-client instead
+  
   terma_ws:
     name: "Terma WebSocket"
     port: 8767
