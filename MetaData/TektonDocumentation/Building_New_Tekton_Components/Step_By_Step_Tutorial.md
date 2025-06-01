@@ -1,0 +1,1204 @@
+# Step By Step Tutorial: Building a New Tekton Component
+
+This tutorial walks through creating a new Tekton component from scratch. We'll build a hypothetical "Nexus" component that manages connections between other components.
+
+## Phase 1: Project Setup
+
+### Step 1: Create Directory Structure
+
+```bash
+# From Tekton root directory
+cd /Users/cskoons/projects/github/Tekton
+
+# Create component directory
+mkdir -p Nexus/{nexus,tests,ui,examples}
+cd Nexus
+
+# Create Python package structure
+mkdir -p nexus/{api,cli,core,models,utils}
+mkdir -p nexus/api/endpoints
+mkdir -p nexus/cli/commands
+mkdir -p ui/{scripts,styles}
+mkdir -p tests/{unit,integration}
+
+# Create __init__.py files
+touch nexus/__init__.py
+touch nexus/{api,cli,core,models,utils}/__init__.py
+touch nexus/api/endpoints/__init__.py
+touch nexus/cli/commands/__init__.py
+touch tests/__init__.py
+```
+
+### Step 2: Create Project Files
+
+```bash
+# Create setup.py
+cat > setup.py << 'EOF'
+from setuptools import setup, find_packages
+
+setup(
+    name="nexus",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "fastapi>=0.104.0",
+        "uvicorn[standard]>=0.24.0",
+        "httpx>=0.25.0",
+        "pydantic>=2.0.0",
+        "pydantic-settings>=2.0.0",
+        "rich>=13.0.0",
+        "python-dotenv>=1.0.0",
+        "aiohttp>=3.9.0",
+        "click>=8.0.0",
+    ],
+    entry_points={
+        "console_scripts": [
+            "nexus=nexus.cli.main:main",
+        ],
+    },
+    python_requires=">=3.8",
+    author="Tekton Team",
+    description="Connection management component for Tekton",
+)
+EOF
+
+# Create requirements.txt
+cat > requirements.txt << 'EOF'
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+httpx>=0.25.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+rich>=13.0.0
+python-dotenv>=1.0.0
+aiohttp>=3.9.0
+click>=8.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+EOF
+
+# Create README.md
+cat > README.md << 'EOF'
+# Nexus
+
+Connection management component for the Tekton ecosystem.
+
+## Overview
+
+Nexus manages and monitors connections between Tekton components, providing:
+- Connection health monitoring
+- Dependency tracking
+- Communication routing
+- Performance metrics
+
+## Installation
+
+```bash
+./setup.sh
+```
+
+## Usage
+
+### Starting the Server
+
+```bash
+./run_nexus.sh
+```
+
+### CLI Usage
+
+```bash
+nexus status
+nexus list-connections
+nexus test-connection <component>
+```
+
+## API Documentation
+
+Once running, visit http://localhost:8016/docs for interactive API documentation.
+
+## MCP Tools
+
+Nexus provides the following MCP tools:
+- `list_connections` - List all active connections
+- `test_connection` - Test connectivity to a component
+- `get_connection_metrics` - Get performance metrics
+
+## Configuration
+
+Configure Nexus through environment variables:
+- `NEXUS_PORT` - API server port (default: 8016)
+- `NEXUS_LOG_LEVEL` - Logging level (default: INFO)
+EOF
+```
+
+### Step 3: Create Setup Scripts
+
+```bash
+# Create setup.sh
+cat > setup.sh << 'EOF'
+#!/bin/bash
+# Setup script for Nexus
+
+set -e  # Exit on error
+
+# Ensure the script is run from the Nexus directory
+cd "$(dirname "$0")"
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+echo "Installing dependencies..."
+pip install -U pip
+pip install -r requirements.txt
+
+# Install package in development mode
+echo "Installing Nexus in development mode..."
+pip install -e .
+
+# Make run script executable
+chmod +x run_nexus.sh
+
+echo "Nexus setup complete!"
+echo "Run './run_nexus.sh' to start the Nexus server."
+EOF
+
+chmod +x setup.sh
+
+# Create run_nexus.sh
+cat > run_nexus.sh << 'EOF'
+#!/bin/bash
+# This script starts the Nexus server
+
+# Ensure the script is run from the Nexus directory
+cd "$(dirname "$0")"
+
+# Load environment variables if .env file exists
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+fi
+
+# Set NEXUS_PORT if not already set
+if [ -z "$NEXUS_PORT" ]; then
+    export NEXUS_PORT=8016
+fi
+
+# Start Nexus API server
+python -m nexus.api.app "$@"
+EOF
+
+chmod +x run_nexus.sh
+```
+
+## Phase 2: Backend Implementation
+
+### Step 4: Create Core Models
+
+```python
+# nexus/models/connection.py
+from datetime import datetime
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
+from enum import Enum
+
+class ConnectionStatus(str, Enum):
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    DEGRADED = "degraded"
+    UNKNOWN = "unknown"
+
+class ConnectionInfo(BaseModel):
+    """Information about a component connection"""
+    component_id: str
+    component_name: str
+    endpoint: str
+    port: int
+    status: ConnectionStatus
+    last_seen: datetime
+    latency_ms: Optional[float] = None
+    error_count: int = 0
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+class ConnectionMetrics(BaseModel):
+    """Performance metrics for a connection"""
+    component_id: str
+    avg_latency_ms: float
+    min_latency_ms: float
+    max_latency_ms: float
+    success_rate: float
+    total_requests: int
+    failed_requests: int
+    last_updated: datetime
+```
+
+### Step 5: Create Core Service
+
+```python
+# nexus/core/connection_manager.py
+import asyncio
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+import aiohttp
+
+from nexus.models.connection import ConnectionInfo, ConnectionStatus, ConnectionMetrics
+
+logger = logging.getLogger(__name__)
+
+class ConnectionManager:
+    """Manages connections to other Tekton components"""
+    
+    def __init__(self, check_interval: int = 30):
+        self.connections: Dict[str, ConnectionInfo] = {}
+        self.metrics: Dict[str, ConnectionMetrics] = {}
+        self.check_interval = check_interval
+        self._monitoring_task: Optional[asyncio.Task] = None
+        self._session: Optional[aiohttp.ClientSession] = None
+        
+    async def initialize(self):
+        """Initialize the connection manager"""
+        logger.info("Initializing ConnectionManager")
+        self._session = aiohttp.ClientSession()
+        self._monitoring_task = asyncio.create_task(self._monitor_connections())
+        
+    async def cleanup(self):
+        """Cleanup resources"""
+        logger.info("Cleaning up ConnectionManager")
+        if self._monitoring_task:
+            self._monitoring_task.cancel()
+        if self._session:
+            await self._session.close()
+            
+    async def register_connection(self, component_id: str, name: str, 
+                                endpoint: str, port: int) -> ConnectionInfo:
+        """Register a new component connection"""
+        connection = ConnectionInfo(
+            component_id=component_id,
+            component_name=name,
+            endpoint=endpoint,
+            port=port,
+            status=ConnectionStatus.UNKNOWN,
+            last_seen=datetime.utcnow()
+        )
+        
+        self.connections[component_id] = connection
+        logger.info(f"Registered connection to {name} ({component_id})")
+        
+        # Test the connection immediately
+        await self._check_connection(component_id)
+        
+        return connection
+        
+    async def test_connection(self, component_id: str) -> ConnectionInfo:
+        """Test a specific connection"""
+        if component_id not in self.connections:
+            raise ValueError(f"Unknown component: {component_id}")
+            
+        await self._check_connection(component_id)
+        return self.connections[component_id]
+        
+    async def get_all_connections(self) -> List[ConnectionInfo]:
+        """Get all registered connections"""
+        return list(self.connections.values())
+        
+    async def get_connection_metrics(self, component_id: str) -> Optional[ConnectionMetrics]:
+        """Get metrics for a specific connection"""
+        return self.metrics.get(component_id)
+        
+    async def _monitor_connections(self):
+        """Background task to monitor all connections"""
+        while True:
+            try:
+                await asyncio.sleep(self.check_interval)
+                
+                # Check all connections
+                tasks = [self._check_connection(cid) for cid in self.connections]
+                await asyncio.gather(*tasks, return_exceptions=True)
+                
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in connection monitoring: {e}")
+                
+    async def _check_connection(self, component_id: str):
+        """Check the health of a specific connection"""
+        connection = self.connections.get(component_id)
+        if not connection:
+            return
+            
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            # Try to reach the health endpoint
+            url = f"http://{connection.endpoint}:{connection.port}/health"
+            async with self._session.get(url, timeout=5) as response:
+                latency_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+                
+                if response.status == 200:
+                    connection.status = ConnectionStatus.CONNECTED
+                    connection.latency_ms = latency_ms
+                    connection.last_seen = datetime.utcnow()
+                else:
+                    connection.status = ConnectionStatus.DEGRADED
+                    connection.error_count += 1
+                    
+        except asyncio.TimeoutError:
+            connection.status = ConnectionStatus.DISCONNECTED
+            connection.error_count += 1
+            logger.warning(f"Connection to {connection.component_name} timed out")
+        except Exception as e:
+            connection.status = ConnectionStatus.DISCONNECTED
+            connection.error_count += 1
+            logger.error(f"Error checking {connection.component_name}: {e}")
+            
+        # Update metrics
+        self._update_metrics(component_id, connection)
+        
+    def _update_metrics(self, component_id: str, connection: ConnectionInfo):
+        """Update connection metrics"""
+        # Simple metrics tracking - in production, use a proper metrics system
+        if component_id not in self.metrics:
+            self.metrics[component_id] = ConnectionMetrics(
+                component_id=component_id,
+                avg_latency_ms=0,
+                min_latency_ms=float('inf'),
+                max_latency_ms=0,
+                success_rate=0,
+                total_requests=0,
+                failed_requests=0,
+                last_updated=datetime.utcnow()
+            )
+            
+        metrics = self.metrics[component_id]
+        metrics.total_requests += 1
+        
+        if connection.status == ConnectionStatus.CONNECTED:
+            if connection.latency_ms:
+                # Update latency metrics (simplified)
+                metrics.min_latency_ms = min(metrics.min_latency_ms, connection.latency_ms)
+                metrics.max_latency_ms = max(metrics.max_latency_ms, connection.latency_ms)
+                metrics.avg_latency_ms = connection.latency_ms  # Simplified
+        else:
+            metrics.failed_requests += 1
+            
+        metrics.success_rate = (metrics.total_requests - metrics.failed_requests) / metrics.total_requests
+        metrics.last_updated = datetime.utcnow()
+```
+
+### Step 6: Create API Application
+
+```python
+# nexus/__main__.py
+"""Entry point for python -m nexus"""
+from nexus.api.app import main
+
+if __name__ == "__main__":
+    main()
+```
+
+Create the main API application:
+
+```python
+# nexus/api/app.py
+#!/usr/bin/env python3
+"""
+Nexus API Server
+
+Connection management component for Tekton
+"""
+
+import os
+import sys
+import logging
+import asyncio
+from datetime import datetime
+from typing import Dict, Any, List
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+# Initialize Tekton environment
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
+    from tekton_startup import tekton_component_startup
+    tekton_component_startup("nexus")
+except ImportError:
+    print("[NEXUS] Could not load Tekton environment manager")
+    print("[NEXUS] Continuing with system environment variables")
+
+# Import Hermes registration
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
+from hermes_registration import HermesRegistration, heartbeat_loop
+
+# Import core modules
+from nexus.core.connection_manager import ConnectionManager
+from nexus.models.connection import ConnectionInfo, ConnectionMetrics
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("nexus.api")
+
+# Create FastAPI application
+app = FastAPI(
+    title="Nexus Connection Manager API",
+    description="Connection management for Tekton components",
+    version="0.1.0",
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configuration
+COMPONENT_NAME = "nexus"
+COMPONENT_PORT = int(os.environ.get("NEXUS_PORT", 8016))
+
+# Root endpoint
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "name": "Nexus Connection Manager",
+        "version": "0.1.0",
+        "status": "running",
+        "documentation": f"http://localhost:{COMPONENT_PORT}/docs"
+    }
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "component": COMPONENT_NAME,
+        "version": "0.1.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "port": COMPONENT_PORT,
+        "uptime": get_uptime(),
+        "checks": {
+            "api": "healthy",
+            "connection_manager": "healthy" if hasattr(app.state, "connection_manager") else "not_initialized"
+        }
+    }
+
+def get_uptime() -> float:
+    """Calculate uptime in seconds."""
+    if hasattr(app.state, "start_time"):
+        return (datetime.utcnow() - app.state.start_time).total_seconds()
+    return 0
+
+# Connection management endpoints
+@app.get("/api/connections", response_model=List[ConnectionInfo])
+async def list_connections():
+    """List all registered connections."""
+    if not hasattr(app.state, "connection_manager"):
+        raise HTTPException(status_code=503, detail="Service not initialized")
+    
+    return await app.state.connection_manager.get_all_connections()
+
+@app.post("/api/connections/{component_id}/test", response_model=ConnectionInfo)
+async def test_connection(component_id: str):
+    """Test a specific connection."""
+    if not hasattr(app.state, "connection_manager"):
+        raise HTTPException(status_code=503, detail="Service not initialized")
+    
+    try:
+        return await app.state.connection_manager.test_connection(component_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@app.get("/api/connections/{component_id}/metrics", response_model=ConnectionMetrics)
+async def get_connection_metrics(component_id: str):
+    """Get metrics for a specific connection."""
+    if not hasattr(app.state, "connection_manager"):
+        raise HTTPException(status_code=503, detail="Service not initialized")
+    
+    metrics = await app.state.connection_manager.get_connection_metrics(component_id)
+    if not metrics:
+        raise HTTPException(status_code=404, detail=f"No metrics for component: {component_id}")
+    
+    return metrics
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Nexus on startup."""
+    try:
+        logger.info(f"Starting {COMPONENT_NAME} on port {COMPONENT_PORT}")
+        app.state.start_time = datetime.utcnow()
+        
+        # Register with Hermes
+        app.state.hermes_registration = HermesRegistration()
+        success = await app.state.hermes_registration.register_component(
+            component_name=COMPONENT_NAME,
+            port=COMPONENT_PORT,
+            version="0.1.0",
+            capabilities=["connection_monitoring", "dependency_tracking", "performance_metrics"],
+            metadata={
+                "description": "Connection management for Tekton components",
+                "author": "Tekton Team"
+            }
+        )
+        
+        if success:
+            asyncio.create_task(heartbeat_loop(app.state.hermes_registration, COMPONENT_NAME))
+            logger.info(f"Successfully registered {COMPONENT_NAME} with Hermes")
+        else:
+            logger.warning(f"Failed to register {COMPONENT_NAME} with Hermes")
+        
+        # Initialize connection manager
+        app.state.connection_manager = ConnectionManager()
+        await app.state.connection_manager.initialize()
+        
+        # Auto-discover and register components from Hermes
+        # This would be implemented to query Hermes for registered components
+        
+        logger.info(f"{COMPONENT_NAME} initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"Error initializing {COMPONENT_NAME}: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown."""
+    try:
+        logger.info(f"Shutting down {COMPONENT_NAME}")
+        
+        # Deregister from Hermes
+        if hasattr(app.state, "hermes_registration"):
+            await app.state.hermes_registration.deregister(COMPONENT_NAME)
+        
+        # Cleanup connection manager
+        if hasattr(app.state, "connection_manager"):
+            await app.state.connection_manager.cleanup()
+        
+        logger.info(f"{COMPONENT_NAME} shutdown complete")
+        
+    except Exception as e:
+        logger.error(f"Error shutting down {COMPONENT_NAME}: {e}")
+
+# Import and include routers
+from nexus.api.endpoints import mcp
+app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+
+def main():
+    """Main entry point."""
+    import argparse
+    import uvicorn
+    
+    parser = argparse.ArgumentParser(description=f"{COMPONENT_NAME} API Server")
+    parser.add_argument("--port", type=int, default=COMPONENT_PORT)
+    parser.add_argument("--host", type=str, default="0.0.0.0")
+    parser.add_argument("--reload", action="store_true")
+    args = parser.parse_args()
+    
+    logger.info(f"Starting {COMPONENT_NAME} server on {args.host}:{args.port}")
+    uvicorn.run(
+        "nexus.api.app:app" if args.reload else app,
+        host=args.host,
+        port=args.port,
+        reload=args.reload
+    )
+
+if __name__ == "__main__":
+    main()
+```
+
+### Step 7: Create MCP Endpoints
+
+```python
+# nexus/api/endpoints/mcp.py
+"""
+MCP v2 Endpoints for Nexus
+"""
+
+import logging
+from typing import Dict, List, Any
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field
+
+from nexus.api.dependencies import get_connection_manager
+from nexus.core.connection_manager import ConnectionManager
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+# MCP v2 Models
+class Tool(BaseModel):
+    """MCP Tool definition"""
+    name: str
+    description: str
+    inputSchema: Dict[str, Any]
+
+class ToolList(BaseModel):
+    """Response for tool listing"""
+    tools: List[Tool]
+
+class ToolCall(BaseModel):
+    """Request to call a tool"""
+    name: str
+    arguments: Dict[str, Any] = Field(default_factory=dict)
+
+class ToolResponse(BaseModel):
+    """Response from tool execution"""
+    content: List[Dict[str, Any]]
+    isError: bool = False
+
+# Define available tools
+AVAILABLE_TOOLS = [
+    Tool(
+        name="list_connections",
+        description="List all component connections and their status",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    ),
+    Tool(
+        name="test_connection",
+        description="Test connectivity to a specific component",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "component_id": {
+                    "type": "string",
+                    "description": "ID of the component to test"
+                }
+            },
+            "required": ["component_id"]
+        }
+    ),
+    Tool(
+        name="get_connection_metrics",
+        description="Get performance metrics for a component connection",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "component_id": {
+                    "type": "string",
+                    "description": "ID of the component"
+                }
+            },
+            "required": ["component_id"]
+        }
+    )
+]
+
+@router.post("/v2/tools/list", response_model=ToolList)
+async def list_tools() -> ToolList:
+    """List available MCP tools."""
+    return ToolList(tools=AVAILABLE_TOOLS)
+
+@router.post("/v2/tools/call", response_model=ToolResponse)
+async def call_tool(
+    request: ToolCall,
+    connection_manager: ConnectionManager = Depends(get_connection_manager)
+) -> ToolResponse:
+    """Execute an MCP tool."""
+    try:
+        if request.name == "list_connections":
+            connections = await connection_manager.get_all_connections()
+            content = [
+                {
+                    "type": "text",
+                    "text": f"{conn.component_name}: {conn.status} (port {conn.port})"
+                }
+                for conn in connections
+            ]
+            return ToolResponse(content=content)
+            
+        elif request.name == "test_connection":
+            component_id = request.arguments.get("component_id")
+            if not component_id:
+                raise ValueError("component_id is required")
+                
+            connection = await connection_manager.test_connection(component_id)
+            return ToolResponse(
+                content=[{
+                    "type": "text",
+                    "text": f"{connection.component_name}: {connection.status} (latency: {connection.latency_ms:.2f}ms)"
+                }]
+            )
+            
+        elif request.name == "get_connection_metrics":
+            component_id = request.arguments.get("component_id")
+            if not component_id:
+                raise ValueError("component_id is required")
+                
+            metrics = await connection_manager.get_connection_metrics(component_id)
+            if metrics:
+                return ToolResponse(
+                    content=[{
+                        "type": "text",
+                        "text": f"Metrics for {component_id}: Success rate: {metrics.success_rate:.2%}, Avg latency: {metrics.avg_latency_ms:.2f}ms"
+                    }]
+                )
+            else:
+                return ToolResponse(
+                    content=[{"type": "text", "text": f"No metrics available for {component_id}"}]
+                )
+        else:
+            raise HTTPException(status_code=404, detail=f"Tool {request.name} not found")
+            
+    except Exception as e:
+        logger.error(f"Error executing tool {request.name}: {e}")
+        return ToolResponse(
+            content=[{"type": "text", "text": str(e)}],
+            isError=True
+        )
+```
+
+Create dependencies:
+
+```python
+# nexus/api/dependencies.py
+"""Dependency injection for Nexus API"""
+
+from fastapi import HTTPException
+from nexus.core.connection_manager import ConnectionManager
+
+async def get_connection_manager() -> ConnectionManager:
+    """Get the connection manager instance."""
+    from nexus.api.app import app
+    
+    if not hasattr(app.state, "connection_manager"):
+        raise HTTPException(status_code=503, detail="Connection manager not initialized")
+    
+    return app.state.connection_manager
+```
+
+## Phase 3: CLI Implementation
+
+### Step 8: Create CLI
+
+```python
+# nexus/cli/main.py
+#!/usr/bin/env python3
+"""
+Nexus CLI
+
+Command-line interface for Nexus connection manager.
+"""
+
+import os
+import asyncio
+import click
+import httpx
+from rich.console import Console
+from rich.table import Table
+from rich.live import Live
+from datetime import datetime
+
+console = Console()
+
+DEFAULT_API_URL = f"http://localhost:{os.environ.get('NEXUS_PORT', 8016)}"
+
+class NexusClient:
+    """Client for interacting with Nexus API."""
+    
+    def __init__(self, base_url: str = DEFAULT_API_URL):
+        self.base_url = base_url
+        self.client = httpx.AsyncClient(timeout=10.0)
+    
+    async def get_health(self):
+        """Get health status."""
+        response = await self.client.get(f"{self.base_url}/health")
+        return response.json()
+    
+    async def list_connections(self):
+        """List all connections."""
+        response = await self.client.get(f"{self.base_url}/api/connections")
+        return response.json()
+    
+    async def test_connection(self, component_id: str):
+        """Test a specific connection."""
+        response = await self.client.post(f"{self.base_url}/api/connections/{component_id}/test")
+        return response.json()
+    
+    async def get_metrics(self, component_id: str):
+        """Get connection metrics."""
+        response = await self.client.get(f"{self.base_url}/api/connections/{component_id}/metrics")
+        return response.json()
+    
+    async def close(self):
+        """Close the client."""
+        await self.client.aclose()
+
+@click.group()
+@click.option('--api-url', default=DEFAULT_API_URL, help='Nexus API URL')
+@click.pass_context
+def cli(ctx, api_url):
+    """Nexus CLI - Connection management for Tekton."""
+    ctx.ensure_object(dict)
+    ctx.obj['client'] = NexusClient(api_url)
+
+@cli.command()
+@click.pass_context
+def status(ctx):
+    """Check Nexus status."""
+    async def _status():
+        client = ctx.obj['client']
+        try:
+            health = await client.get_health()
+            
+            table = Table(title="Nexus Status")
+            table.add_column("Property", style="cyan")
+            table.add_column("Value", style="green")
+            
+            table.add_row("Status", health['status'])
+            table.add_row("Version", health['version'])
+            table.add_row("Port", str(health['port']))
+            table.add_row("Uptime", f"{health.get('uptime', 0):.2f}s")
+            
+            console.print(table)
+            
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+        finally:
+            await client.close()
+    
+    asyncio.run(_status())
+
+@cli.command()
+@click.pass_context
+def list_connections(ctx):
+    """List all component connections."""
+    async def _list():
+        client = ctx.obj['client']
+        try:
+            connections = await client.list_connections()
+            
+            table = Table(title="Component Connections")
+            table.add_column("Component", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Port")
+            table.add_column("Last Seen")
+            table.add_column("Latency")
+            
+            for conn in connections:
+                status_style = {
+                    "connected": "green",
+                    "disconnected": "red",
+                    "degraded": "yellow",
+                    "unknown": "gray"
+                }.get(conn['status'], "white")
+                
+                last_seen = datetime.fromisoformat(conn['last_seen'].replace('Z', '+00:00'))
+                last_seen_str = last_seen.strftime("%Y-%m-%d %H:%M:%S")
+                
+                latency_str = f"{conn.get('latency_ms', 0):.2f}ms" if conn.get('latency_ms') else "N/A"
+                
+                table.add_row(
+                    conn['component_name'],
+                    f"[{status_style}]{conn['status']}[/{status_style}]",
+                    str(conn['port']),
+                    last_seen_str,
+                    latency_str
+                )
+            
+            console.print(table)
+            
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+        finally:
+            await client.close()
+    
+    asyncio.run(_list())
+
+@cli.command()
+@click.argument('component_id')
+@click.pass_context
+def test_connection(ctx, component_id):
+    """Test connection to a specific component."""
+    async def _test():
+        client = ctx.obj['client']
+        try:
+            with console.status(f"Testing connection to {component_id}..."):
+                result = await client.test_connection(component_id)
+            
+            status_style = {
+                "connected": "green",
+                "disconnected": "red",
+                "degraded": "yellow"
+            }.get(result['status'], "white")
+            
+            console.print(f"Component: {result['component_name']}")
+            console.print(f"Status: [{status_style}]{result['status']}[/{status_style}]")
+            if result.get('latency_ms'):
+                console.print(f"Latency: {result['latency_ms']:.2f}ms")
+            
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+        finally:
+            await client.close()
+    
+    asyncio.run(_test())
+
+@cli.command()
+@click.option('--interval', default=5, help='Update interval in seconds')
+@click.pass_context
+def monitor(ctx, interval):
+    """Monitor connections in real-time."""
+    async def _monitor():
+        client = ctx.obj['client']
+        
+        def generate_table():
+            return Table(title=f"Connection Monitor (Updated every {interval}s)")
+        
+        try:
+            with Live(generate_table(), refresh_per_second=1) as live:
+                while True:
+                    connections = await client.list_connections()
+                    
+                    table = generate_table()
+                    table.add_column("Component", style="cyan")
+                    table.add_column("Status")
+                    table.add_column("Latency")
+                    table.add_column("Errors")
+                    
+                    for conn in connections:
+                        status_style = {
+                            "connected": "green",
+                            "disconnected": "red",
+                            "degraded": "yellow",
+                            "unknown": "gray"
+                        }.get(conn['status'], "white")
+                        
+                        latency_str = f"{conn.get('latency_ms', 0):.2f}ms" if conn.get('latency_ms') else "N/A"
+                        
+                        table.add_row(
+                            conn['component_name'],
+                            f"[{status_style}]● {conn['status']}[/{status_style}]",
+                            latency_str,
+                            str(conn.get('error_count', 0))
+                        )
+                    
+                    live.update(table)
+                    await asyncio.sleep(interval)
+                    
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Monitoring stopped[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+        finally:
+            await client.close()
+    
+    asyncio.run(_monitor())
+
+def main():
+    """Main entry point."""
+    cli()
+
+if __name__ == "__main__":
+    main()
+```
+
+## Phase 4: UI Implementation
+
+### Step 9: Create UI Component
+
+Follow the [UI Implementation Guide](./UI_Implementation_Guide.md) to create:
+- `ui/nexus-component.html`
+- `ui/scripts/nexus.js`
+- `ui/styles/nexus.css`
+
+## Phase 5: Testing
+
+### Step 10: Create Tests
+
+```python
+# tests/test_connection_manager.py
+import pytest
+import asyncio
+from datetime import datetime
+
+from nexus.core.connection_manager import ConnectionManager
+from nexus.models.connection import ConnectionStatus
+
+@pytest.fixture
+async def connection_manager():
+    """Create a connection manager for testing."""
+    manager = ConnectionManager(check_interval=1)
+    await manager.initialize()
+    yield manager
+    await manager.cleanup()
+
+@pytest.mark.asyncio
+async def test_register_connection(connection_manager):
+    """Test registering a new connection."""
+    connection = await connection_manager.register_connection(
+        component_id="test-component",
+        name="Test Component",
+        endpoint="localhost",
+        port=8000
+    )
+    
+    assert connection.component_id == "test-component"
+    assert connection.component_name == "Test Component"
+    assert connection.port == 8000
+    assert connection.status == ConnectionStatus.DISCONNECTED  # No real server
+
+@pytest.mark.asyncio
+async def test_get_all_connections(connection_manager):
+    """Test getting all connections."""
+    # Register multiple connections
+    await connection_manager.register_connection("comp1", "Component 1", "localhost", 8001)
+    await connection_manager.register_connection("comp2", "Component 2", "localhost", 8002)
+    
+    connections = await connection_manager.get_all_connections()
+    assert len(connections) == 2
+    assert any(c.component_id == "comp1" for c in connections)
+    assert any(c.component_id == "comp2" for c in connections)
+
+# Create test runner
+# tests/conftest.py
+import pytest
+import asyncio
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for the test session."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+```
+
+### Step 11: Create Integration Test
+
+```python
+# examples/test_fastmcp.py
+#!/usr/bin/env python3
+"""Test FastMCP integration for Nexus"""
+
+import asyncio
+import httpx
+import json
+
+async def test_mcp_tools():
+    """Test MCP tool listing and execution."""
+    base_url = "http://localhost:8016"
+    
+    async with httpx.AsyncClient() as client:
+        # List tools
+        print("Listing MCP tools...")
+        response = await client.post(f"{base_url}/mcp/v2/tools/list")
+        tools = response.json()
+        print(f"Available tools: {json.dumps(tools, indent=2)}")
+        
+        # Call list_connections tool
+        print("\nCalling list_connections tool...")
+        response = await client.post(
+            f"{base_url}/mcp/v2/tools/call",
+            json={"name": "list_connections", "arguments": {}}
+        )
+        result = response.json()
+        print(f"Result: {json.dumps(result, indent=2)}")
+
+if __name__ == "__main__":
+    asyncio.run(test_mcp_tools())
+```
+
+## Phase 6: Documentation
+
+### Step 12: Update Documentation
+
+1. Add Nexus to `/config/port_assignments.md`
+2. Create `/MetaData/ComponentDocumentation/Nexus/` directory
+3. Add component-specific documentation
+4. Update Hermes component registry
+
+## Final Steps
+
+### Step 13: Test Everything
+
+```bash
+# 1. Setup the component
+./setup.sh
+
+# 2. Start the server
+./run_nexus.sh
+
+# 3. In another terminal, test the CLI
+nexus status
+nexus list-connections
+
+# 4. Test the API
+curl http://localhost:8016/health
+
+# 5. Test MCP integration
+python examples/test_fastmcp.py
+
+# 6. Access the UI
+# Open Hephaestus and navigate to Nexus component
+```
+
+### Step 14: Integration Checklist
+
+- [ ] Component starts without errors
+- [ ] Registers with Hermes successfully
+- [ ] Health endpoint returns correct status
+- [ ] MCP tools are accessible
+- [ ] CLI commands work correctly
+- [ ] UI component loads in Hephaestus
+- [ ] WebSocket connections work
+- [ ] Component appears in Tekton status
+
+## Common Issues and Solutions
+
+### Port Already in Use
+```bash
+# Find what's using the port
+lsof -i :8016
+
+# Kill the process if needed
+kill -9 <PID>
+```
+
+### Import Errors
+- Ensure you're in the virtual environment
+- Check PYTHONPATH includes Tekton directories
+- Verify shared utilities are available
+
+### Hermes Registration Fails
+- Check Hermes is running on port 8001
+- Verify network connectivity
+- Check registration payload format
+
+### UI Not Loading
+- Ensure component is registered with Hermes
+- Check browser console for errors
+- Verify WebSocket connection
+
+## Next Steps
+
+1. **Enhance Functionality** - Add more specific features
+2. **Add More MCP Tools** - Expand capabilities
+3. **Improve UI** - Add visualizations and controls
+4. **Write More Tests** - Increase coverage
+5. **Performance Optimization** - Profile and optimize
+
+---
+
+*Remember: Keep it simple, test everything, document clearly*
+
+---
+
+*Next: [Shared Patterns Reference](./Shared_Patterns_Reference.md)*

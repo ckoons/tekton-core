@@ -78,10 +78,6 @@ def load_port_assignments() -> Dict[str, int]:
                         component_key = "hephaestus"
                     elif component == "Tekton Core":
                         component_key = "tekton_core"
-                    elif component == "LLM Adapter":
-                        component_key = "llm_adapter"
-                    elif component == "LLM Adapter WS":
-                        component_key = "llm_adapter_ws"
                     elif component == "Terma WS":
                         component_key = "terma_ws"
                         
@@ -242,14 +238,6 @@ def get_terma_ws_port() -> int:
     return get_component_port("terma_ws")
 
 
-def get_llm_adapter_port() -> int:
-    """Get LLM Adapter HTTP port."""
-    return get_component_port("llm_adapter")
-
-
-def get_llm_adapter_ws_port() -> int:
-    """Get LLM Adapter WebSocket port."""
-    return get_component_port("llm_adapter_ws")
 
 
 # Utility functions for URL construction
@@ -273,14 +261,11 @@ def get_athena_url(host: str = "localhost", protocol: str = "http") -> str:
     return get_component_url("athena", host, protocol)
 
 
-def get_llm_adapter_url(host: str = "localhost", protocol: str = "http") -> str:
-    """Get LLM Adapter base URL."""
-    return get_component_url("llm_adapter", host, protocol)
+def get_prometheus_url(host: str = "localhost", protocol: str = "http") -> str:
+    """Get Prometheus base URL."""
+    return get_component_url("prometheus", host, protocol)
 
 
-def get_llm_adapter_ws_url(host: str = "localhost") -> str:
-    """Get LLM Adapter WebSocket URL."""
-    return get_component_url("llm_adapter_ws", host, "ws")
 
 
 # Export all public functions
@@ -306,13 +291,10 @@ __all__ = [
     'get_telos_port',
     'get_terma_port',
     'get_terma_ws_port',
-    'get_llm_adapter_port',
-    'get_llm_adapter_ws_port',
     # URL helper functions
     'get_rhetor_url',
     'get_hermes_url',
     'get_engram_url',
     'get_athena_url',
-    'get_llm_adapter_url',
-    'get_llm_adapter_ws_url',
+    'get_prometheus_url',
 ]
