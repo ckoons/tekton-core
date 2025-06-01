@@ -8,9 +8,8 @@ import os
 import sys
 import logging
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from hermes_registration import HermesRegistration
+# Import from same directory
+from .hermes_registration import HermesRegistration
 
 logger = logging.getLogger(__name__)
 

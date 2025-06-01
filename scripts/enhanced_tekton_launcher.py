@@ -335,6 +335,14 @@ class EnhancedComponentLauncher:
             env = os.environ.copy()
             env[f"{component_name.upper()}_PORT"] = str(port)
             
+            # Add Tekton root to PYTHONPATH for shared imports
+            tekton_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            current_pythonpath = env.get('PYTHONPATH', '')
+            if current_pythonpath:
+                env['PYTHONPATH'] = f"{tekton_root}:{current_pythonpath}"
+            else:
+                env['PYTHONPATH'] = tekton_root
+            
             # Change to component directory
             component_dir = self.get_component_directory(component_name)
                 
