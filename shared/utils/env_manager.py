@@ -221,7 +221,6 @@ class TektonEnvManager:
             'APOLLO_PORT',
             'BUDGET_PORT',
             'SOPHIA_PORT',
-            'LLM_ADAPTER_',
             'TERMA_WS_PORT'
         ]
         
@@ -386,10 +385,6 @@ BUDGET_PORT=8013
 SOPHIA_PORT=8014
 
 # Specialized Service Ports
-# HTTP API for LLM Adapter
-LLM_ADAPTER_HTTP_PORT=8300
-# WebSocket for LLM Adapter
-LLM_ADAPTER_WS_PORT=8301
 # WebSocket for Terma Terminal (legacy)
 TERMA_WS_PORT=8767
 

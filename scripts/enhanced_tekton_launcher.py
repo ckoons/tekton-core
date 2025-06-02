@@ -331,6 +331,15 @@ class EnhancedComponentLauncher:
             # Get launch command (using original logic)
             cmd = self.get_component_command(component_name)
             
+            # Check if we got a valid command
+            if not cmd:
+                return LaunchResult(
+                    component_name=component_name,
+                    success=False,
+                    state=ComponentState.FAILED,
+                    message=f"No run script found for component: {component_name}"
+                )
+            
             # Set environment variables
             env = os.environ.copy()
             env[f"{component_name.upper()}_PORT"] = str(port)
@@ -508,21 +517,12 @@ class EnhancedComponentLauncher:
         elif run_script and run_script.endswith('.py'):
             return [sys.executable, run_script]
         else:
-            port = get_component_port(component_name)
+            # All components should have run scripts now
+            self.log(f"Warning: No run script found for {component_name}", "warning", component_name)
+            self.log(f"Expected to find: run_{component_name}.sh in {component_dir}", "warning", component_name)
             
-            app_module = f"{component_name}.api.app:app"
-            if component_name == "hermes":
-                app_module = "hermes.api.app:app"
-            elif component_name == "hephaestus":
-                return [sys.executable, os.path.join(component_dir, "ui", "server", "server.py")]
-                
-            return [
-                sys.executable, "-m", "uvicorn",
-                app_module,
-                "--host", "0.0.0.0",
-                "--port", str(port),
-                "--reload"
-            ]
+            # Return empty list to indicate failure
+            return []
     
     async def launch_with_monitoring(self, components: List[str], enable_monitoring: bool = True):
         """Launch components with optional continuous monitoring"""

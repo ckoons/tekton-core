@@ -33,8 +33,6 @@ Some components may use additional ports for specialized services:
 
 | Service        | Port | Description                               | Environment Variable   |
 |----------------|------|-------------------------------------------|------------------------|
-| LLM Adapter    | 8300 | HTTP API for LLM Adapter                  | `LLM_ADAPTER_HTTP_PORT`|
-| LLM Adapter WS | 8301 | WebSocket for LLM Adapter                 | `LLM_ADAPTER_WS_PORT` |
 | Terma WS       | 8767 | WebSocket for Terma Terminal (legacy)     | `TERMA_WS_PORT`        |
 
 ## Usage

@@ -202,10 +202,8 @@ class EnhancedComponentKiller:
         
     async def send_graceful_shutdown_signal(self, component_name: str, port: int) -> bool:
         """Send HTTP shutdown signal to component"""
-        # Skip HTTP shutdown for components that likely don't have shutdown endpoints
-        skip_http_components = ["hermes", "engram", "rhetor", "hephaestus", "metis"]
-        if component_name in skip_http_components:
-            return False
+        # All components should now have shutdown endpoints
+        # No need to skip any components
 
         try:
             endpoints_to_try = [
