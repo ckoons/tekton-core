@@ -303,7 +303,14 @@ class EnhancedStatusChecker:
                         comp.get("name", "").lower() 
                         for comp in data.get("components", [])
                     ]
-                    return component_name in registered_names
+                    # Check both underscore and hyphen versions of the name
+                    component_name_lower = component_name.lower()
+                    component_name_hyphen = component_name_lower.replace('_', '-')
+                    component_name_underscore = component_name_lower.replace('-', '_')
+                    
+                    return (component_name_lower in registered_names or 
+                            component_name_hyphen in registered_names or
+                            component_name_underscore in registered_names)
         except:
             pass
         return False

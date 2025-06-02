@@ -9,7 +9,7 @@ import time
 from typing import Dict, Any, Optional
 
 from ...metrics_integration import MetricCategory, MetricUnit
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 
 
 class MetricsManager:

@@ -8,7 +8,7 @@ This module provides functions for detecting issues with components and the syst
 import time
 from typing import Dict, List, Any, Set
 
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ..health import HealthStatus
 from ..alerts import AlertSeverity
 

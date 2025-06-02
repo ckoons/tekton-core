@@ -9,7 +9,7 @@ import time
 import random
 from typing import Dict, Any
 
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ..health import HealthStatus, ComponentHealth
 
 from .metrics_processing import calculate_health_score

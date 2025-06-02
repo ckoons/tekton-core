@@ -10,7 +10,7 @@ import time
 from typing import Dict, Any
 
 from ..component_health import ComponentHealthAdapter
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 
 
 async def example():
