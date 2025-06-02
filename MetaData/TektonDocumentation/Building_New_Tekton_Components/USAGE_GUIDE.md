@@ -14,6 +14,18 @@ This guide explains how to use the Building_New_Tekton_Components documentation 
 - Familiarity with async/await patterns
 - Access to Tekton codebase
 
+## ⚠️ CRITICAL UPDATE: Shared Utilities Are Now Mandatory
+
+As of the Shared Utilities Sprint, all new components MUST use the shared utilities. Key changes:
+
+1. **No more optional imports** - All `shared.utils.*` imports are required
+2. **Lifespan pattern is mandatory** - No `@app.on_event` decorators
+3. **Use shared logging** - `setup_component_logging()` not `logging.getLogger()`
+4. **Never hardcode ports** - Always use `get_component_config()`
+5. **Socket release delay required** - 0.5s delay after shutdown
+
+**Start with [Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md) to see all requirements!**
+
 ## Documentation Overview
 
 The documentation is organized in a logical progression from concept to implementation:
@@ -25,7 +37,7 @@ The documentation is organized in a logical progression from concept to implemen
 4. Backend_Implementation_Guide.md  # Build your backend
 5. UI_Implementation_Guide.md       # Create your UI
 6. UI_Styling_Standards.md         # Apply styling standards
-7. Shared_Patterns_Reference.md    # Use common patterns
+7. Shared_Patterns_Reference.md    # ⚠️ CRITICAL - Required patterns
 8. Testing_Guide.md                # Write and run tests
 9. Documentation_Requirements.md    # Document your component
 ```

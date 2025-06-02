@@ -68,7 +68,8 @@ following the Single Port Architecture pattern.
 
 import os
 import sys
-import logging
+import asyncio
+from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -76,31 +77,129 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Initialize Tekton environment
-try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-    from tekton_startup import tekton_component_startup
-    tekton_component_startup("mycomponent")
-except ImportError:
-    print("[MYCOMPONENT] Could not load Tekton environment manager")
-    print("[MYCOMPONENT] Continuing with system environment variables")
+# REQUIRED: Add Tekton root to path
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if tekton_root not in sys.path:
+    sys.path.insert(0, tekton_root)
 
-# Import Hermes registration
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-from hermes_registration import HermesRegistration, heartbeat_loop
+# Import shared utilities (NO LONGER OPTIONAL)
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
+from shared.utils.health_check import create_health_response
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("mycomponent.api")
+# Component configuration
+COMPONENT_NAME = "mycomponent"
 
-# Create FastAPI application
+# Use shared logger setup - DO NOT use logging.getLogger()
+logger = setup_component_logging(COMPONENT_NAME)
+
+# Global state for registration
+hermes_registration = None
+heartbeat_task = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for MyComponent"""
+    global hermes_registration, heartbeat_task
+    
+    # Startup
+    logger.info("Starting MyComponent API")
+    
+    async def mycomponent_startup():
+        """Component-specific startup logic"""
+        try:
+            # Get configuration - NEVER hardcode ports
+            config = get_component_config()
+            port = config.mycomponent.port if hasattr(config, 'mycomponent') else int(os.environ.get("MYCOMPONENT_PORT", 8015))
+            
+            # Store in app state for access in endpoints
+            app.state.port = port
+            app.state.start_time = datetime.utcnow()
+            
+            # Register with Hermes
+            global hermes_registration, heartbeat_task
+            hermes_registration = HermesRegistration()
+            
+            logger.info(f"Attempting to register MyComponent with Hermes on port {port}")
+            is_registered = await hermes_registration.register_component(
+                component_name=COMPONENT_NAME,
+                port=port,  # NEVER hardcode this value
+                version="0.1.0",
+                capabilities=["capability1", "capability2"],  # Update with actual capabilities
+                metadata={
+                    "description": "MyComponent description",
+                    "author": "Tekton Team"
+                }
+            )
+            
+            if is_registered:
+                logger.info("Successfully registered with Hermes")
+                heartbeat_task = asyncio.create_task(
+                    heartbeat_loop(hermes_registration, COMPONENT_NAME, interval=30)
+                )
+            else:
+                logger.warning("Failed to register with Hermes - continuing without registration")
+                
+            # Initialize your component's core functionality here
+            # app.state.my_service = MyService()
+            # await app.state.my_service.initialize()
+            
+        except Exception as e:
+            logger.error(f"Error during MyComponent startup: {e}", exc_info=True)
+            raise StartupError(str(e), COMPONENT_NAME, "STARTUP_FAILED")
+    
+    # Execute startup with metrics
+    try:
+        metrics = await component_startup(COMPONENT_NAME, mycomponent_startup, timeout=30)
+        logger.info(f"MyComponent started successfully in {metrics.total_time:.2f}s")
+    except Exception as e:
+        logger.error(f"Failed to start MyComponent: {e}")
+        raise
+    
+    # Create shutdown handler
+    shutdown = GracefulShutdown(COMPONENT_NAME)
+    
+    # Register cleanup tasks
+    async def cleanup_hermes():
+        """Cleanup Hermes registration"""
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+        
+        if hermes_registration and hermes_registration.is_registered:
+            await hermes_registration.deregister(COMPONENT_NAME)
+            logger.info("Deregistered from Hermes")
+    
+    shutdown.register_cleanup(cleanup_hermes)
+    
+    # Add other cleanup tasks as needed
+    # async def cleanup_service():
+    #     if hasattr(app.state, "my_service"):
+    #         await app.state.my_service.cleanup()
+    # shutdown.register_cleanup(cleanup_service)
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down MyComponent API")
+    await shutdown.shutdown_sequence(timeout=10)
+    
+    # CRITICAL: Socket release delay for macOS
+    await asyncio.sleep(0.5)
+
+# Create app with lifespan
 app = FastAPI(
     title="MyComponent API",
     description="API for MyComponent - [component description]",
     version="0.1.0",
+    lifespan=lifespan  # REQUIRED
 )
 
 # Add CORS middleware
@@ -112,107 +211,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Component configuration
-COMPONENT_NAME = "mycomponent"
-COMPONENT_PORT = int(os.environ.get("MYCOMPONENT_PORT", 8015))
-
 # Root endpoint
 @app.get("/")
 async def root():
     """Root endpoint."""
+    port = getattr(app.state, 'port', 8015)
     return {
         "name": "MyComponent",
         "version": "0.1.0",
         "status": "running",
-        "documentation": f"http://localhost:{COMPONENT_PORT}/docs"
+        "documentation": f"http://localhost:{port}/docs"
     }
 
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint following Tekton standards."""
-    return {
-        "status": "healthy",
-        "component": COMPONENT_NAME,
-        "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "port": COMPONENT_PORT,
-        "uptime": get_uptime() if hasattr(app.state, "start_time") else 0,
-        "checks": {
-            "api": "healthy",
-            "dependencies": check_dependencies()
-        }
-    }
-
-def get_uptime() -> float:
-    """Calculate uptime in seconds."""
+    """Health check endpoint using shared utility."""
+    from shared.utils.health_check import create_health_response
+    
+    port = getattr(app.state, 'port', 8015)
+    uptime = None
     if hasattr(app.state, "start_time"):
-        return (datetime.utcnow() - app.state.start_time).total_seconds()
-    return 0
-
-def check_dependencies() -> Dict[str, str]:
-    """Check status of component dependencies."""
-    # Add checks for your specific dependencies
-    return {
-        "hermes": "healthy" if hasattr(app.state, "hermes_registration") else "not_registered"
-    }
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize component on startup."""
-    try:
-        logger.info(f"Starting {COMPONENT_NAME} on port {COMPONENT_PORT}")
-        app.state.start_time = datetime.utcnow()
-        
-        # Register with Hermes
-        app.state.hermes_registration = HermesRegistration()
-        success = await app.state.hermes_registration.register_component(
-            component_name=COMPONENT_NAME,
-            port=COMPONENT_PORT,
-            version="0.1.0",
-            capabilities=["capability1", "capability2"],  # Update with actual capabilities
-            metadata={
-                "description": "MyComponent description",
-                "author": "Tekton Team"
+        uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
+    
+    return create_health_response(
+        component_name=COMPONENT_NAME,
+        port=port,
+        version="0.1.0",
+        status="healthy",
+        registered=hermes_registration.is_registered if hermes_registration else False,
+        uptime=uptime,
+        details={
+            "api": "healthy",
+            "dependencies": {
+                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "not_registered"
             }
-        )
-        
-        if success:
-            # Start heartbeat loop
-            import asyncio
-            asyncio.create_task(heartbeat_loop(app.state.hermes_registration, COMPONENT_NAME))
-            logger.info(f"Successfully registered {COMPONENT_NAME} with Hermes")
-        else:
-            logger.warning(f"Failed to register {COMPONENT_NAME} with Hermes")
-            
-        # Initialize your component's core functionality here
-        # app.state.my_service = MyService()
-        # await app.state.my_service.initialize()
-        
-        logger.info(f"{COMPONENT_NAME} initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Error initializing {COMPONENT_NAME}: {e}")
-        # Don't re-raise to allow API to start even if initialization partially fails
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    try:
-        logger.info(f"Shutting down {COMPONENT_NAME}")
-        
-        # Deregister from Hermes
-        if hasattr(app.state, "hermes_registration") and app.state.hermes_registration:
-            await app.state.hermes_registration.deregister(COMPONENT_NAME)
-            
-        # Cleanup your component's resources here
-        # if hasattr(app.state, "my_service"):
-        #     await app.state.my_service.cleanup()
-        
-        logger.info(f"{COMPONENT_NAME} shutdown complete")
-        
-    except Exception as e:
-        logger.error(f"Error shutting down {COMPONENT_NAME}: {e}")
+        }
+    )
 
 # Import and include routers
 from mycomponent.api.endpoints import mcp
@@ -590,6 +625,79 @@ async def process_data(
 5. **Document everything** - Use docstrings and type hints
 6. **Follow naming conventions** - Lowercase with underscores for modules
 7. **Keep it simple** - No complex abstractions
+
+## ⚠️ Common Mistakes to Avoid
+
+> **WARNING: These are the most common errors when building components**
+> - **DON'T** use `@app.on_event("startup")` or `@app.on_event("shutdown")` - they're deprecated
+> - **DON'T** import from `tekton.utils.port_config` - it doesn't exist
+> - **DON'T** hardcode port values anywhere (port=8000, etc.)
+> - **DON'T** forget the `await asyncio.sleep(0.5)` in shutdown for macOS
+> - **DON'T** use `setup_component_logger` - it's `setup_component_logging`
+
+## Troubleshooting Common Issues
+
+### Import Error: 'setup_component_logger'
+- **Issue**: `ImportError: cannot import name 'setup_component_logger'`
+- **Fix**: Use `setup_component_logging` (with 'ing' at the end)
+
+### Component Not Registering with Hermes
+- **Check**: Is the port hardcoded in the registration call?
+- **Fix**: Use `port=port` variable from config, not `port=8000`
+
+### Socket Already in Use on macOS
+- **Issue**: Port binding fails on restart
+- **Fix**: Ensure `await asyncio.sleep(0.5)` is at the end of shutdown
+
+### FastAPI Startup Errors
+- **Issue**: `TypeError: 'async_generator' object is not callable`
+- **Fix**: Ensure you're using the lifespan pattern correctly with `@asynccontextmanager`
+
+## Migrating from Old Patterns
+
+### Before (Deprecated):
+```python
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Starting component")
+    # startup code
+    app.state.hermes = HermesRegistration()
+    await app.state.hermes.register_component(...)
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down")
+    # shutdown code
+    await app.state.hermes.deregister(...)
+
+app = FastAPI()
+```
+
+### After (Modern):
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting component")
+    async def startup_logic():
+        # startup code
+        global hermes_registration
+        hermes_registration = HermesRegistration()
+        await hermes_registration.register_component(...)
+    
+    metrics = await component_startup("mycomponent", startup_logic, timeout=30)
+    logger.info(f"Started in {metrics.total_time:.2f}s")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down")
+    shutdown = GracefulShutdown("mycomponent")
+    await shutdown.shutdown_sequence(timeout=10)
+    await asyncio.sleep(0.5)  # CRITICAL!
+
+app = FastAPI(lifespan=lifespan)
+```
 
 ---
 
