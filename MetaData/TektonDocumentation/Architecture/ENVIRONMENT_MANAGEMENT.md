@@ -114,8 +114,6 @@ except ImportError:
 - `SOPHIA_PORT`: 8014 (Machine learning)
 
 ### Specialized Ports
-- `LLM_ADAPTER_HTTP_PORT`: 8300 (LLM Adapter HTTP)
-- `LLM_ADAPTER_WS_PORT`: 8301 (LLM Adapter WebSocket)
 - `TERMA_WS_PORT`: 8767 (Terma WebSocket legacy)
 
 ### Terminal Settings
