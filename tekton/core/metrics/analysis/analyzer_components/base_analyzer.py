@@ -9,7 +9,7 @@ import logging
 import numpy as np
 from typing import Dict, List, Any, Optional, Union
 
-from ..utils import session_to_dict
+from ...utils import session_to_dict
 
 logger = logging.getLogger(__name__)
 

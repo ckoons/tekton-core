@@ -7,7 +7,7 @@ This module provides functions for processing and calculating metrics for compon
 
 from typing import Dict, Any
 
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ..health import HealthStatus
 from ..alerts import AlertSeverity
 

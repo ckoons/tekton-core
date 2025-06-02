@@ -9,7 +9,7 @@ import json
 import time
 from typing import Dict, List, Any, Optional, Callable
 
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ...logging_integration import get_logger, LogCategory
 from ...metrics_integration import get_metrics_manager
 from ..health import HealthStatus, ComponentHealth, SystemHealth, state_to_health_status

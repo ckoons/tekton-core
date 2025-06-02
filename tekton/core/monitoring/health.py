@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Dict, List, Any, Optional, Set
 
 from ..logging_integration import get_logger, LogCategory
-from ..component_lifecycle import ComponentState
+from ..lifecycle import ComponentState
 
 # Configure logger
 logger = get_logger("tekton.monitoring.health")

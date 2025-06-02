@@ -8,7 +8,7 @@ Manages component state transitions and health status mapping.
 import logging
 from typing import Dict, Any, Optional
 
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ...monitoring_dashboard import HealthStatus, Alert, AlertSeverity
 from ...logging_integration import LogCategory
 

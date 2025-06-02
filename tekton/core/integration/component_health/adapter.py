@@ -15,7 +15,7 @@ from typing import Dict, List, Any, Optional, Callable, Union, Set
 from ...logging_integration import get_logger, LogCategory, LogLevel
 from ...metrics_integration import get_metrics_manager, MetricCategory, MetricUnit
 from ...monitoring_dashboard import get_dashboard, HealthStatus, Alert, AlertSeverity
-from ...component_lifecycle import ComponentState
+from ...lifecycle import ComponentState
 from ...graceful_degradation import CircuitBreaker, NoFallbackAvailableError
 
 from .state_manager import StateManager

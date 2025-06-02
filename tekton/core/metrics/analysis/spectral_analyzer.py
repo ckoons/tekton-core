@@ -16,7 +16,7 @@ from .parameter_sensitivity import calculate_control_parameter_sensitivity
 from .hysteresis import calculate_hysteresis_detection
 from .catastrophe_points import identify_catastrophe_points
 from .architectural_elasticity import find_architectural_elasticity
-from .utils import session_to_dict
+from ..utils import session_to_dict
 from .analyzer_components.base_analyzer import BaseAnalyzer
 from .analyzer_components.metrics import calculate_spectral_metrics
 from .analyzer_components.insights import generate_insights
