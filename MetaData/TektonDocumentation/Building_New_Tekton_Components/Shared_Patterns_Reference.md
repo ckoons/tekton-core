@@ -2,6 +2,30 @@
 
 This reference documents common patterns, utilities, and conventions used across all Tekton components. Always use these patterns instead of creating component-specific implementations.
 
+## Required Imports (MANDATORY)
+
+All new components MUST use the shared utilities. These are no longer optional:
+
+```python
+import os
+import sys
+from contextlib import asynccontextmanager
+
+# REQUIRED: Add Tekton root to path
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if tekton_root not in sys.path:
+    sys.path.insert(0, tekton_root)
+
+# Import shared utilities (NO LONGER OPTIONAL)
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
+from shared.utils.health_check import create_health_response
+```
+
 ## Environment Configuration
 
 ### Three-Tier Environment System
@@ -12,20 +36,7 @@ Tekton uses a three-tier environment variable system:
 2. **User Environment** - `~/.env.tekton`
 3. **Component Environment** - `ComponentName/.env`
 
-```python
-# Standard environment initialization
-import sys
-import os
-
-# Initialize Tekton environment
-try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-    from tekton_startup import tekton_component_startup
-    tekton_component_startup("mycomponent")
-except ImportError:
-    print("[MYCOMPONENT] Could not load Tekton environment manager")
-    print("[MYCOMPONENT] Continuing with system environment variables")
-```
+The shared utilities handle environment loading automatically.
 
 ### Standard Environment Variables
 
@@ -66,13 +77,17 @@ MYCOMPONENT_API_TIMEOUT=30
 ### Port Configuration Pattern
 
 ```python
-# In your component
-COMPONENT_PORT = int(os.environ.get("MYCOMPONENT_PORT", 8015))
+# NEVER hardcode ports - always use configuration
+config = get_component_config()
+port = config.mycomponent.port if hasattr(config, 'mycomponent') else int(os.environ.get("MYCOMPONENT_PORT", 8015))
 
-# When referencing other components (after Shared_Utilities_Sprint)
-from tekton.shared.config import PortConfig
+# ❌ DON'T do this:
+# port = 8015
+# port = get_component_port()  # Old pattern
 
-hermes_url = PortConfig.get_component_url("hermes")
+# ✅ DO this:
+config = get_component_config()
+port = config.mycomponent.port if hasattr(config, 'mycomponent') else int(os.environ.get("MYCOMPONENT_PORT", 8015))
 ```
 
 ## Logging Configuration
@@ -80,16 +95,17 @@ hermes_url = PortConfig.get_component_url("hermes")
 ### Standard Logging Setup
 
 ```python
-import logging
+# Use shared logger setup - DO NOT use logging.getLogger()
+logger = setup_component_logging("mycomponent")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("mycomponent.module")
+# ❌ DON'T do this:
+# logger = logging.getLogger("mycomponent")
+# logging.basicConfig(...)
 
-# Usage
+# ✅ DO this:
+logger = setup_component_logging("mycomponent")
+
+# Usage remains the same
 logger.info("Starting component")
 logger.error(f"Error occurred: {e}")
 logger.debug("Debug information")
@@ -105,28 +121,32 @@ logger.debug("Debug information")
 
 ## Health Check Pattern
 
-### Standard Health Response
+### Standard Health Response (Using Shared Utility)
 
 ```python
-from datetime import datetime
-from typing import Dict, Any
+from shared.utils.health_check import create_health_response
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint following Tekton standards."""
-    return {
-        "status": "healthy",  # healthy, degraded, unhealthy
-        "component": "mycomponent",
-        "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "port": COMPONENT_PORT,
-        "uptime": get_uptime(),
-        "checks": {
+    """Health check endpoint using shared utility."""
+    port = getattr(app.state, 'port', 8015)
+    uptime = None
+    if hasattr(app.state, "start_time"):
+        uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
+    
+    return create_health_response(
+        component_name=COMPONENT_NAME,
+        port=port,
+        version="0.1.0",
+        status="healthy",  # healthy, degraded, unhealthy
+        registered=hermes_registration.is_registered if hermes_registration else False,
+        uptime=uptime,
+        details={
             "api": "healthy",
-            "database": check_database_health(),
+            "database": check_database_health() if has_database else None,
             "dependencies": check_dependencies()
         }
-    }
+    )
 ```
 
 ### Health Status Values
@@ -137,29 +157,54 @@ async def health_check():
 
 ## Service Registration
 
-### Hermes Registration Pattern
+### Hermes Registration Pattern (MUST use lifespan)
+
+**WARNING**: The `@app.on_event` decorators are deprecated. You MUST use the lifespan pattern:
 
 ```python
-from hermes_registration import HermesRegistration, heartbeat_loop
+# Global state for registration
+hermes_registration = None
+heartbeat_task = None
 
-@app.on_event("startup")
-async def startup_event():
-    # Register with Hermes
-    app.state.hermes_registration = HermesRegistration()
-    success = await app.state.hermes_registration.register_component(
-        component_name="mycomponent",
-        port=COMPONENT_PORT,
-        version="0.1.0",
-        capabilities=["capability1", "capability2"],
-        metadata={
-            "description": "Component description",
-            "author": "Tekton Team"
-        }
-    )
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager - REQUIRED pattern"""
+    global hermes_registration, heartbeat_task
     
-    if success:
-        # Start heartbeat
-        asyncio.create_task(heartbeat_loop(app.state.hermes_registration, "mycomponent"))
+    # Startup
+    async def component_startup_logic():
+        # Register with Hermes
+        global hermes_registration, heartbeat_task
+        hermes_registration = HermesRegistration()
+        
+        is_registered = await hermes_registration.register_component(
+            component_name="mycomponent",
+            port=port,  # From config, NEVER hardcoded
+            version="0.1.0",
+            capabilities=["capability1", "capability2"],
+            metadata={...}
+        )
+        
+        if is_registered:
+            heartbeat_task = asyncio.create_task(
+                heartbeat_loop(hermes_registration, "mycomponent", interval=30)
+            )
+    
+    # Execute startup with metrics
+    metrics = await component_startup("mycomponent", component_startup_logic, timeout=30)
+    logger.info(f"Started in {metrics.total_time:.2f}s")
+    
+    yield
+    
+    # Shutdown with GracefulShutdown handler
+    shutdown = GracefulShutdown("mycomponent")
+    await shutdown.shutdown_sequence(timeout=10)
+    
+    # CRITICAL: Socket release delay
+    await asyncio.sleep(0.5)
+
+# Create app with lifespan
+app = FastAPI(lifespan=lifespan)  # REQUIRED
 ```
 
 ### Heartbeat Pattern
@@ -284,57 +329,16 @@ async def general_exception_handler(request, exc):
 
 ## Startup and Shutdown
 
-### Graceful Startup
+**DEPRECATED**: The `@app.on_event` decorators are no longer supported. See the lifespan pattern in Service Registration above.
 
-```python
-@app.on_event("startup")
-async def startup_event():
-    """Initialize component on startup."""
-    try:
-        logger.info(f"Starting {COMPONENT_NAME}")
-        app.state.start_time = datetime.utcnow()
-        
-        # Initialize services
-        app.state.my_service = MyService()
-        await app.state.my_service.initialize()
-        
-        # Register with Hermes
-        # ... registration code ...
-        
-        logger.info(f"{COMPONENT_NAME} initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Error initializing {COMPONENT_NAME}: {e}")
-        # Don't re-raise - allow partial functionality
-```
+### Common Mistakes to Avoid
 
-### Graceful Shutdown
-
-```python
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    try:
-        logger.info(f"Shutting down {COMPONENT_NAME}")
-        
-        # Stop background tasks
-        for task in asyncio.all_tasks():
-            if not task.done():
-                task.cancel()
-        
-        # Deregister from Hermes
-        if hasattr(app.state, "hermes_registration"):
-            await app.state.hermes_registration.deregister(COMPONENT_NAME)
-        
-        # Cleanup resources
-        if hasattr(app.state, "my_service"):
-            await app.state.my_service.cleanup()
-        
-        logger.info(f"{COMPONENT_NAME} shutdown complete")
-        
-    except Exception as e:
-        logger.error(f"Error during shutdown: {e}")
-```
+- ❌ DON'T use `@app.on_event("startup")` or `@app.on_event("shutdown")`
+- ❌ DON'T import from `tekton.utils.port_config` - it doesn't exist
+- ❌ DON'T use `setup_component_logger` - it's `setup_component_logging`
+- ❌ DON'T hardcode ports anywhere
+- ❌ DON'T forget the socket release delay in shutdown
+- ❌ DON'T skip the lifespan pattern - it's REQUIRED
 
 ## CLI Patterns
 
@@ -542,30 +546,36 @@ mycomponent/
 └── utils/        # Component utilities
 ```
 
-## Common Utilities (After Shared_Utilities_Sprint)
+## Common Utilities (NOW AVAILABLE AND REQUIRED)
 
-These utilities will be available after the Shared_Utilities_Sprint:
+The shared utilities are now mandatory for all components:
 
 ```python
-# Port configuration
-from tekton.shared.config import PortConfig
-hermes_port = PortConfig.get_component_port("hermes")
+# All imports from shared.utils, not tekton.shared
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
+from shared.utils.health_check import create_health_response
 
-# Logging setup
-from tekton.shared.logging import setup_component_logger
-logger = setup_component_logger("mycomponent")
-
-# Health checks
-from tekton.shared.health import create_health_response
-response = create_health_response("mycomponent", port, "healthy")
-
-# Error handling
-from tekton.shared.errors import TektonError, StartupError
-
-# Component startup
-from tekton.shared.startup import component_startup
-await component_startup("mycomponent", startup_func)
+# Example usage:
+logger = setup_component_logging("mycomponent")
+config = get_component_config()
+metrics = await component_startup("mycomponent", startup_func, timeout=30)
+shutdown = GracefulShutdown("mycomponent")
+health = create_health_response("mycomponent", port, "0.1.0", "healthy")
 ```
+
+## Testing Requirements
+
+Every new component MUST:
+1. Start without errors
+2. Register with Hermes successfully
+3. Show as healthy in enhanced_tekton_status.py
+4. Use shared utilities throughout
+5. Follow the lifespan pattern
 
 ## Best Practices Summary
 

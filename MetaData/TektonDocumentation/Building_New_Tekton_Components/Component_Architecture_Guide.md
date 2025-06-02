@@ -68,23 +68,43 @@ COMPONENT_PORTS = {
 
 ## Service Registration Pattern
 
-Components must register with Hermes on startup:
+Components MUST use the lifespan pattern with shared utilities:
 
 ```python
-# Standard registration pattern
-async def startup_event():
-    # Register with Hermes
-    hermes_registration = HermesRegistration()
-    await hermes_registration.register_component(
-        component_name="mycomponent",
-        port=8015,
-        version="0.1.0",
-        capabilities=["capability1", "capability2"],
-        metadata={"description": "My component description"}
-    )
+# REQUIRED: Use lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup with shared utilities
+    async def component_startup():
+        # Get configuration - NEVER hardcode ports
+        config = get_component_config()
+        port = config.mycomponent.port if hasattr(config, 'mycomponent') else int(os.environ.get("MYCOMPONENT_PORT", 8015))
+        
+        # Register with Hermes
+        hermes_registration = HermesRegistration()
+        await hermes_registration.register_component(
+            component_name="mycomponent",
+            port=port,  # From config, never hardcoded
+            version="0.1.0",
+            capabilities=["capability1", "capability2"],
+            metadata={"description": "My component description"}
+        )
+        
+        # Start heartbeat with interval
+        asyncio.create_task(heartbeat_loop(hermes_registration, "mycomponent", interval=30))
     
-    # Start heartbeat loop
-    asyncio.create_task(heartbeat_loop(hermes_registration, "mycomponent"))
+    # Execute startup with metrics
+    metrics = await component_startup("mycomponent", component_startup, timeout=30)
+    logger.info(f"Started in {metrics.total_time:.2f}s")
+    
+    yield
+    
+    # Shutdown with GracefulShutdown
+    shutdown = GracefulShutdown("mycomponent")
+    await shutdown.shutdown_sequence(timeout=10)
+    await asyncio.sleep(0.5)  # CRITICAL: Socket release delay
+
+app = FastAPI(lifespan=lifespan)  # REQUIRED
 ```
 
 ## MCP Integration
@@ -104,15 +124,22 @@ async def call_tool(request: MCPToolCall) -> MCPToolResponse:
 
 ## Environment Configuration
 
-Components use Tekton's three-tier environment system:
+Components use Tekton's three-tier environment system through shared utilities:
 1. System environment variables
 2. User-level `.env.tekton`
 3. Component-level `.env`
 
 ```python
-# Standard environment loading
-from tekton_startup import tekton_component_startup
-tekton_component_startup("mycomponent")
+# REQUIRED: Use shared utilities for all configuration
+from shared.utils.env_config import get_component_config
+from shared.utils.logging_setup import setup_component_logging
+
+# Get configuration
+config = get_component_config()
+logger = setup_component_logging("mycomponent")
+
+# NEVER hardcode values
+port = config.mycomponent.port if hasattr(config, 'mycomponent') else int(os.environ.get("MYCOMPONENT_PORT", 8015))
 ```
 
 ## Health Check Pattern
@@ -171,20 +198,19 @@ class APIError(BaseModel):
 
 ## Startup and Shutdown
 
-Components implement graceful startup and shutdown:
+**IMPORTANT**: The `@app.on_event` decorators are deprecated. Components MUST use the lifespan pattern with shared utilities:
 
 ```python
-@app.on_event("startup")
-async def startup_event():
-    # Initialize component
-    # Register with Hermes
-    # Start background tasks
+from shared.utils.startup import component_startup
+from shared.utils.shutdown import GracefulShutdown
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    # Stop background tasks
-    # Deregister from Hermes
-    # Clean up resources
+# See the Service Registration Pattern section above for the complete lifespan implementation
+# Key requirements:
+# 1. Use asynccontextmanager with lifespan
+# 2. Use component_startup for startup metrics
+# 3. Use GracefulShutdown for cleanup
+# 4. Include socket release delay (0.5s) after shutdown
+# 5. Pass lifespan to FastAPI constructor
 ```
 
 ## Component Categories
@@ -217,7 +243,7 @@ While all components follow the same architecture, they typically fall into thes
 2. **Fail Fast** - Clear error messages, quick failure detection
 3. **Document Everything** - Code is read more than written
 4. **Test First** - Let tests drive the implementation
-5. **Use Shared Utilities** - Don't reinvent the wheel
+5. **Use Shared Utilities** - MANDATORY, not optional
 6. **Monitor Health** - Always know component status
 7. **Log Appropriately** - Not too much, not too little
 
@@ -230,6 +256,11 @@ While all components follow the same architecture, they typically fall into thes
 5. Custom health check formats
 6. Skipping Hermes registration
 7. Not implementing proper shutdown handlers
+8. Using deprecated @app.on_event decorators
+9. Hardcoding port numbers
+10. Using logging.getLogger instead of setup_component_logging
+11. Forgetting the socket release delay in shutdown
+12. Not using the lifespan pattern
 
 ---
 

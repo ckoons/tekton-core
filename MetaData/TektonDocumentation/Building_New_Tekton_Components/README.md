@@ -6,6 +6,19 @@ This guide provides the standardized approach for building new Tekton components
 
 **Core Philosophy: Semper Progresso** - Always moving forward. We use the latest patterns and technologies without backward compatibility concerns.
 
+## IMPORTANT: Shared Utilities Update
+
+As of the Shared Utilities Sprint, the shared utilities are now **MANDATORY** for all new components:
+
+- ✅ **REQUIRED**: Use `shared.utils.*` imports for all common functionality
+- ✅ **REQUIRED**: Use the lifespan pattern with `asynccontextmanager`
+- ✅ **REQUIRED**: Use `setup_component_logging()` not `logging.getLogger()`
+- ✅ **REQUIRED**: Use `get_component_config()` for port configuration
+- ❌ **DEPRECATED**: `@app.on_event("startup")` and `@app.on_event("shutdown")`
+- ❌ **NEVER**: Hardcode port numbers or skip the socket release delay
+
+See [Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md) for the complete list of required patterns.
+
 ## What is a Tekton Component?
 
 A Tekton component is a self-contained service that:
