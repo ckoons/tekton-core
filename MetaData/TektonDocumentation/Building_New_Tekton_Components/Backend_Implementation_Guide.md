@@ -348,7 +348,7 @@ app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
 # Add the shutdown endpoint to your app
-add_shutdown_endpoint_to_app(app)
+add_shutdown_endpoint_to_app(app, COMPONENT_NAME)
 
 # Main module requirement
 if __name__ == "__main__":
@@ -775,7 +775,7 @@ app.add_middleware(CORSMiddleware, ...)
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 
 # REQUIRED: Add shutdown endpoint
-add_shutdown_endpoint_to_app(app)
+add_shutdown_endpoint_to_app(app, "mycomponent")
 ```
 
 ### Shutdown Endpoint Behavior
@@ -985,7 +985,7 @@ from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 - Use lifespan pattern (no `@app.on_event`)
 - Implement `/health` endpoint with `create_health_response`
 - Implement `/status` endpoint for tekton-status
-- Add shutdown endpoint with `add_shutdown_endpoint_to_app`
+- Add shutdown endpoint with `add_shutdown_endpoint_to_app(app, component_name)`
 - Include socket release delay (0.5s) after shutdown
 
 ### 4. **Configuration Requirements**

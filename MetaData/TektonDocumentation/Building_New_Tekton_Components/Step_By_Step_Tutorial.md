@@ -676,7 +676,7 @@ from nexus.api.endpoints import mcp
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 
 # Add shutdown endpoint using shared utility
-add_shutdown_endpoint_to_app(app)
+add_shutdown_endpoint_to_app(app, COMPONENT_NAME)
 
 # Main module requirement
 if __name__ == "__main__":
@@ -1370,7 +1370,7 @@ Based on the Shared Utilities Sprint standards:
 - [ ] Registers with Hermes successfully
 - [ ] Implements /health endpoint with create_health_response
 - [ ] Implements /status endpoint for tekton-status
-- [ ] Has shutdown endpoint via add_shutdown_endpoint_to_app
+- [ ] Has shutdown endpoint via add_shutdown_endpoint_to_app(app, "nexus")
 - [ ] Launch script uses ANSI colors and lsof checking
 - [ ] Logs to ~/.tekton/logs/
 - [ ] Component appears in tekton-status as healthy
