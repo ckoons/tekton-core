@@ -19,6 +19,7 @@ Tekton serves as the "builder" - the central coordinator between various AI mode
 - **Memory Integration**: Leverages Engram for persistent context across sessions
 - **Agent Management**: Works with Agenteer for specialized agent creation and workflow
 - **Resource Optimization**: Uses the right AI for each task based on complexity and requirements
+- **Zero-Downtime Restarts**: Advanced socket reuse enables immediate component restarts without port conflicts
 
 ## Architecture
 
