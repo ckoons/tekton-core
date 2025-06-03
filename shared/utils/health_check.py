@@ -1,38 +1,20 @@
 """
 Standardized Health Check Response for Tekton Components
 
-Provides a consistent health check format across all components.
+This module now imports from the new Pydantic v2 models in tekton.models.
+It maintains backward compatibility by re-exporting the same interface.
 """
-from datetime import datetime
 from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
 
+# Import from the new shared models
+from tekton.models.health import (
+    HealthCheckResponse,
+    HealthStatus,
+    create_health_response as _create_health_response
+)
 
-class HealthCheckResponse(BaseModel):
-    """Standard health check response format"""
-    status: str = Field(..., description="Health status: healthy, degraded, or unhealthy")
-    version: str = Field(..., description="Component version")
-    timestamp: str = Field(..., description="ISO-8601 timestamp")
-    component: str = Field(..., description="Component name")
-    port: int = Field(..., description="Component port")
-    registered_with_hermes: bool = Field(default=False, description="Whether registered with Hermes")
-    details: Dict[str, Any] = Field(default_factory=dict, description="Component-specific details")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "status": "healthy",
-                "version": "0.1.0",
-                "timestamp": "2025-04-25T10:30:00Z",
-                "component": "rhetor",
-                "port": 8003,
-                "registered_with_hermes": True,
-                "details": {
-                    "providers_available": 6,
-                    "active_contexts": 3
-                }
-            }
-        }
+# Re-export for backward compatibility
+__all__ = ['HealthCheckResponse', 'create_health_response']
 
 
 def create_health_response(
@@ -43,13 +25,26 @@ def create_health_response(
     registered: bool = False,
     details: Optional[Dict[str, Any]] = None
 ) -> HealthCheckResponse:
-    """Helper function to create a standardized health response"""
-    return HealthCheckResponse(
-        status=status,
-        version=version,
-        timestamp=datetime.now().isoformat(),
-        component=component_name,
+    """
+    Helper function to create a standardized health response.
+    
+    This wrapper maintains backward compatibility with the string status parameter
+    while the new models use the HealthStatus enum.
+    """
+    # Convert string status to HealthStatus enum
+    health_status = HealthStatus.HEALTHY
+    if status.lower() == "degraded":
+        health_status = HealthStatus.DEGRADED
+    elif status.lower() == "unhealthy":
+        health_status = HealthStatus.UNHEALTHY
+    elif status.lower() == "unknown":
+        health_status = HealthStatus.UNKNOWN
+    
+    return _create_health_response(
+        component_name=component_name,
         port=port,
-        registered_with_hermes=registered,
-        details=details or {}
+        version=version,
+        status=health_status,
+        registered=registered,
+        details=details
     )

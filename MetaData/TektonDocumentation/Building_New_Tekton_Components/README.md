@@ -32,6 +32,7 @@ A Tekton component is a self-contained service that:
 ## Quick Start Checklist
 
 - [ ] Create component directory structure
+- [ ] Create `__main__.py` for `python -m` support (REQUIRED)
 - [ ] Implement backend API server (FastAPI)
 - [ ] Add MCP v2 endpoints
 - [ ] Create CLI interface
@@ -41,6 +42,7 @@ A Tekton component is a self-contained service that:
 - [ ] Configure environment variables
 - [ ] Write backend tests
 - [ ] Document the component
+- [ ] Test with enhanced launcher
 
 ## Documentation Structure
 
@@ -63,7 +65,7 @@ ComponentName/
 ├── requirements.txt             # Python dependencies
 ├── componentname/               # Main package directory
 │   ├── __init__.py
-│   ├── __main__.py             # Entry point for python -m
+│   ├── __main__.py             # REQUIRED: Entry point for python -m componentname
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── app.py              # FastAPI application

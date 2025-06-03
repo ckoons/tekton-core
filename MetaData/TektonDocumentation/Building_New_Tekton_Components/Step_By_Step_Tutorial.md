@@ -411,10 +411,13 @@ class ConnectionManager:
 ```python
 # nexus/__main__.py
 """Entry point for python -m nexus"""
-from nexus.api.app import main
+from nexus.api.app import app
+import uvicorn
+import os
 
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("NEXUS_PORT", 8016))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 ```
 
 Create the main API application:
@@ -1287,7 +1290,7 @@ echo -e "${GREEN}Starting $COMPONENT_NAME on port $PORT...${NC}"
 echo "Logging to: $LOG_FILE"
 
 # Run the component with proper module path
-python -m $COMPONENT_MODULE.api.app "$@" 2>&1 | tee -a "$LOG_FILE" &
+python -m $COMPONENT_MODULE "$@" 2>&1 | tee -a "$LOG_FILE" &
 PID=$!
 
 # Health check loop (30 second timeout)
