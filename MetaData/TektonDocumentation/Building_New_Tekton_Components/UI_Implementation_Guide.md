@@ -4,6 +4,15 @@
 
 This guide covers implementing the Hephaestus UI component for your Tekton component. The UI serves as a visibility layer, with LLMs handling complex interactions through chat interfaces.
 
+## ⚠️ Important Update
+
+Following the Shared Utilities Sprint, ensure your UI component:
+- ✅ Connects to the backend using environment variables (no hardcoded ports)
+- ✅ Shows health status from the standardized `/health` endpoint
+- ✅ Displays status information from the `/status` endpoint
+- ✅ Uses consistent error handling for disconnected components
+- ✅ Follows the component color scheme in UI_Styling_Standards.md
+
 ## UI Architecture Principles
 
 1. **Direct HTML Injection** - No Shadow DOM, direct component injection

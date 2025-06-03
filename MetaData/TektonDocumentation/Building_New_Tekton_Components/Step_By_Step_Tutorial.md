@@ -2,6 +2,18 @@
 
 This tutorial walks through creating a new Tekton component from scratch. We'll build a hypothetical "Nexus" component that manages connections between other components.
 
+## ⚠️ IMPORTANT: Updated for Shared Utilities Sprint
+
+This tutorial has been updated to follow the mandatory standards from the Shared Utilities Sprint:
+- ✅ Uses the lifespan pattern (no deprecated @app.on_event)
+- ✅ Imports all shared utilities (now REQUIRED)
+- ✅ Uses setup_component_logging() not logging.getLogger()
+- ✅ Never hardcodes ports
+- ✅ Includes all required endpoints (/health, /status, /shutdown)
+- ✅ Follows standardized launch script patterns
+
+**Start with [Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md) to understand all requirements!**
+
 ## Phase 1: Project Setup
 
 ### Step 1: Create Directory Structure
@@ -418,43 +430,143 @@ Connection management component for Tekton
 
 import os
 import sys
-import logging
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, Any, List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-# Initialize Tekton environment
-try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-    from tekton_startup import tekton_component_startup
-    tekton_component_startup("nexus")
-except ImportError:
-    print("[NEXUS] Could not load Tekton environment manager")
-    print("[NEXUS] Continuing with system environment variables")
+# REQUIRED: Add Tekton root to path
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if tekton_root not in sys.path:
+    sys.path.insert(0, tekton_root)
 
-# Import Hermes registration
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "shared", "utils"))
-from hermes_registration import HermesRegistration, heartbeat_loop
+# Import shared utilities (NO LONGER OPTIONAL)
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
+from shared.utils.health_check import create_health_response
+from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
 # Import core modules
 from nexus.core.connection_manager import ConnectionManager
 from nexus.models.connection import ConnectionInfo, ConnectionMetrics
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("nexus.api")
+# Component configuration
+COMPONENT_NAME = "nexus"
 
-# Create FastAPI application
+# Use shared logger setup - DO NOT use logging.getLogger()
+logger = setup_component_logging(COMPONENT_NAME)
+
+# Global state for registration
+hermes_registration = None
+heartbeat_task = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for Nexus"""
+    global hermes_registration, heartbeat_task
+    
+    # Startup
+    logger.info("Starting Nexus API")
+    
+    async def nexus_startup():
+        """Component-specific startup logic"""
+        try:
+            # Get configuration - NEVER hardcode ports
+            config = get_component_config()
+            port = config.nexus.port if hasattr(config, 'nexus') else int(os.environ.get("NEXUS_PORT", 8016))
+            
+            # Store in app state for access in endpoints
+            app.state.port = port
+            app.state.start_time = datetime.utcnow()
+            
+            # Register with Hermes
+            global hermes_registration, heartbeat_task
+            hermes_registration = HermesRegistration()
+            
+            logger.info(f"Attempting to register Nexus with Hermes on port {port}")
+            is_registered = await hermes_registration.register_component(
+                component_name=COMPONENT_NAME,
+                port=port,  # NEVER hardcode this value
+                version="0.1.0",
+                capabilities=["connection_monitoring", "dependency_tracking", "performance_metrics"],
+                metadata={
+                    "description": "Connection management for Tekton components",
+                    "author": "Tekton Team"
+                }
+            )
+            
+            if is_registered:
+                logger.info("Successfully registered with Hermes")
+                heartbeat_task = asyncio.create_task(
+                    heartbeat_loop(hermes_registration, COMPONENT_NAME, interval=30)
+                )
+            else:
+                logger.warning("Failed to register with Hermes - continuing without registration")
+                
+            # Initialize connection manager
+            app.state.connection_manager = ConnectionManager()
+            await app.state.connection_manager.initialize()
+            
+        except Exception as e:
+            logger.error(f"Error during Nexus startup: {e}", exc_info=True)
+            raise StartupError(str(e), COMPONENT_NAME, "STARTUP_FAILED")
+    
+    # Execute startup with metrics
+    try:
+        metrics = await component_startup(COMPONENT_NAME, nexus_startup, timeout=30)
+        logger.info(f"Nexus started successfully in {metrics.total_time:.2f}s")
+    except Exception as e:
+        logger.error(f"Failed to start Nexus: {e}")
+        raise
+    
+    # Create shutdown handler
+    shutdown = GracefulShutdown(COMPONENT_NAME)
+    
+    # Register cleanup tasks
+    async def cleanup_hermes():
+        """Cleanup Hermes registration"""
+        if heartbeat_task:
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+        
+        if hermes_registration and hermes_registration.is_registered:
+            await hermes_registration.deregister(COMPONENT_NAME)
+            logger.info("Deregistered from Hermes")
+    
+    shutdown.register_cleanup(cleanup_hermes)
+    
+    # Add connection manager cleanup
+    async def cleanup_connection_manager():
+        if hasattr(app.state, "connection_manager"):
+            await app.state.connection_manager.cleanup()
+    
+    shutdown.register_cleanup(cleanup_connection_manager)
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Nexus API")
+    await shutdown.shutdown_sequence(timeout=10)
+    
+    # CRITICAL: Socket release delay for macOS
+    await asyncio.sleep(0.5)
+
+# Create app with lifespan
 app = FastAPI(
     title="Nexus Connection Manager API",
     description="Connection management for Tekton components",
     version="0.1.0",
+    lifespan=lifespan  # REQUIRED
 )
 
 # Add CORS middleware
@@ -466,43 +578,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuration
-COMPONENT_NAME = "nexus"
-COMPONENT_PORT = int(os.environ.get("NEXUS_PORT", 8016))
-
 # Root endpoint
 @app.get("/")
 async def root():
     """Root endpoint."""
+    port = getattr(app.state, 'port', 8016)
     return {
         "name": "Nexus Connection Manager",
         "version": "0.1.0",
         "status": "running",
-        "documentation": f"http://localhost:{COMPONENT_PORT}/docs"
+        "documentation": f"http://localhost:{port}/docs"
     }
 
 # Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "component": COMPONENT_NAME,
-        "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
-        "port": COMPONENT_PORT,
-        "uptime": get_uptime(),
-        "checks": {
+    """Health check endpoint using shared utility."""
+    port = getattr(app.state, 'port', 8016)
+    uptime = None
+    if hasattr(app.state, "start_time"):
+        uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
+    
+    return create_health_response(
+        component_name=COMPONENT_NAME,
+        port=port,
+        version="0.1.0",
+        status="healthy",
+        registered=hermes_registration.is_registered if hermes_registration else False,
+        uptime=uptime,
+        details={
             "api": "healthy",
-            "connection_manager": "healthy" if hasattr(app.state, "connection_manager") else "not_initialized"
+            "connection_manager": "healthy" if hasattr(app.state, "connection_manager") else "not_initialized",
+            "dependencies": {
+                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "not_registered"
+            }
+        }
+    )
+
+# Status endpoint for tekton-status
+@app.get("/status")
+async def get_status():
+    """Status endpoint for tekton-status integration."""
+    port = getattr(app.state, 'port', 8016)
+    return {
+        "component": COMPONENT_NAME,
+        "status": "running",
+        "version": "0.1.0",
+        "port": port,
+        "registered": hermes_registration.is_registered if hermes_registration else False,
+        "uptime": (datetime.utcnow() - app.state.start_time).total_seconds() if hasattr(app.state, "start_time") else 0,
+        "capabilities": ["connection_monitoring", "dependency_tracking", "performance_metrics"],
+        "health": {
+            "api": "healthy",
+            "dependencies": {
+                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "disconnected"
+            }
         }
     }
-
-def get_uptime() -> float:
-    """Calculate uptime in seconds."""
-    if hasattr(app.state, "start_time"):
-        return (datetime.utcnow() - app.state.start_time).total_seconds()
-    return 0
 
 # Connection management endpoints
 @app.get("/api/connections", response_model=List[ConnectionInfo])
@@ -536,76 +668,25 @@ async def get_connection_metrics(component_id: str):
     
     return metrics
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize Nexus on startup."""
-    try:
-        logger.info(f"Starting {COMPONENT_NAME} on port {COMPONENT_PORT}")
-        app.state.start_time = datetime.utcnow()
-        
-        # Register with Hermes
-        app.state.hermes_registration = HermesRegistration()
-        success = await app.state.hermes_registration.register_component(
-            component_name=COMPONENT_NAME,
-            port=COMPONENT_PORT,
-            version="0.1.0",
-            capabilities=["connection_monitoring", "dependency_tracking", "performance_metrics"],
-            metadata={
-                "description": "Connection management for Tekton components",
-                "author": "Tekton Team"
-            }
-        )
-        
-        if success:
-            asyncio.create_task(heartbeat_loop(app.state.hermes_registration, COMPONENT_NAME))
-            logger.info(f"Successfully registered {COMPONENT_NAME} with Hermes")
-        else:
-            logger.warning(f"Failed to register {COMPONENT_NAME} with Hermes")
-        
-        # Initialize connection manager
-        app.state.connection_manager = ConnectionManager()
-        await app.state.connection_manager.initialize()
-        
-        # Auto-discover and register components from Hermes
-        # This would be implemented to query Hermes for registered components
-        
-        logger.info(f"{COMPONENT_NAME} initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Error initializing {COMPONENT_NAME}: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    try:
-        logger.info(f"Shutting down {COMPONENT_NAME}")
-        
-        # Deregister from Hermes
-        if hasattr(app.state, "hermes_registration"):
-            await app.state.hermes_registration.deregister(COMPONENT_NAME)
-        
-        # Cleanup connection manager
-        if hasattr(app.state, "connection_manager"):
-            await app.state.connection_manager.cleanup()
-        
-        logger.info(f"{COMPONENT_NAME} shutdown complete")
-        
-    except Exception as e:
-        logger.error(f"Error shutting down {COMPONENT_NAME}: {e}")
-
 # Import and include routers
 from nexus.api.endpoints import mcp
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 
-def main():
-    """Main entry point."""
+# Add shutdown endpoint using shared utility
+add_shutdown_endpoint_to_app(app)
+
+# Main module requirement
+if __name__ == "__main__":
     import argparse
     import uvicorn
     
+    # Get port from environment - NEVER hardcode
+    port = int(os.environ.get("NEXUS_PORT", 8016))
+    
     parser = argparse.ArgumentParser(description=f"{COMPONENT_NAME} API Server")
-    parser.add_argument("--port", type=int, default=COMPONENT_PORT)
-    parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--reload", action="store_true")
+    parser.add_argument("--port", type=int, default=port, help="Port to run the server on")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind the server to")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
     args = parser.parse_args()
     
     logger.info(f"Starting {COMPONENT_NAME} server on {args.host}:{args.port}")
@@ -615,9 +696,6 @@ def main():
         port=args.port,
         reload=args.reload
     )
-
-if __name__ == "__main__":
-    main()
 ```
 
 ### Step 7: Create MCP Endpoints
@@ -1116,9 +1194,124 @@ if __name__ == "__main__":
     asyncio.run(test_mcp_tools())
 ```
 
+## Phase 5: Launch Scripts
+
+### Step 11: Create setup.sh
+
+```bash
+#!/bin/bash
+# Setup script for Nexus
+
+set -e  # Exit on error
+
+# Ensure the script is run from the Nexus directory
+cd "$(dirname "$0")"
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+echo "Installing dependencies..."
+pip install -U pip
+pip install -r requirements.txt
+
+# Install package in development mode
+echo "Installing Nexus in development mode..."
+pip install -e .
+
+# Make run script executable
+chmod +x run_nexus.sh
+
+echo "Nexus setup complete!"
+echo "Run './run_nexus.sh' to start the Nexus server."
+```
+
+### Step 12: Create run_nexus.sh
+
+```bash
+#!/bin/bash
+# Launch script for Nexus - follows Tekton standards
+
+# ANSI color codes for visibility
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Component name and port configuration
+COMPONENT_NAME="Nexus"
+COMPONENT_MODULE="nexus"
+PORT_VAR="NEXUS_PORT"
+
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Set up Python path to include component and Tekton root
+export PYTHONPATH="$SCRIPT_DIR:$(dirname "$SCRIPT_DIR"):$PYTHONPATH"
+
+# Get port from environment (NO hardcoded ports!)
+PORT="${!PORT_VAR}"
+if [ -z "$PORT" ]; then
+    echo -e "${RED}Error: $PORT_VAR not set${NC}"
+    echo "Please set the port in your environment or .env file"
+    exit 1
+fi
+
+# Check if port is already in use
+if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null ; then
+    echo -e "${RED}Error: Port $PORT is already in use${NC}"
+    echo "Another service is using this port. Check with: lsof -i :$PORT"
+    exit 1
+fi
+
+# Create log directory if it doesn't exist
+LOG_DIR="$HOME/.tekton/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/$COMPONENT_MODULE.log"
+
+# Activate virtual environment if present
+if [ -d "venv" ]; then
+    echo -e "${GREEN}Activating virtual environment...${NC}"
+    source venv/bin/activate
+fi
+
+# Start the component
+echo -e "${GREEN}Starting $COMPONENT_NAME on port $PORT...${NC}"
+echo "Logging to: $LOG_FILE"
+
+# Run the component with proper module path
+python -m $COMPONENT_MODULE.api.app "$@" 2>&1 | tee -a "$LOG_FILE" &
+PID=$!
+
+# Health check loop (30 second timeout)
+echo -e "${YELLOW}Waiting for $COMPONENT_NAME to start...${NC}"
+for i in {1..30}; do
+    if curl -s "http://localhost:$PORT/health" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $COMPONENT_NAME is running!${NC}"
+        echo -e "${GREEN}API Documentation: http://localhost:$PORT/docs${NC}"
+        echo -e "${GREEN}Health Check: http://localhost:$PORT/health${NC}"
+        echo -e "${GREEN}Process ID: $PID${NC}"
+        exit 0
+    fi
+    sleep 1
+    echo -n "."
+done
+
+echo -e "\n${RED}✗ $COMPONENT_NAME failed to start within 30 seconds${NC}"
+echo "Check the logs at: $LOG_FILE"
+exit 1
+```
+
 ## Phase 6: Documentation
 
-### Step 12: Update Documentation
+### Step 13: Update Documentation
 
 1. Add Nexus to `/config/port_assignments.md`
 2. Create `/MetaData/ComponentDocumentation/Nexus/` directory
@@ -1127,39 +1320,62 @@ if __name__ == "__main__":
 
 ## Final Steps
 
-### Step 13: Test Everything
+### Step 14: Test Everything
 
 ```bash
 # 1. Setup the component
 ./setup.sh
 
-# 2. Start the server
+# 2. Set environment variable
+export NEXUS_PORT=8016
+
+# 3. Start the server
 ./run_nexus.sh
 
-# 3. In another terminal, test the CLI
+# 4. In another terminal, test the health endpoint
+curl http://localhost:8016/health
+
+# 5. Test the status endpoint
+curl http://localhost:8016/status
+
+# 6. Test the shutdown endpoint
+curl -X POST http://localhost:8016/shutdown
+
+# 7. Test with tekton-status
+tekton-status
+
+# 8. Test the CLI
 nexus status
 nexus list-connections
 
-# 4. Test the API
-curl http://localhost:8016/health
-
-# 5. Test MCP integration
+# 9. Test MCP integration
 python examples/test_fastmcp.py
 
-# 6. Access the UI
+# 10. Access the UI
 # Open Hephaestus and navigate to Nexus component
 ```
 
-### Step 14: Integration Checklist
+### Step 15: Integration Checklist
 
-- [ ] Component starts without errors
+Based on the Shared Utilities Sprint standards:
+
+- [ ] Uses lifespan pattern (no @app.on_event)
+- [ ] Imports all shared utilities correctly
+- [ ] Uses setup_component_logging() not logging.getLogger()
+- [ ] Gets port from environment (never hardcoded)
+- [ ] Includes socket release delay (0.5s) after shutdown
 - [ ] Registers with Hermes successfully
-- [ ] Health endpoint returns correct status
+- [ ] Implements /health endpoint with create_health_response
+- [ ] Implements /status endpoint for tekton-status
+- [ ] Has shutdown endpoint via add_shutdown_endpoint_to_app
+- [ ] Launch script uses ANSI colors and lsof checking
+- [ ] Logs to ~/.tekton/logs/
+- [ ] Component appears in tekton-status as healthy
 - [ ] MCP tools are accessible
 - [ ] CLI commands work correctly
 - [ ] UI component loads in Hephaestus
 - [ ] WebSocket connections work
-- [ ] Component appears in Tekton status
+- [ ] Main module has if __name__ == "__main__": block
 
 ## Common Issues and Solutions
 
