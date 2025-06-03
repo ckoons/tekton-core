@@ -219,7 +219,8 @@ chmod +x run_nexus.sh
 # nexus/models/connection.py
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from tekton.models.base import TektonBaseModel
+from pydantic import Field
 from enum import Enum
 
 class ConnectionStatus(str, Enum):
@@ -228,7 +229,7 @@ class ConnectionStatus(str, Enum):
     DEGRADED = "degraded"
     UNKNOWN = "unknown"
 
-class ConnectionInfo(BaseModel):
+class ConnectionInfo(TektonBaseModel):
     """Information about a component connection"""
     component_id: str
     component_name: str
@@ -240,7 +241,7 @@ class ConnectionInfo(BaseModel):
     error_count: int = 0
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class ConnectionMetrics(BaseModel):
+class ConnectionMetrics(TektonBaseModel):
     """Performance metrics for a connection"""
     component_id: str
     avg_latency_ms: float
@@ -712,7 +713,8 @@ MCP v2 Endpoints for Nexus
 import logging
 from typing import Dict, List, Any
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from tekton.models.base import TektonBaseModel
+from pydantic import Field
 
 from nexus.api.dependencies import get_connection_manager
 from nexus.core.connection_manager import ConnectionManager
@@ -722,22 +724,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # MCP v2 Models
-class Tool(BaseModel):
+class Tool(TektonBaseModel):
     """MCP Tool definition"""
     name: str
     description: str
     inputSchema: Dict[str, Any]
 
-class ToolList(BaseModel):
+class ToolList(TektonBaseModel):
     """Response for tool listing"""
     tools: List[Tool]
 
-class ToolCall(BaseModel):
+class ToolCall(TektonBaseModel):
     """Request to call a tool"""
     name: str
     arguments: Dict[str, Any] = Field(default_factory=dict)
 
-class ToolResponse(BaseModel):
+class ToolResponse(TektonBaseModel):
     """Response from tool execution"""
     content: List[Dict[str, Any]]
     isError: bool = False

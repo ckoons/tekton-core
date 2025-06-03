@@ -122,7 +122,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from tekton.models.base import TektonBaseModel
 
 # REQUIRED: Add Tekton root to path
 tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
@@ -388,29 +388,30 @@ MCP v2 Endpoints for MyComponent
 import logging
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from tekton.models.base import TektonBaseModel
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # MCP v2 Models
-class Tool(BaseModel):
+class Tool(TektonBaseModel):
     """MCP Tool definition"""
     name: str
     description: str
     inputSchema: Dict[str, Any]
 
-class ToolList(BaseModel):
+class ToolList(TektonBaseModel):
     """Response for tool listing"""
     tools: List[Tool]
 
-class ToolCall(BaseModel):
+class ToolCall(TektonBaseModel):
     """Request to call a tool"""
     name: str
     arguments: Dict[str, Any] = Field(default_factory=dict)
 
-class ToolResponse(BaseModel):
+class ToolResponse(TektonBaseModel):
     """Response from tool execution"""
     content: List[Dict[str, Any]]
     isError: bool = False
@@ -809,9 +810,9 @@ curl -X POST http://localhost:$PORT/shutdown
 
 ```python
 from fastapi import HTTPException
-from pydantic import BaseModel
+from tekton.models.base import TektonBaseModel
 
-class ErrorResponse(BaseModel):
+class ErrorResponse(TektonBaseModel):
     error: str
     component: str = "mycomponent"
     timestamp: str
@@ -825,7 +826,7 @@ async def general_exception_handler(request, exc):
         content=ErrorResponse(
             error=str(exc),
             timestamp=datetime.utcnow().isoformat()
-        ).dict()
+        ).model_dump()
     )
 ```
 
