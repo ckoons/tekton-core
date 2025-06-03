@@ -64,7 +64,7 @@ def run_component_server(
     component_name: str,
     app_module: str,
     default_port: int,
-    reload: bool = True
+    reload: bool = False
 ):
     """
     Run a Tekton component server with proper socket reuse.

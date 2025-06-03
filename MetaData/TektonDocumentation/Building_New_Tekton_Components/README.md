@@ -16,6 +16,7 @@ As of the Shared Utilities Sprint, the shared utilities are now **MANDATORY** fo
 - ✅ **REQUIRED**: Use `get_component_config()` for port configuration
 - ❌ **DEPRECATED**: `@app.on_event("startup")` and `@app.on_event("shutdown")`
 - ❌ **NEVER**: Hardcode port numbers or skip the socket release delay
+- ✅ **REQUIRED**: Use `socket_server` utilities for port reuse (no plain `uvicorn.run()`)
 
 See [Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md) for the complete list of required patterns.
 

@@ -412,13 +412,26 @@ class ConnectionManager:
 ```python
 # nexus/__main__.py
 """Entry point for python -m nexus"""
-from nexus.api.app import app
-import uvicorn
 import os
+import sys
+
+# Add Tekton root to path if not already present
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if tekton_root not in sys.path:
+    sys.path.insert(0, tekton_root)
+
+from shared.utils.socket_server import run_component_server
 
 if __name__ == "__main__":
-    port = int(os.environ.get("NEXUS_PORT", 8016))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Get port from environment variable - NO HARDCODED DEFAULTS!
+    default_port = int(os.environ.get("NEXUS_PORT"))
+    
+    run_component_server(
+        component_name="nexus",
+        app_module="nexus.api.app",
+        default_port=default_port,
+        reload=True
+    )
 ```
 
 Create the main API application:
@@ -586,7 +599,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint."""
-    port = getattr(app.state, 'port', 8016)
+    port = getattr(app.state, 'port', int(os.environ.get("NEXUS_PORT")))
     return {
         "name": "Nexus Connection Manager",
         "version": "0.1.0",
@@ -598,7 +611,7 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint using shared utility."""
-    port = getattr(app.state, 'port', 8016)
+    port = getattr(app.state, 'port', int(os.environ.get("NEXUS_PORT")))
     uptime = None
     if hasattr(app.state, "start_time"):
         uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
@@ -623,7 +636,7 @@ async def health_check():
 @app.get("/status")
 async def get_status():
     """Status endpoint for tekton-status integration."""
-    port = getattr(app.state, 'port', 8016)
+    port = getattr(app.state, 'port', int(os.environ.get("NEXUS_PORT")))
     return {
         "component": COMPONENT_NAME,
         "status": "running",
@@ -681,24 +694,19 @@ add_shutdown_endpoint_to_app(app, COMPONENT_NAME)
 
 # Main module requirement
 if __name__ == "__main__":
-    import argparse
-    import uvicorn
+    from shared.utils.socket_server import run_with_socket_reuse
     
     # Get port from environment - NEVER hardcode
-    port = int(os.environ.get("NEXUS_PORT", 8016))
+    port = int(os.environ.get("NEXUS_PORT"))
     
-    parser = argparse.ArgumentParser(description=f"{COMPONENT_NAME} API Server")
-    parser.add_argument("--port", type=int, default=port, help="Port to run the server on")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind the server to")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
-    args = parser.parse_args()
-    
-    logger.info(f"Starting {COMPONENT_NAME} server on {args.host}:{args.port}")
-    uvicorn.run(
-        "nexus.api.app:app" if args.reload else app,
-        host=args.host,
-        port=args.port,
-        reload=args.reload
+    # Use socket reuse for quick port release
+    run_with_socket_reuse(
+        "nexus.api.app:app",
+        host="0.0.0.0",
+        port=port,
+        timeout_graceful_shutdown=3,
+        server_header=False,
+        access_log=False
     )
 ```
 
