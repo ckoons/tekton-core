@@ -171,8 +171,8 @@ ui/
 const MyComponentUI = {
     // Configuration
     config: {
-        apiUrl: window.MYCOMPONENT_API_URL || 'http://localhost:8015',
-        wsUrl: window.MYCOMPONENT_WS_URL || 'ws://localhost:8015/ws',
+        apiUrl: window.MYCOMPONENT_API_URL || `http://localhost:${window.MYCOMPONENT_PORT || 8015}`,
+        wsUrl: window.MYCOMPONENT_WS_URL || `ws://localhost:${window.MYCOMPONENT_PORT || 8015}/ws`,
         refreshInterval: 30000, // 30 seconds
         component: 'mycomponent'
     },
