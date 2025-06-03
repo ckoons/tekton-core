@@ -53,6 +53,26 @@ aiohttp>=3.9.0
 asyncio>=3.4.3
 ```
 
+## Socket Reuse Requirements
+
+### Why Socket Reuse is Mandatory
+
+All Tekton components MUST use the socket reuse utilities to enable rapid restarts without "Address already in use" errors. This is especially critical on macOS where ports can remain in TIME_WAIT state for 60-120 seconds.
+
+### Implementation Requirements
+
+1. **In `__main__.py`**: Use `run_component_server()` from `shared.utils.socket_server`
+2. **In `app.py` (if __name__ == "__main__")**: Use `run_with_socket_reuse()`
+3. **Never use plain `uvicorn.run()`**: This will cause port binding issues on restart
+4. **No hardcoded port fallbacks**: Always require port from environment
+
+### Socket Reuse Benefits
+
+- Enables `SO_REUSEADDR` socket option
+- Configures fast graceful shutdown (3 seconds)
+- Prevents "Address already in use" errors
+- Allows immediate component restart after shutdown
+
 ## Environment Configuration
 
 ### Three-Tier Environment Priority
@@ -738,7 +758,7 @@ async def get_status():
         "component": COMPONENT_NAME,
         "status": "running",
         "version": "0.1.0",
-        "port": getattr(app.state, 'port', 8015),
+        "port": getattr(app.state, 'port', int(os.environ.get("MYCOMPONENT_PORT"))),
         "registered": hermes_registration.is_registered if hermes_registration else False,
         "uptime": (datetime.utcnow() - app.state.start_time).total_seconds() if hasattr(app.state, "start_time") else 0,
         "capabilities": ["capability1", "capability2"],  # List your MCP tools/capabilities
@@ -891,9 +911,10 @@ These features are planned but not yet standardized:
 > - **DON'T** skip the shutdown endpoint - it's required for tekton-kill
 > - **DON'T** use `logging.getLogger()` - use `setup_component_logging()`
 > - **DON'T** create custom logging/startup/shutdown utilities - use shared ones
-> - **DON'T** use socket_server wrapper - always use standard uvicorn directly
+> - **DON'T** use plain uvicorn.run() - always use socket_server utilities for proper port reuse
 > - **DON'T** forget to declare heartbeat_task as global in lifespan
 > - **DON'T** create subprocess/multiprocessing without proper cleanup
+> - **DON'T** forget to import socket_server utilities in __main__.py and app.py
 
 ## Troubleshooting Common Issues
 
