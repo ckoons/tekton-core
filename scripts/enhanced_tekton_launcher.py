@@ -433,21 +433,40 @@ class EnhancedComponentLauncher:
     
     # Include original helper methods
     def check_port_available(self, port: int) -> bool:
-        """Check if a port is available (original logic)"""
+        """Check if a port is available or only has TIME_WAIT sockets"""
         import socket
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('', port))
-                return True
-        except OSError:
-            return False
+        
+        # First check if there's an actual listening process
+        if platform.system() == "Darwin":
+            # On macOS, check for LISTEN state specifically
+            result = subprocess.run(
+                ["lsof", "-i", f":{port}", "-sTCP:LISTEN"],
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # There's an actual listening process
+                return False
+                
+            # No listening process, but might have TIME_WAIT sockets
+            # With SO_REUSEPORT, we can bind anyway
+            return True
+        else:
+            # Fallback to original logic for other platforms
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('', port))
+                    return True
+            except OSError:
+                return False
         
     def kill_port_process(self, port: int) -> bool:
-        """Kill process listening on a port (original logic)"""
+        """Kill process listening on a port (only LISTEN state, not TIME_WAIT)"""
         try:
             if platform.system() == "Darwin":
+                # Only get PIDs of processes in LISTEN state
                 result = subprocess.run(
-                    ["lsof", "-ti", f":{port}"],
+                    ["lsof", "-ti", f":{port}", "-sTCP:LISTEN"],
                     capture_output=True,
                     text=True
                 )

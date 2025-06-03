@@ -8,9 +8,58 @@ import os
 import sys
 import socket
 import signal
+import asyncio
+import struct
 import uvicorn
 from uvicorn.config import Config
 from uvicorn.server import Server
+
+
+async def run_with_socket_reuse_async(app_str: str, host: str = "0.0.0.0", port: int = 8000, **kwargs):
+    """
+    Run uvicorn with socket reuse enabled (async version).
+    
+    This properly configures socket reuse for immediate port rebinding on macOS.
+    """
+    # Create socket with proper reuse options
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    # Enable reuse options BEFORE binding
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if hasattr(socket, 'SO_REUSEPORT'):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    
+    # Set SO_LINGER to 0 for immediate close (onoff=1, linger=0)
+    linger_struct = struct.pack('ii', 1, 0)  # onoff=1, linger time=0
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger_struct)
+    
+    # Bind and listen
+    sock.bind((host, port))
+    sock.listen(128)
+    
+    # Configure uvicorn with our socket
+    kwargs.pop('host', None)
+    kwargs.pop('port', None)
+    
+    config = Config(
+        app_str,
+        fd=sock.fileno(),
+        **kwargs
+    )
+    
+    server = Server(config)
+    
+    # Handle signals properly
+    def signal_handler(signum, frame):
+        server.should_exit = True
+    
+    for sig in [signal.SIGTERM, signal.SIGINT]:
+        signal.signal(sig, signal_handler)
+    
+    try:
+        await server.serve()
+    finally:
+        sock.close()
 
 
 def run_with_socket_reuse(app_str: str, host: str = "0.0.0.0", port: int = 8000, **kwargs):
@@ -18,33 +67,51 @@ def run_with_socket_reuse(app_str: str, host: str = "0.0.0.0", port: int = 8000,
     Run uvicorn with socket reuse enabled.
     
     This fixes the "Address already in use" error during rapid restarts.
-    
-    Args:
-        app_str: App import string (e.g., "myapp.main:app")
-        host: Host to bind to
-        port: Port to bind to
-        **kwargs: Additional uvicorn.run arguments
     """
-    # Create socket with SO_REUSEADDR
+    # Create socket with proper reuse options
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    
+    # Enable reuse options BEFORE binding
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if hasattr(socket, 'SO_REUSEPORT'):
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    
+    # Set SO_LINGER to 0 for immediate close (onoff=1, linger=0)
+    linger_struct = struct.pack('ii', 1, 0)  # onoff=1, linger time=0
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger_struct)
+    
+    # Bind and listen
+    sock.bind((host, port))
+    sock.listen(128)
+    
+    # Configure uvicorn with our socket
+    kwargs.pop('host', None)
+    kwargs.pop('port', None)
+    
+    config = Config(
+        app_str,
+        fd=sock.fileno(),
+        **kwargs
+    )
+    
+    server = Server(config)
+    
+    # Create new event loop for the server
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    # Handle signals
+    def signal_handler(signum, frame):
+        server.should_exit = True
+    
+    for sig in [signal.SIGTERM, signal.SIGINT]:
+        signal.signal(sig, signal_handler)
     
     try:
-        sock.bind((host, port))
-        sock.listen(5)
-        
-        # Update kwargs to use the socket
-        kwargs.update({
-            "host": None,  # Don't bind again
-            "port": None,  # Don't bind again
-            "fd": sock.fileno()
-        })
-        
-        # Run uvicorn with the pre-bound socket
-        uvicorn.run(app_str, **kwargs)
-        
+        loop.run_until_complete(server.serve())
     finally:
         sock.close()
+        loop.close()
 
 
 class ReuseAddressServer(Server):
@@ -58,6 +125,9 @@ class ReuseAddressServer(Server):
         for server in self.servers:
             for sock in server.sockets:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                # On macOS, also set SO_REUSEPORT
+                if hasattr(socket, 'SO_REUSEPORT'):
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
 
 def run_component_server(
