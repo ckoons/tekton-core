@@ -81,7 +81,28 @@ The shared utilities handle this automatically via `get_component_config()`.
 
 ## API Implementation
 
-### 1. Create app.py
+### 1. Create Module Entry Point (__main__.py)
+
+**IMPORTANT**: Every component MUST have a `__main__.py` file in the package root to support the enhanced launcher:
+
+```python
+# mycomponent/__main__.py
+"""Entry point for python -m mycomponent"""
+from mycomponent.api.app import app
+import uvicorn
+import os
+
+if __name__ == "__main__":
+    port = int(os.environ.get("MYCOMPONENT_PORT", 8015))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+```
+
+This enables launching via:
+- `python -m mycomponent` (REQUIRED for enhanced launcher)
+- Direct module execution
+- Consistent behavior across all components
+
+### 2. Create app.py
 
 ```python
 #!/usr/bin/env python3
@@ -356,7 +377,7 @@ if __name__ == "__main__":
     # )
 ```
 
-### 2. Create MCP Endpoints
+### 3. Create MCP Endpoints
 
 ```python
 # mycomponent/api/endpoints/mcp.py
@@ -859,6 +880,8 @@ These features are planned but not yet standardized:
 ## ⚠️ Common Mistakes to Avoid
 
 > **WARNING: These are the most common errors when building components**
+> - **DON'T** forget to create `__main__.py` in package root - REQUIRED for launcher
+> - **DON'T** put `if __name__ == "__main__":` in app.py - only in `__main__.py`
 > - **DON'T** use `@app.on_event("startup")` or `@app.on_event("shutdown")` - they're deprecated
 > - **DON'T** import from `tekton.utils.port_config` - it doesn't exist
 > - **DON'T** hardcode port values anywhere (port=8000, etc.)
@@ -866,7 +889,6 @@ These features are planned but not yet standardized:
 > - **DON'T** use `setup_component_logger` - it's `setup_component_logging`
 > - **DON'T** skip the shutdown endpoint - it's required for tekton-kill
 > - **DON'T** use `logging.getLogger()` - use `setup_component_logging()`
-> - **DON'T** forget to add the main module block with `if __name__ == "__main__":`
 > - **DON'T** create custom logging/startup/shutdown utilities - use shared ones
 > - **DON'T** use socket_server wrapper - always use standard uvicorn directly
 > - **DON'T** forget to declare heartbeat_task as global in lifespan
