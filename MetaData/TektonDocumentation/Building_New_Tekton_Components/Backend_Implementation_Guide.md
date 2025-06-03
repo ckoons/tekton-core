@@ -53,6 +53,32 @@ aiohttp>=3.9.0
 asyncio>=3.4.3
 ```
 
+## Environment Configuration
+
+### Three-Tier Environment Priority
+
+Tekton uses a three-tier environment system with the following priority (highest to lowest):
+
+1. **System Environment Variables** - Set in shell or OS
+2. **User Environment** - `~/.env.tekton` (overrides component defaults)
+3. **Component Environment** - `ComponentName/.env` (component defaults)
+
+Example:
+```bash
+# ComponentName/.env (lowest priority)
+MYCOMPONENT_PORT=8015
+MYCOMPONENT_LOG_LEVEL=INFO
+
+# ~/.env.tekton (overrides component)
+MYCOMPONENT_LOG_LEVEL=DEBUG
+HERMES_URL=http://localhost:8001
+
+# System environment (highest priority)
+export MYCOMPONENT_PORT=8016  # This wins
+```
+
+The shared utilities handle this automatically via `get_component_config()`.
+
 ## API Implementation
 
 ### 1. Create app.py
@@ -90,6 +116,7 @@ from shared.utils.errors import StartupError
 from shared.utils.startup import component_startup, StartupMetrics
 from shared.utils.shutdown import GracefulShutdown
 from shared.utils.health_check import create_health_response
+from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
 # Component configuration
 COMPONENT_NAME = "mycomponent"
@@ -98,12 +125,14 @@ COMPONENT_NAME = "mycomponent"
 logger = setup_component_logging(COMPONENT_NAME)
 
 # Global state for registration
+# IMPORTANT: These MUST be declared at module level for proper cleanup
 hermes_registration = None
 heartbeat_task = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for MyComponent"""
+    # IMPORTANT: Must declare as global to access module-level variables
     global hermes_registration, heartbeat_task
     
     # Startup
@@ -185,6 +214,18 @@ async def lifespan(app: FastAPI):
     #         await app.state.my_service.cleanup()
     # shutdown.register_cleanup(cleanup_service)
     
+    # IMPORTANT: Clean up any subprocess/multiprocessing tasks
+    # async def cleanup_subprocesses():
+    #     """Ensure all child processes are terminated"""
+    #     if hasattr(app.state, "subprocess_pool"):
+    #         # Terminate all subprocesses
+    #         for proc in app.state.subprocess_pool:
+    #             proc.terminate()
+    #             await asyncio.sleep(0.1)
+    #             if proc.poll() is None:
+    #                 proc.kill()
+    # shutdown.register_cleanup(cleanup_subprocesses)
+    
     yield
     
     # Shutdown
@@ -224,21 +265,47 @@ async def root():
     }
 
 # Health check endpoint
-@app.get("/health")
+@app.get("/health", 
+    responses={
+        200: {"description": "Component is healthy"},
+        503: {"description": "Component is unhealthy"},
+        207: {"description": "Component is degraded (partial functionality)"}
+    })
 async def health_check():
-    """Health check endpoint using shared utility."""
+    """Health check endpoint using shared utility.
+    
+    Returns appropriate HTTP status codes:
+    - 200: healthy
+    - 207: degraded (partial functionality)  
+    - 503: unhealthy
+    """
     from shared.utils.health_check import create_health_response
+    from fastapi.responses import JSONResponse
     
     port = getattr(app.state, 'port', 8015)
     uptime = None
     if hasattr(app.state, "start_time"):
         uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
     
-    return create_health_response(
+    # Determine health status
+    status = "healthy"
+    http_status = 200
+    
+    # Check critical dependencies
+    if not hermes_registration or not hermes_registration.is_registered:
+        status = "degraded"
+        http_status = 207
+    
+    # Check for critical failures
+    # if critical_failure_condition:
+    #     status = "unhealthy"
+    #     http_status = 503
+    
+    response = create_health_response(
         component_name=COMPONENT_NAME,
         port=port,
         version="0.1.0",
-        status="healthy",
+        status=status,
         registered=hermes_registration.is_registered if hermes_registration else False,
         uptime=uptime,
         details={
@@ -248,29 +315,45 @@ async def health_check():
             }
         }
     )
+    
+    return JSONResponse(content=response, status_code=http_status)
 
 # Import and include routers
 from mycomponent.api.endpoints import mcp
 
 app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
 
+# Add shutdown endpoint using shared utility
+from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
+
+# Add the shutdown endpoint to your app
+add_shutdown_endpoint_to_app(app)
+
+# Main module requirement
 if __name__ == "__main__":
-    import argparse
     import uvicorn
     
-    parser = argparse.ArgumentParser(description=f"{COMPONENT_NAME} API Server")
-    parser.add_argument("--port", type=int, default=COMPONENT_PORT, help="Port to run the server on")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind the server to")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
-    args = parser.parse_args()
+    # Get port from environment - NEVER hardcode
+    port = int(os.environ.get("MYCOMPONENT_PORT", 8015))
     
-    logger.info(f"Starting {COMPONENT_NAME} server on {args.host}:{args.port}")
-    uvicorn.run(
-        "mycomponent.api.app:app" if args.reload else app,
-        host=args.host,
-        port=args.port,
-        reload=args.reload
-    )
+    # Simple direct uvicorn run
+    uvicorn.run(app, host="0.0.0.0", port=port)
+    
+    # OR with argparse for development flexibility:
+    # import argparse
+    # parser = argparse.ArgumentParser(description=f"{COMPONENT_NAME} API Server")
+    # parser.add_argument("--port", type=int, default=port, help="Port to run the server on")
+    # parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind the server to")
+    # parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    # args = parser.parse_args()
+    # 
+    # logger.info(f"Starting {COMPONENT_NAME} server on {args.host}:{args.port}")
+    # uvicorn.run(
+    #     "mycomponent.api.app:app" if args.reload else app,
+    #     host=args.host,
+    #     port=args.port,
+    #     reload=args.reload
+    # )
 ```
 
 ### 2. Create MCP Endpoints
@@ -546,25 +629,157 @@ echo "Run './run_mycomponent.sh' to start the MyComponent server."
 
 ```bash
 #!/bin/bash
-# This script starts the MyComponent server
+# Launch script for MyComponent - follows Tekton standards
 
-# Ensure the script is run from the MyComponent directory
-cd "$(dirname "$0")"
+# ANSI color codes for visibility
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Load environment variables if .env file exists
-if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
+# Component name and port configuration
+COMPONENT_NAME="MyComponent"
+COMPONENT_MODULE="mycomponent"
+PORT_VAR="MYCOMPONENT_PORT"
+
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Set up Python path to include component and Tekton root
+export PYTHONPATH="$SCRIPT_DIR:$(dirname "$SCRIPT_DIR"):$PYTHONPATH"
+
+# Get port from environment (NO hardcoded ports!)
+PORT="${!PORT_VAR}"
+if [ -z "$PORT" ]; then
+    echo -e "${RED}Error: $PORT_VAR not set${NC}"
+    echo "Please set the port in your environment or .env file"
+    exit 1
 fi
 
-# Set MYCOMPONENT_PORT if not already set
-if [ -z "$MYCOMPONENT_PORT" ]; then
-    export MYCOMPONENT_PORT=8015
+# Check if port is already in use
+if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null ; then
+    echo -e "${RED}Error: Port $PORT is already in use${NC}"
+    echo "Another service is using this port. Check with: lsof -i :$PORT"
+    exit 1
 fi
 
-# Start MyComponent API server
-python -m mycomponent.api.app "$@"
+# Create log directory if it doesn't exist
+LOG_DIR="$HOME/.tekton/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/$COMPONENT_MODULE.log"
+
+# Activate virtual environment if present
+if [ -d "venv" ]; then
+    echo -e "${GREEN}Activating virtual environment...${NC}"
+    source venv/bin/activate
+fi
+
+# Start the component
+echo -e "${GREEN}Starting $COMPONENT_NAME on port $PORT...${NC}"
+echo "Logging to: $LOG_FILE"
+
+# Run the component with proper module path
+python -m $COMPONENT_MODULE.api.app "$@" 2>&1 | tee -a "$LOG_FILE" &
+PID=$!
+
+# Health check loop (30 second timeout)
+echo -e "${YELLOW}Waiting for $COMPONENT_NAME to start...${NC}"
+for i in {1..30}; do
+    if curl -s "http://localhost:$PORT/health" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ $COMPONENT_NAME is running!${NC}"
+        echo -e "${GREEN}API Documentation: http://localhost:$PORT/docs${NC}"
+        echo -e "${GREEN}Health Check: http://localhost:$PORT/health${NC}"
+        echo -e "${GREEN}Process ID: $PID${NC}"
+        exit 0
+    fi
+    sleep 1
+    echo -n "."
+done
+
+echo -e "\n${RED}✗ $COMPONENT_NAME failed to start within 30 seconds${NC}"
+echo "Check the logs at: $LOG_FILE"
+exit 1
+```
+
+## Status Endpoint Requirements
+
+All components MUST provide status information for `tekton-status`:
+
+### Standard Status Response
+
+```python
+@app.get("/status")
+async def get_status():
+    """Status endpoint for tekton-status integration."""
+    return {
+        "component": COMPONENT_NAME,
+        "status": "running",
+        "version": "0.1.0",
+        "port": getattr(app.state, 'port', 8015),
+        "registered": hermes_registration.is_registered if hermes_registration else False,
+        "uptime": (datetime.utcnow() - app.state.start_time).total_seconds() if hasattr(app.state, "start_time") else 0,
+        "capabilities": ["capability1", "capability2"],  # List your MCP tools/capabilities
+        "health": {
+            "api": "healthy",
+            "dependencies": {
+                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "disconnected"
+            }
+        }
+    }
+```
+
+## Shutdown Endpoint Requirements
+
+All components MUST implement the shutdown endpoint using the shared utility:
+
+### Adding the Shutdown Endpoint
+
+```python
+# This is done in app.py after creating the FastAPI app
+from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
+
+# Create app with lifespan
+app = FastAPI(
+    title="MyComponent API",
+    description="API for MyComponent",
+    version="0.1.0",
+    lifespan=lifespan  # REQUIRED
+)
+
+# Add CORS middleware
+app.add_middleware(CORSMiddleware, ...)
+
+# Add routes
+app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+
+# REQUIRED: Add shutdown endpoint
+add_shutdown_endpoint_to_app(app)
+```
+
+### Shutdown Endpoint Behavior
+
+The shutdown endpoint (POST `/shutdown`) will:
+1. Initiate graceful shutdown of the component
+2. Trigger the shutdown sequence in the lifespan context
+3. Ensure proper cleanup of resources
+4. Return a response confirming shutdown initiation
+
+### Usage by tekton-kill
+
+The `tekton-kill` script uses this endpoint to gracefully shutdown components:
+
+```bash
+# How tekton-kill stops a component
+curl -X POST http://localhost:$PORT/shutdown
+
+# Component will:
+# 1. Stop accepting new requests
+# 2. Complete in-flight requests
+# 3. Cancel heartbeat task
+# 4. Deregister from Hermes
+# 5. Clean up resources
+# 6. Exit gracefully
 ```
 
 ## Common Patterns
@@ -626,6 +841,21 @@ async def process_data(
 6. **Follow naming conventions** - Lowercase with underscores for modules
 7. **Keep it simple** - No complex abstractions
 
+## Future Enhancements
+
+These features are planned but not yet standardized:
+
+1. **Rate Limiting** - No standard implementation yet
+   ```python
+   # Future pattern (not implemented):
+   # from shared.utils.rate_limit import rate_limit
+   # @rate_limit(calls=100, period=60)  # 100 calls per minute
+   ```
+
+2. **Request Validation** - Currently handled by Pydantic models
+3. **Authentication** - No standard auth pattern yet
+4. **Metrics Collection** - Basic health/status only for now
+
 ## ⚠️ Common Mistakes to Avoid
 
 > **WARNING: These are the most common errors when building components**
@@ -634,6 +864,13 @@ async def process_data(
 > - **DON'T** hardcode port values anywhere (port=8000, etc.)
 > - **DON'T** forget the `await asyncio.sleep(0.5)` in shutdown for macOS
 > - **DON'T** use `setup_component_logger` - it's `setup_component_logging`
+> - **DON'T** skip the shutdown endpoint - it's required for tekton-kill
+> - **DON'T** use `logging.getLogger()` - use `setup_component_logging()`
+> - **DON'T** forget to add the main module block with `if __name__ == "__main__":`
+> - **DON'T** create custom logging/startup/shutdown utilities - use shared ones
+> - **DON'T** use socket_server wrapper - always use standard uvicorn directly
+> - **DON'T** forget to declare heartbeat_task as global in lifespan
+> - **DON'T** create subprocess/multiprocessing without proper cleanup
 
 ## Troubleshooting Common Issues
 
@@ -697,6 +934,57 @@ async def lifespan(app: FastAPI):
     await asyncio.sleep(0.5)  # CRITICAL!
 
 app = FastAPI(lifespan=lifespan)
+```
+
+## Summary: Tekton Component Integration Standards
+
+Based on the completed Shared Utilities Sprint, here are the mandatory requirements for all new components:
+
+### 1. **Required Imports**
+```python
+from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
+from shared.utils.logging_setup import setup_component_logging
+from shared.utils.env_config import get_component_config
+from shared.utils.errors import StartupError
+from shared.utils.startup import component_startup, StartupMetrics
+from shared.utils.shutdown import GracefulShutdown
+from shared.utils.health_check import create_health_response
+from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
+```
+
+### 2. **Launch Script Requirements**
+- ANSI color codes for visibility
+- Port checking with `lsof`
+- Logging to `~/.tekton/logs/`
+- Health check loop with timeout
+- Display service endpoints when started
+
+### 3. **API Requirements**
+- Use lifespan pattern (no `@app.on_event`)
+- Implement `/health` endpoint with `create_health_response`
+- Implement `/status` endpoint for tekton-status
+- Add shutdown endpoint with `add_shutdown_endpoint_to_app`
+- Include socket release delay (0.5s) after shutdown
+
+### 4. **Configuration Requirements**
+- Never hardcode ports
+- Use `get_component_config()` for all settings
+- Support three-tier environment system
+- Set up logging with `setup_component_logging()`
+
+### 5. **Service Registration**
+- Register with Hermes on startup
+- Send heartbeats every 30 seconds
+- Deregister on shutdown
+- Handle registration failures gracefully
+
+### 6. **Testing Your Component**
+```bash
+# Component should:
+./run_mycomponent.sh         # Start successfully
+./tekton-status              # Show as healthy
+curl http://localhost:PORT/health  # Return health status
+curl -X POST http://localhost:PORT/shutdown  # Shutdown gracefully
 ```
 
 ---
