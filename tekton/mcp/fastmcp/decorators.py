@@ -13,7 +13,7 @@ import time
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, get_type_hints
 
-from pydantic import BaseModel, ValidationError, create_model
+from pydantic import ValidationError, create_model
 
 logger = logging.getLogger(__name__)
 
