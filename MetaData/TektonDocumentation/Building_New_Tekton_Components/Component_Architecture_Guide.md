@@ -11,6 +11,14 @@ Tekton components follow a unified architecture pattern that ensures consistency
 - RESTful endpoints for standard operations
 - WebSocket support for real-time communication
 - MCP v2 endpoints for inter-component communication
+- **API Consistency Standards (Required as of API Consistency Sprint):**
+  - All components use version "0.1.0"
+  - Infrastructure endpoints at root: `/health`, `/ready`, `/status`, `/shutdown`
+  - Business logic under `/api/v1/` prefix
+  - Service discovery at `/api/v1/discovery`
+  - OpenAPI docs at `/api/v1/docs`
+  - Use shared API utilities: `create_standard_routers()`, `mount_standard_routers()`
+  - MCP endpoints remain at `/api/mcp/v2` (unchanged)
 
 ### 2. Business Logic Layer
 - Core functionality isolated from API concerns
