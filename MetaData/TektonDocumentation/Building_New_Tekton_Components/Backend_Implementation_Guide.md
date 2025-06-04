@@ -159,22 +159,40 @@ from shared.utils.shutdown import GracefulShutdown
 from shared.utils.health_check import create_health_response
 from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
-# Component configuration
-COMPONENT_NAME = "mycomponent"
+# Import shared API utilities for consistency (REQUIRED as of API Consistency Sprint)
+from shared.api import (
+    create_standard_routers,
+    mount_standard_routers,
+    create_ready_endpoint,
+    create_discovery_endpoint,
+    get_openapi_configuration,
+    EndpointInfo
+)
+
+# Component configuration (REQUIRED - API Consistency Standards)
+COMPONENT_NAME = "MyComponent"  # Use PascalCase for display
+COMPONENT_VERSION = "0.1.0"  # All components must use 0.1.0
+COMPONENT_DESCRIPTION = "Brief description of component functionality"
 
 # Use shared logger setup - DO NOT use logging.getLogger()
-logger = setup_component_logging(COMPONENT_NAME)
+logger = setup_component_logging(COMPONENT_NAME.lower())
 
-# Global state for registration
+# Global state for registration and timing
 # IMPORTANT: These MUST be declared at module level for proper cleanup
 hermes_registration = None
 heartbeat_task = None
+start_time = None  # Track startup time for ready endpoint
+is_registered_with_hermes = False  # Track registration status
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for MyComponent"""
     # IMPORTANT: Must declare as global to access module-level variables
-    global hermes_registration, heartbeat_task
+    global hermes_registration, heartbeat_task, start_time, is_registered_with_hermes
+    
+    # Track startup time for ready endpoint
+    import time
+    start_time = time.time()
     
     # Startup
     logger.info("Starting MyComponent API")
@@ -195,10 +213,10 @@ async def lifespan(app: FastAPI):
             hermes_registration = HermesRegistration()
             
             logger.info(f"Attempting to register MyComponent with Hermes on port {port}")
-            is_registered = await hermes_registration.register_component(
-                component_name=COMPONENT_NAME,
+            is_registered_with_hermes = await hermes_registration.register_component(
+                component_name=COMPONENT_NAME.lower(),
                 port=port,  # NEVER hardcode this value
-                version="0.1.0",
+                version=COMPONENT_VERSION,  # Use the constant
                 capabilities=["capability1", "capability2"],  # Update with actual capabilities
                 metadata={
                     "description": "MyComponent description",
@@ -276,11 +294,13 @@ async def lifespan(app: FastAPI):
     # CRITICAL: Socket release delay for macOS
     await asyncio.sleep(0.5)
 
-# Create app with lifespan
+# Create app with standard configuration (API Consistency Standards)
 app = FastAPI(
-    title="MyComponent API",
-    description="API for MyComponent - [component description]",
-    version="0.1.0",
+    **get_openapi_configuration(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION
+    ),
     lifespan=lifespan  # REQUIRED
 )
 
@@ -293,20 +313,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Root endpoint
-@app.get("/")
+# Create standard routers (API Consistency Standards)
+routers = create_standard_routers(COMPONENT_NAME)
+
+# Root endpoint - use standard router
+@routers.root.get("/")
 async def root():
     """Root endpoint."""
-    port = getattr(app.state, 'port', 8015)
     return {
-        "name": "MyComponent",
-        "version": "0.1.0",
+        "name": COMPONENT_NAME,
+        "version": COMPONENT_VERSION,
+        "description": COMPONENT_DESCRIPTION,
         "status": "running",
-        "documentation": f"http://localhost:{port}/docs"
+        "docs": "/api/v1/docs"  # Updated docs URL
     }
 
-# Health check endpoint
-@app.get("/health", 
+# Health check endpoint - use standard router
+@routers.root.get("/health", 
     responses={
         200: {"description": "Component is healthy"},
         503: {"description": "Component is unhealthy"},
@@ -342,33 +365,78 @@ async def health_check():
     #     status = "unhealthy"
     #     http_status = 503
     
-    response = create_health_response(
-        component_name=COMPONENT_NAME,
+    # Use standardized health response (no JSONResponse wrapper needed)
+    return create_health_response(
+        component_name=COMPONENT_NAME.lower(),
         port=port,
-        version="0.1.0",
+        version=COMPONENT_VERSION,
         status=status,
-        registered=hermes_registration.is_registered if hermes_registration else False,
-        uptime=uptime,
+        registered=is_registered_with_hermes,
         details={
-            "api": "healthy",
+            "uptime": uptime,
             "dependencies": {
-                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "not_registered"
+                "hermes": "healthy" if is_registered_with_hermes else "not_registered"
             }
         }
     )
-    
-    return JSONResponse(content=response, status_code=http_status)
 
-# Import and include routers
-from mycomponent.api.endpoints import mcp
+# Add ready endpoint (API Consistency Standards)
+routers.root.add_api_route(
+    "/ready",
+    create_ready_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        start_time=start_time or 0,
+        readiness_check=lambda: hermes_registration is not None  # Custom check
+    ),
+    methods=["GET"]
+)
 
-app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+# Add discovery endpoint (API Consistency Standards)
+routers.v1.add_api_route(
+    "/discovery",
+    create_discovery_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION,
+        endpoints=[
+            EndpointInfo(
+                path="/api/v1/example",
+                method="GET",
+                description="Example endpoint description"
+            ),
+            # Add your component's endpoints here
+        ],
+        capabilities=["capability1", "capability2"],  # Your capabilities
+        dependencies={
+            "hermes": "http://localhost:8001",
+            # Add other dependencies
+        },
+        metadata={
+            "documentation": "/api/v1/docs"
+        }
+    ),
+    methods=["GET"]
+)
+
+# Business logic endpoints - use v1 router
+@routers.v1.get("/example")
+async def example_endpoint():
+    """Example business logic endpoint under /api/v1/"""
+    return {"message": "This endpoint is now at /api/v1/example"}
+
+# Mount standard routers (REQUIRED)
+mount_standard_routers(app, routers)
+
+# Import and include MCP router (remains at /api/mcp/v2)
+try:
+    from mycomponent.api.endpoints.mcp import router as mcp_router
+    app.include_router(mcp_router, prefix="/api/mcp/v2", tags=["mcp"])
+except ImportError:
+    logger.warning("MCP endpoints not available")
 
 # Add shutdown endpoint using shared utility
-from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
-
-# Add the shutdown endpoint to your app
-add_shutdown_endpoint_to_app(app, COMPONENT_NAME)
+add_shutdown_endpoint_to_app(app, COMPONENT_NAME.lower())
 
 # Main module requirement
 if __name__ == "__main__":
@@ -986,6 +1054,7 @@ Based on the completed Shared Utilities Sprint, here are the mandatory requireme
 
 ### 1. **Required Imports**
 ```python
+# Shared utilities (from Shared Utilities Sprint)
 from shared.utils.hermes_registration import HermesRegistration, heartbeat_loop
 from shared.utils.logging_setup import setup_component_logging
 from shared.utils.env_config import get_component_config
@@ -994,6 +1063,16 @@ from shared.utils.startup import component_startup, StartupMetrics
 from shared.utils.shutdown import GracefulShutdown
 from shared.utils.health_check import create_health_response
 from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
+
+# Shared API utilities (from API Consistency Sprint)
+from shared.api import (
+    create_standard_routers,
+    mount_standard_routers,
+    create_ready_endpoint,
+    create_discovery_endpoint,
+    get_openapi_configuration,
+    EndpointInfo
+)
 ```
 
 ### 2. **Launch Script Requirements**
@@ -1005,10 +1084,18 @@ from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
 ### 3. **API Requirements**
 - Use lifespan pattern (no `@app.on_event`)
+- Use `get_openapi_configuration()` for FastAPI app creation
+- Create standard routers with `create_standard_routers()`
+- Mount routers with `mount_standard_routers()`
 - Implement `/health` endpoint with `create_health_response`
+- Implement `/ready` endpoint with `create_ready_endpoint()`
+- Implement `/api/v1/discovery` endpoint with `create_discovery_endpoint()`
+- Move all business logic endpoints under `/api/v1/` prefix
+- MCP endpoints remain at `/api/mcp/v2` (do not change)
 - Implement `/status` endpoint for tekton-status
 - Add shutdown endpoint with `add_shutdown_endpoint_to_app(app, component_name)`
 - Include socket release delay (0.5s) after shutdown
+- All components must use version "0.1.0"
 
 ### 4. **Configuration Requirements**
 - Never hardcode ports
@@ -1029,6 +1116,63 @@ from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 ./tekton-status              # Show as healthy
 curl http://localhost:PORT/health  # Return health status
 curl -X POST http://localhost:PORT/shutdown  # Shutdown gracefully
+```
+
+## API Consistency Standards (As of API Consistency Sprint)
+
+All Tekton components must follow these API standards for consistency:
+
+### Endpoint Structure
+```
+/                    # Root endpoint
+/health              # Health check (infrastructure)
+/ready               # Readiness check (infrastructure)
+/status              # Status for tekton-status (infrastructure)
+/shutdown            # Graceful shutdown (infrastructure)
+/api/v1/             # All business logic endpoints
+/api/v1/discovery    # Service discovery endpoint
+/api/v1/docs         # OpenAPI documentation
+/api/mcp/v2/         # MCP endpoints (unchanged)
+```
+
+### Standard Router Usage
+```python
+# Create routers
+routers = create_standard_routers(COMPONENT_NAME)
+
+# Use routers for endpoints
+@routers.root.get("/")           # Infrastructure endpoints
+@routers.v1.get("/endpoint")     # Business logic endpoints
+
+# Mount routers
+mount_standard_routers(app, routers)
+```
+
+### Required Endpoints
+Every component MUST implement:
+1. `/health` - Component health status
+2. `/ready` - Component readiness status
+3. `/api/v1/discovery` - Service discovery information
+4. `/status` - Status information for tekton-status
+5. `/shutdown` - Graceful shutdown endpoint
+
+### Example Discovery Endpoint
+```python
+routers.v1.add_api_route(
+    "/discovery",
+    create_discovery_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION,
+        endpoints=[
+            EndpointInfo(path="/api/v1/example", method="GET", description="Example endpoint"),
+        ],
+        capabilities=["capability1", "capability2"],
+        dependencies={"hermes": "http://localhost:8001"},
+        metadata={"documentation": "/api/v1/docs"}
+    ),
+    methods=["GET"]
+)
 ```
 
 ---

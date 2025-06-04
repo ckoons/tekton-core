@@ -470,24 +470,42 @@ from shared.utils.shutdown import GracefulShutdown
 from shared.utils.health_check import create_health_response
 from shared.utils.shutdown_endpoint import add_shutdown_endpoint_to_app
 
+# Import shared API utilities (REQUIRED as of API Consistency Sprint)
+from shared.api import (
+    create_standard_routers,
+    mount_standard_routers,
+    create_ready_endpoint,
+    create_discovery_endpoint,
+    get_openapi_configuration,
+    EndpointInfo
+)
+
 # Import core modules
 from nexus.core.connection_manager import ConnectionManager
 from nexus.models.connection import ConnectionInfo, ConnectionMetrics
 
-# Component configuration
-COMPONENT_NAME = "nexus"
+# Component configuration (REQUIRED - API Consistency Standards)
+COMPONENT_NAME = "Nexus"  # Use PascalCase for display
+COMPONENT_VERSION = "0.1.0"  # All components must use 0.1.0
+COMPONENT_DESCRIPTION = "Connection management component for Tekton"
 
 # Use shared logger setup - DO NOT use logging.getLogger()
-logger = setup_component_logging(COMPONENT_NAME)
+logger = setup_component_logging(COMPONENT_NAME.lower())
 
-# Global state for registration
+# Global state for registration and timing
 hermes_registration = None
 heartbeat_task = None
+start_time = None  # Track startup time for ready endpoint
+is_registered_with_hermes = False  # Track registration status
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for Nexus"""
-    global hermes_registration, heartbeat_task
+    global hermes_registration, heartbeat_task, start_time, is_registered_with_hermes
+    
+    # Track startup time for ready endpoint
+    import time
+    start_time = time.time()
     
     # Startup
     logger.info("Starting Nexus API")
@@ -508,10 +526,10 @@ async def lifespan(app: FastAPI):
             hermes_registration = HermesRegistration()
             
             logger.info(f"Attempting to register Nexus with Hermes on port {port}")
-            is_registered = await hermes_registration.register_component(
-                component_name=COMPONENT_NAME,
+            is_registered_with_hermes = await hermes_registration.register_component(
+                component_name=COMPONENT_NAME.lower(),
                 port=port,  # NEVER hardcode this value
-                version="0.1.0",
+                version=COMPONENT_VERSION,  # Use the constant
                 capabilities=["connection_monitoring", "dependency_tracking", "performance_metrics"],
                 metadata={
                     "description": "Connection management for Tekton components",
@@ -519,7 +537,7 @@ async def lifespan(app: FastAPI):
                 }
             )
             
-            if is_registered:
+            if is_registered_with_hermes:
                 logger.info("Successfully registered with Hermes")
                 heartbeat_task = asyncio.create_task(
                     heartbeat_loop(hermes_registration, COMPONENT_NAME, interval=30)
@@ -578,11 +596,13 @@ async def lifespan(app: FastAPI):
     # CRITICAL: Socket release delay for macOS
     await asyncio.sleep(0.5)
 
-# Create app with lifespan
+# Create app with standard configuration (API Consistency Standards)
 app = FastAPI(
-    title="Nexus Connection Manager API",
-    description="Connection management for Tekton components",
-    version="0.1.0",
+    **get_openapi_configuration(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION
+    ),
     lifespan=lifespan  # REQUIRED
 )
 
@@ -595,20 +615,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Root endpoint
-@app.get("/")
+# Create standard routers (API Consistency Standards)
+routers = create_standard_routers(COMPONENT_NAME)
+
+# Root endpoint - use standard router
+@routers.root.get("/")
 async def root():
     """Root endpoint."""
-    port = getattr(app.state, 'port', int(os.environ.get("NEXUS_PORT")))
     return {
-        "name": "Nexus Connection Manager",
-        "version": "0.1.0",
+        "name": COMPONENT_NAME,
+        "version": COMPONENT_VERSION,
+        "description": COMPONENT_DESCRIPTION,
         "status": "running",
-        "documentation": f"http://localhost:{port}/docs"
+        "docs": "/api/v1/docs"  # Updated docs URL
     }
 
-# Health check endpoint
-@app.get("/health")
+# Health check endpoint - use standard router
+@routers.root.get("/health")
 async def health_check():
     """Health check endpoint using shared utility."""
     port = getattr(app.state, 'port', int(os.environ.get("NEXUS_PORT")))
@@ -617,17 +640,16 @@ async def health_check():
         uptime = (datetime.utcnow() - app.state.start_time).total_seconds()
     
     return create_health_response(
-        component_name=COMPONENT_NAME,
+        component_name=COMPONENT_NAME.lower(),
         port=port,
-        version="0.1.0",
+        version=COMPONENT_VERSION,
         status="healthy",
-        registered=hermes_registration.is_registered if hermes_registration else False,
-        uptime=uptime,
+        registered=is_registered_with_hermes,
         details={
-            "api": "healthy",
+            "uptime": uptime,
             "connection_manager": "healthy" if hasattr(app.state, "connection_manager") else "not_initialized",
             "dependencies": {
-                "hermes": "healthy" if hermes_registration and hermes_registration.is_registered else "not_registered"
+                "hermes": "healthy" if is_registered_with_hermes else "not_registered"
             }
         }
     )
@@ -653,8 +675,55 @@ async def get_status():
         }
     }
 
-# Connection management endpoints
-@app.get("/api/connections", response_model=List[ConnectionInfo])
+# Add ready endpoint (API Consistency Standards)
+routers.root.add_api_route(
+    "/ready",
+    create_ready_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        start_time=start_time or 0,
+        readiness_check=lambda: hasattr(app.state, "connection_manager")
+    ),
+    methods=["GET"]
+)
+
+# Add discovery endpoint (API Consistency Standards)
+routers.v1.add_api_route(
+    "/discovery",
+    create_discovery_endpoint(
+        component_name=COMPONENT_NAME,
+        component_version=COMPONENT_VERSION,
+        component_description=COMPONENT_DESCRIPTION,
+        endpoints=[
+            EndpointInfo(
+                path="/api/v1/connections",
+                method="GET",
+                description="List all registered connections"
+            ),
+            EndpointInfo(
+                path="/api/v1/connections/{component_id}/test",
+                method="POST",
+                description="Test a specific connection"
+            ),
+            EndpointInfo(
+                path="/api/v1/connections/{component_id}/metrics",
+                method="GET",
+                description="Get metrics for a specific connection"
+            )
+        ],
+        capabilities=["connection_monitoring", "dependency_tracking", "performance_metrics"],
+        dependencies={
+            "hermes": "http://localhost:8001"
+        },
+        metadata={
+            "documentation": "/api/v1/docs"
+        }
+    ),
+    methods=["GET"]
+)
+
+# Connection management endpoints - use v1 router
+@routers.v1.get("/connections", response_model=List[ConnectionInfo])
 async def list_connections():
     """List all registered connections."""
     if not hasattr(app.state, "connection_manager"):
@@ -662,7 +731,7 @@ async def list_connections():
     
     return await app.state.connection_manager.get_all_connections()
 
-@app.post("/api/connections/{component_id}/test", response_model=ConnectionInfo)
+@routers.v1.post("/connections/{component_id}/test", response_model=ConnectionInfo)
 async def test_connection(component_id: str):
     """Test a specific connection."""
     if not hasattr(app.state, "connection_manager"):
@@ -673,7 +742,7 @@ async def test_connection(component_id: str):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-@app.get("/api/connections/{component_id}/metrics", response_model=ConnectionMetrics)
+@routers.v1.get("/connections/{component_id}/metrics", response_model=ConnectionMetrics)
 async def get_connection_metrics(component_id: str):
     """Get metrics for a specific connection."""
     if not hasattr(app.state, "connection_manager"):
@@ -685,9 +754,15 @@ async def get_connection_metrics(component_id: str):
     
     return metrics
 
-# Import and include routers
-from nexus.api.endpoints import mcp
-app.include_router(mcp.router, prefix="/mcp", tags=["mcp"])
+# Mount standard routers (REQUIRED)
+mount_standard_routers(app, routers)
+
+# Import and include MCP router (remains at /api/mcp/v2)
+try:
+    from nexus.api.endpoints import mcp
+    app.include_router(mcp.router, prefix="/api/mcp/v2", tags=["mcp"])
+except ImportError:
+    logger.warning("MCP endpoints not available")
 
 # Add shutdown endpoint using shared utility
 add_shutdown_endpoint_to_app(app, COMPONENT_NAME)
