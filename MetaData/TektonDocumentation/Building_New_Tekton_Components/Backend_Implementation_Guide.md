@@ -647,6 +647,338 @@ if __name__ == "__main__":
     main()
 ```
 
+## MCP (Model Context Protocol) Implementation
+
+### 1. Add MCP Dependencies
+
+Update your `requirements.txt`:
+
+```text
+# Existing requirements...
+# Add MCP support (included in tekton-shared)
+tekton-shared>=0.1.0
+```
+
+### 2. Create MCP Service
+
+```python
+# mycomponent/mcp/__init__.py
+from .service import MyComponentMCP
+
+__all__ = ["MyComponentMCP"]
+```
+
+```python
+# mycomponent/mcp/service.py
+"""
+MCP implementation for MyComponent.
+"""
+from shared.mcp import MCPService, MCPConfig
+from shared.mcp.tools import HealthCheckTool, ComponentInfoTool
+from typing import Dict, Any
+
+class MyComponentMCP(MCPService):
+    """MCP service implementation for MyComponent."""
+    
+    def __init__(self, core_service, **kwargs):
+        """Initialize with reference to core service."""
+        self.core_service = core_service
+        super().__init__(**kwargs)
+    
+    async def register_default_tools(self):
+        """Register component-specific tools."""
+        # Register standard health check
+        health_tool = HealthCheckTool(
+            self.component_name,
+            health_check_func=self.check_component_health
+        )
+        await self.register_tool(
+            name=health_tool.name,
+            description=health_tool.description,
+            input_schema=health_tool.get_input_schema(),
+            handler=health_tool
+        )
+        
+        # Register component info
+        info_tool = ComponentInfoTool(
+            self.component_name,
+            self.component_version,
+            "Description of MyComponent functionality",
+            capabilities=["capability1", "capability2", "capability3"]
+        )
+        await self.register_tool(
+            name=info_tool.name,
+            description=info_tool.description,
+            input_schema=info_tool.get_input_schema(),
+            handler=info_tool
+        )
+        
+        # Register custom component tools
+        await self.register_tool(
+            name="process_data",
+            description="Process data using MyComponent logic",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Data to process"
+                    },
+                    "options": {
+                        "type": "object",
+                        "description": "Processing options"
+                    }
+                },
+                "required": ["data"]
+            },
+            handler=self.handle_process_data
+        )
+    
+    async def check_component_health(self) -> Dict[str, Any]:
+        """Custom health check implementation."""
+        # Check core service health
+        service_status = await self.core_service.health_check()
+        
+        return {
+            "service": service_status,
+            "mcp_tools": len(self.tools),
+            "active_contexts": len(self.contexts)
+        }
+    
+    async def handle_process_data(self, parameters: Dict[str, Any], context=None):
+        """Handle data processing tool."""
+        data = parameters.get("data", [])
+        options = parameters.get("options", {})
+        
+        try:
+            # Use core service to process
+            result = await self.core_service.process_batch(data, options)
+            
+            return {
+                "success": True,
+                "processed_count": len(result),
+                "results": result
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+```
+
+### 3. Integrate MCP with FastAPI
+
+Update your `app.py` to include MCP initialization:
+
+```python
+# mycomponent/api/app.py
+from mycomponent.mcp import MyComponentMCP
+from shared.mcp import MCPConfig
+
+# Global MCP service
+mcp_service = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan with MCP support."""
+    global mcp_service
+    
+    # ... existing initialization ...
+    
+    # Initialize MCP service
+    mcp_config = MCPConfig.from_env("mycomponent")
+    mcp_service = MyComponentMCP(
+        core_service=app.state.core_service,
+        component_name="mycomponent",
+        component_version=COMPONENT_VERSION,
+        hermes_url=mcp_config.hermes_url
+    )
+    
+    # Initialize and register with Hermes
+    await mcp_service.initialize()
+    
+    # Store in app state
+    app.state.mcp_service = mcp_service
+    
+    yield
+    
+    # Cleanup
+    if mcp_service:
+        await mcp_service.shutdown()
+```
+
+### 4. Optional: Expose Local MCP Endpoints
+
+If you want to test MCP tools locally:
+
+```python
+# Add to your router configuration
+@routers.v1.get("/mcp/tools")
+async def list_mcp_tools(request: Request):
+    """List available MCP tools."""
+    mcp_service = request.app.state.mcp_service
+    if not mcp_service:
+        raise HTTPException(status_code=503, detail="MCP service not initialized")
+    
+    return mcp_service.list_tools()
+
+@routers.v1.post("/mcp/tools/{tool_name}/execute")
+async def execute_mcp_tool(
+    tool_name: str,
+    parameters: dict,
+    request: Request
+):
+    """Execute an MCP tool locally."""
+    mcp_service = request.app.state.mcp_service
+    if not mcp_service:
+        raise HTTPException(status_code=503, detail="MCP service not initialized")
+    
+    tool_id = f"mycomponent.{tool_name}"
+    result = await mcp_service.execute_tool(tool_id, parameters)
+    
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error"))
+    
+    return result
+```
+
+### 5. Create Custom Tools
+
+For complex tools, create separate tool classes:
+
+```python
+# mycomponent/mcp/tools.py
+from shared.mcp.base import MCPTool
+from typing import List, Optional
+
+class AnalysisToolMCP(MCPTool):
+    """Advanced analysis tool for MyComponent."""
+    
+    name = "analyze_patterns"
+    description = "Analyze patterns in provided data"
+    tags = ["analysis", "patterns", "advanced"]
+    
+    def __init__(self, analyzer_service):
+        self.analyzer = analyzer_service
+        super().__init__()
+    
+    async def execute(
+        self,
+        dataset: List[dict],
+        pattern_type: str = "statistical",
+        confidence_threshold: float = 0.8
+    ) -> dict:
+        """
+        Execute pattern analysis.
+        
+        Args:
+            dataset: List of data points to analyze
+            pattern_type: Type of pattern analysis
+            confidence_threshold: Minimum confidence for patterns
+            
+        Returns:
+            Analysis results with discovered patterns
+        """
+        # Validate inputs
+        if not dataset:
+            return {"error": "No data provided for analysis"}
+        
+        # Run analysis
+        patterns = await self.analyzer.find_patterns(
+            data=dataset,
+            method=pattern_type,
+            min_confidence=confidence_threshold
+        )
+        
+        return {
+            "success": True,
+            "pattern_count": len(patterns),
+            "patterns": patterns,
+            "metadata": {
+                "analyzed_items": len(dataset),
+                "pattern_type": pattern_type,
+                "threshold": confidence_threshold
+            }
+        }
+```
+
+### 6. Testing MCP Implementation
+
+```python
+# tests/test_mcp.py
+import pytest
+from mycomponent.mcp import MyComponentMCP
+from mycomponent.core import MyService
+
+@pytest.mark.asyncio
+async def test_mcp_initialization():
+    """Test MCP service initialization."""
+    # Create mock core service
+    core_service = MyService()
+    
+    # Initialize MCP
+    mcp = MyComponentMCP(
+        core_service=core_service,
+        component_name="test",
+        component_version="1.0.0"
+    )
+    
+    await mcp.initialize()
+    
+    # Verify tools are registered
+    tools = mcp.list_tools()
+    assert len(tools) >= 3  # health, info, and custom tools
+    
+    # Find specific tool
+    process_tool = next(
+        (t for t in tools if t["name"] == "process_data"),
+        None
+    )
+    assert process_tool is not None
+    assert "data" in process_tool["input_schema"]["properties"]
+
+@pytest.mark.asyncio
+async def test_tool_execution():
+    """Test executing an MCP tool."""
+    core_service = MyService()
+    mcp = MyComponentMCP(
+        core_service=core_service,
+        component_name="test",
+        component_version="1.0.0"
+    )
+    
+    await mcp.initialize()
+    
+    # Execute tool
+    result = await mcp.execute_tool(
+        "test.process_data",
+        {
+            "data": [{"id": 1, "value": "test"}],
+            "options": {"mode": "fast"}
+        }
+    )
+    
+    assert result["success"] is True
+    assert "results" in result
+```
+
+### 7. MCP Configuration
+
+Configure MCP behavior through environment variables:
+
+```bash
+# .env.mycomponent
+# MCP Configuration
+MCP_AUTO_REGISTER=true
+MCP_ENABLE_DEFAULT_TOOLS=true
+MCP_TOOL_TIMEOUT=60
+MCP_MAX_CONCURRENT_TOOLS=10
+
+# Hermes connection (auto-detected from Tekton config)
+# HERMES_URL=http://localhost:8001
+```
+
 ## Core Business Logic
 
 ### 1. Create Core Module
