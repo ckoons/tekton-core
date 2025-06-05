@@ -35,25 +35,27 @@ A Tekton component is a self-contained service that:
 - [ ] Create component directory structure
 - [ ] Create `__main__.py` for `python -m` support (REQUIRED)
 - [ ] Implement backend API server (FastAPI)
-- [ ] Add MCP v2 endpoints
+- [ ] Implement MCP service using shared library
+- [ ] Register MCP tools with Hermes
 - [ ] Create CLI interface
 - [ ] Register with Hermes
 - [ ] Build UI component for Hephaestus
 - [ ] Add health check endpoints
 - [ ] Configure environment variables
-- [ ] Write backend tests
-- [ ] Document the component
+- [ ] Write backend tests (including MCP tools)
+- [ ] Document the component and its MCP tools
 - [ ] Test with enhanced launcher
 
 ## Documentation Structure
 
 1. **[Component_Architecture_Guide.md](./Component_Architecture_Guide.md)** - Overall architecture and patterns
-2. **[Backend_Implementation_Guide.md](./Backend_Implementation_Guide.md)** - Backend API and business logic
+2. **[Backend_Implementation_Guide.md](./Backend_Implementation_Guide.md)** - Backend API and business logic (includes MCP)
 3. **[UI_Implementation_Guide.md](./UI_Implementation_Guide.md)** - Hephaestus UI integration
 4. **[Step_By_Step_Tutorial.md](./Step_By_Step_Tutorial.md)** - Complete walkthrough
 5. **[Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md)** - Common patterns and utilities
 6. **[Testing_Guide.md](./Testing_Guide.md)** - Test-driven development approach
 7. **[Documentation_Requirements.md](./Documentation_Requirements.md)** - Required documentation
+8. **[MCP Implementation Guide](../MCP_IMPLEMENTATION_GUIDE.md)** - Detailed MCP implementation patterns
 
 ## Component Directory Structure
 
