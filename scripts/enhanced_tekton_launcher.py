@@ -113,21 +113,48 @@ class LogReader(threading.Thread):
         
     def run(self):
         """Read lines from stream and write to log file"""
+        import re
+        
+        # Compile regex patterns once
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        python_log_pattern = re.compile(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(.+)')
+        
         try:
             while self.running:
                 line = self.stream.readline()
                 if not line:
                     break
                     
-                # Write to log file
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                log_line = f"{timestamp} {line.decode('utf-8', errors='replace')}"
+                # Decode and strip trailing newline
+                decoded_line = line.decode('utf-8', errors='replace').rstrip('\n')
+                
+                # Strip ANSI color codes
+                clean_line = ansi_escape.sub('', decoded_line)
+                
+                # Skip empty lines
+                if not clean_line.strip():
+                    self.log_file.write('\n')
+                    self.log_file.flush()
+                    continue
+                
+                # Detect if it's a Python log line (has timestamp + formatted content)
+                match = python_log_pattern.match(clean_line)
+                
+                if match:
+                    # It's already a Python log with timestamp - preserve as-is
+                    log_line = clean_line + '\n'
+                else:
+                    # Add timestamp and source prefix
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    source = "STDERR" if self.stream_name == "stderr" else "STDOUT"
+                    log_line = f"{timestamp} [{source}] {clean_line}\n"
+                
                 self.log_file.write(log_line)
                 self.log_file.flush()
                 
-                # Also print to console if verbose
-                if self.stream_name == "stderr" and "ERROR" in line.decode('utf-8', errors='ignore'):
-                    print(f"[{self.component_name}] ERROR: {line.decode('utf-8', errors='replace').strip()}")
+                # Also print to console if verbose (for errors)
+                if self.stream_name == "stderr" and "ERROR" in clean_line:
+                    print(f"[{self.component_name}] ERROR: {clean_line}")
                     
         except Exception as e:
             print(f"[{self.component_name}] Log reader error: {e}")

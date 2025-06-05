@@ -84,18 +84,30 @@ class TektonEnvManager:
         current = Path.cwd()
         
         for path in [current] + list(current.parents):
-            # Look for .env.tekton file
+            # Look for .env.tekton file (most reliable indicator)
             if (path / ".env.tekton").exists():
                 return path
             
-            # Look for tekton-core directory
-            if (path / "tekton-core").exists():
+            # Look for multiple component directories as a strong indicator
+            # If we find several component directories, this is likely the Tekton root
+            component_dirs = ["Apollo", "Hermes", "Engram", "Rhetor", "Athena", "Synthesis", 
+                             "Ergon", "Sophia", "Prometheus", "Harmonia", "Budget", "Metis", 
+                             "Telos", "Hephaestus", "tekton-core"]
+            component_count = sum(1 for comp in component_dirs if (path / comp).exists())
+            
+            # If we find at least 5 component directories, this is likely the root
+            if component_count >= 5:
                 return path
             
-            # Look for specific Tekton components
-            tekton_indicators = ["Apollo", "Hermes", "Ergon", "scripts/tekton-launch"]
-            if any((path / indicator).exists() for indicator in tekton_indicators):
+            # Look for the scripts directory with tekton scripts
+            if (path / "scripts" / "enhanced_tekton_launcher.py").exists():
                 return path
+        
+        # If TEKTON_ROOT environment variable is set, use it
+        if 'TEKTON_ROOT' in os.environ:
+            tekton_root = Path(os.environ['TEKTON_ROOT'])
+            if tekton_root.exists():
+                return tekton_root
         
         # Fallback to current directory
         logger.warning("Could not find Tekton root directory, using current directory")
