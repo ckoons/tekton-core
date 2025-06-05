@@ -56,7 +56,19 @@ def setup_component_logging(
     
     # Use standard format if not provided
     if format_string is None:
-        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        # Import format utilities
+        try:
+            from shared.utils.tekton_log_formats import get_format_for_component, FORMATS
+            # Check for environment variable override
+            format_type = os.environ.get(f"{component_name.upper()}_LOG_FORMAT") or \
+                         os.environ.get("TEKTON_LOG_FORMAT", "standard")
+            if format_type in FORMATS:
+                format_string = FORMATS[format_type]
+            else:
+                format_string = get_format_for_component(component_name)
+        except ImportError:
+            # Fallback if formats module not available
+            format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     
     # Configure basic logging
     logging.basicConfig(
