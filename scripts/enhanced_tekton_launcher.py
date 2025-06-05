@@ -628,8 +628,9 @@ class EnhancedComponentLauncher:
         return False
     
     def get_component_directory(self, component_name: str) -> str:
-        """Get the directory for a component (original logic)"""
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        """Get the directory for a component"""
+        # Use the globally found tekton_root instead of calculating from __file__
+        base_dir = tekton_root
         
         dir_mappings = {
             "tekton_core": "tekton-core",
