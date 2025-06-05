@@ -19,8 +19,38 @@ from dataclasses import dataclass, asdict
 import psutil
 import statistics
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Find the Tekton root directory by looking for a marker file
+def find_tekton_root():
+    """Find the Tekton root directory by looking for marker files"""
+    # If __file__ is a symlink, resolve it first
+    script_path = os.path.realpath(__file__)
+    current_dir = os.path.dirname(script_path)
+    
+    # Look for Tekton root markers
+    markers = ['setup.py', 'tekton', 'README.md']
+    
+    while current_dir != '/':
+        # Check if all markers exist in this directory
+        if all(os.path.exists(os.path.join(current_dir, marker)) for marker in markers):
+            # Additional check: make sure tekton is a directory
+            if os.path.isdir(os.path.join(current_dir, 'tekton')):
+                return current_dir
+        
+        # Move up one directory
+        parent = os.path.dirname(current_dir)
+        if parent == current_dir:  # Reached root
+            break
+        current_dir = parent
+    
+    # Fallback: check TEKTON_ROOT env variable
+    if 'TEKTON_ROOT' in os.environ:
+        return os.environ['TEKTON_ROOT']
+    
+    raise RuntimeError("Could not find Tekton root directory. Please set TEKTON_ROOT environment variable.")
+
+# Add Tekton root to Python path
+tekton_root = find_tekton_root()
+sys.path.insert(0, tekton_root)
 
 from tekton.utils.component_config import get_component_config, ComponentInfo
 
@@ -44,6 +74,12 @@ class ComponentMetrics:
     process_info: Optional[Dict[str, Any]]
     endpoint_health: Dict[str, bool]  # Health of individual endpoints
     dependencies_healthy: bool
+    ready: bool = False  # From /ready endpoint
+    capabilities: List[str] = None  # Component capabilities
+    
+    def __post_init__(self):
+        if self.capabilities is None:
+            self.capabilities = []
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON output"""
@@ -251,6 +287,15 @@ class EnhancedStatusChecker:
         if comp_name != "hermes":  # Hermes can't register with itself
             metrics.registered_with_hermes = await self.check_hermes_registration(comp_name)
             
+        # Check ready status
+        ready_result = await self.check_ready_endpoint(comp_info.port)
+        metrics.ready = ready_result.get("ready", False)
+        if ready_result.get("version"):
+            metrics.version = ready_result["version"]
+            
+        # Get capabilities
+        metrics.capabilities = await self.get_component_capabilities(comp_name, comp_info.port)
+            
         # Calculate health score
         metrics.health_score = self.calculate_health_score(metrics)
         
@@ -314,6 +359,100 @@ class EnhancedStatusChecker:
         except:
             pass
         return False
+        
+    async def check_ready_endpoint(self, port: int) -> Dict[str, Any]:
+        """Check the /ready endpoint for readiness status"""
+        try:
+            url = f"http://localhost:{port}/ready"
+            async with self.session.get(url) as resp:
+                if resp.status == 200:
+                    try:
+                        data = await resp.json()
+                        return {
+                            "ready": data.get("ready", False),
+                            "version": data.get("version", "unknown"),
+                            "uptime": data.get("uptime", 0),
+                            "checks": data.get("checks", {})
+                        }
+                    except json.JSONDecodeError:
+                        return {"ready": False}
+                else:
+                    return {"ready": False}
+        except:
+            return {"ready": False}
+            
+    async def get_component_capabilities(self, component_name: str, port: int) -> List[str]:
+        """Get component capabilities from MCP or API endpoints"""
+        capabilities = []
+        
+        # Try MCP tools endpoint first
+        try:
+            async with self.session.get(f"http://localhost:{port}/mcp/tools") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    tools = data.get("tools", [])
+                    # Extract capability names from MCP tools
+                    for tool in tools:
+                        if isinstance(tool, dict) and "name" in tool:
+                            capabilities.append(tool["name"])
+        except:
+            pass
+            
+        # If no MCP tools, try API endpoints
+        if not capabilities:
+            try:
+                async with self.session.get(f"http://localhost:{port}/api") as resp:
+                    if resp.status == 200:
+                        # Try to parse available endpoints
+                        # This is component-specific and may need enhancement
+                        if component_name == "apollo":
+                            capabilities = ["prediction", "context", "protocol"]
+                        elif component_name == "hermes":
+                            capabilities = ["messaging", "registration", "discovery"]
+                        elif component_name == "engram":
+                            capabilities = ["memory", "storage", "retrieval"]
+                        elif component_name == "rhetor":
+                            capabilities = ["llm", "streaming", "models"]
+                        elif component_name == "athena":
+                            capabilities = ["knowledge", "query", "graph"]
+                        elif component_name == "synthesis":
+                            capabilities = ["analysis", "synthesis", "transform"]
+                        elif component_name == "ergon":
+                            capabilities = ["agents", "workflows", "coordination"]
+                        elif component_name == "sophia":
+                            capabilities = ["embedding", "search", "similarity"]
+                        elif component_name == "prometheus":
+                            capabilities = ["metrics", "monitoring", "analytics"]
+                        elif component_name == "harmonia":
+                            capabilities = ["workflow", "orchestration", "state"]
+                        elif component_name == "budget":
+                            capabilities = ["cost", "allocation", "tracking"]
+                        elif component_name == "metis":
+                            capabilities = ["planning", "strategy", "optimization"]
+                        elif component_name == "telos":
+                            capabilities = ["goals", "objectives", "alignment"]
+            except:
+                pass
+                
+        return capabilities
+    
+    def get_recent_logs(self, component_name: str, lines: int = 5) -> List[str]:
+        """Get recent log lines for a component"""
+        # Use the global tekton_root that was found at startup
+        log_file_path = os.path.join(tekton_root, ".tekton", "logs", f"{component_name}.log")
+        
+        if not os.path.exists(log_file_path):
+            return []
+            
+        try:
+            with open(log_file_path, 'r') as f:
+                # Read all lines and get the last N
+                all_lines = f.readlines()
+                recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+                # Clean up the lines (remove extra whitespace)
+                return [line.strip() for line in recent_lines if line.strip()]
+        except Exception:
+            return []
         
     def get_process_info(self, port: int) -> Optional[Dict[str, Any]]:
         """Get detailed process information"""
@@ -465,6 +604,149 @@ class EnhancedStatusChecker:
             
         return component_metrics, system_metrics
         
+    def format_default_table(self, component_metrics: List[ComponentMetrics]) -> str:
+        """Format default status table (simplified view)"""
+        table_data = []
+        
+        for metrics in component_metrics:
+            # Status with emoji
+            status_symbols = {
+                "healthy": "✅",
+                "unhealthy": "❌", 
+                "not_running": "⭕",
+                "timeout": "⏱️",
+                "error": "⚠️",
+                "starting": "🟡"
+            }
+            status_display = f"{status_symbols.get(metrics.status, '❓')} {metrics.status}"
+            
+            # Health score with color coding
+            score = metrics.health_score
+            if score >= 80:
+                score_display = f"🟢 {score:.0f}"
+            elif score >= 60:
+                score_display = f"🟡 {score:.0f}"
+            else:
+                score_display = f"🔴 {score:.0f}"
+                
+            # Response time
+            response_str = f"{metrics.response_time:.3f}s" if metrics.response_time else "-"
+            
+            # Registration status
+            if metrics.name.lower() == "hermes":
+                reg_symbol = "♻️"  # Hermes recycles itself
+            else:
+                reg_symbol = "✅" if metrics.registered_with_hermes else "❌"
+            
+            # Component name from config
+            comp_info = self.config.get_component(metrics.name)
+            display_name = comp_info.name if comp_info else metrics.name.title()
+            
+            row = [
+                display_name,
+                metrics.port,
+                status_display,
+                metrics.version,
+                score_display,
+                response_str,
+                reg_symbol
+            ]
+            
+            table_data.append(row)
+            
+        # Sort by health score (descending)
+        table_data.sort(key=lambda x: float(x[4].split()[-1]), reverse=True)
+        
+        headers = ["Component", "Port", "Status", "Version", "Health", "Response", "Reg"]
+        return tabulate(table_data, headers=headers, tablefmt="fancy_grid")
+        
+    def format_full_table(self, component_metrics: List[ComponentMetrics]) -> str:
+        """Format full status table with enhanced information"""
+        table_data = []
+        
+        for metrics in component_metrics:
+            # Status with emoji
+            status_symbols = {
+                "healthy": "✅",
+                "unhealthy": "❌", 
+                "not_running": "⭕",
+                "timeout": "⏱️",
+                "error": "⚠️",
+                "starting": "🟡"
+            }
+            status_display = f"{status_symbols.get(metrics.status, '❓')} {metrics.status}"
+            
+            # Health score with color coding
+            score = metrics.health_score
+            if score >= 80:
+                score_display = f"🟢 {score:.0f}"
+            elif score >= 60:
+                score_display = f"🟡 {score:.0f}"
+            else:
+                score_display = f"🔴 {score:.0f}"
+                
+            # Response time
+            response_str = f"{metrics.response_time:.3f}s" if metrics.response_time else "-"
+            
+            # Registration status
+            if metrics.name.lower() == "hermes":
+                reg_symbol = "♻️"  # Hermes recycles itself
+            else:
+                reg_symbol = "✅" if metrics.registered_with_hermes else "❌"
+            
+            # Ready status
+            ready_str = "✅ Yes" if metrics.ready else "❌ No"
+            
+            # Capabilities
+            capabilities_str = ", ".join(metrics.capabilities[:3])  # Show first 3
+            if len(metrics.capabilities) > 3:
+                capabilities_str += f" +{len(metrics.capabilities) - 3}"
+            
+            # Component name from config
+            comp_info = self.config.get_component(metrics.name)
+            display_name = comp_info.name if comp_info else metrics.name.title()
+            
+            row = [
+                display_name,
+                metrics.port,
+                status_display,
+                metrics.version,
+                score_display,
+                response_str,
+                reg_symbol,
+                ready_str,
+                capabilities_str or "-"
+            ]
+            
+            table_data.append(row)
+            
+        # Sort by health score (descending)
+        table_data.sort(key=lambda x: float(x[4].split()[-1]), reverse=True)
+        
+        headers = ["Component", "Port", "Status", "Version", "Health", "Response", "Reg", "Ready", "Capabilities"]
+        return tabulate(table_data, headers=headers, tablefmt="fancy_grid")
+    
+    def format_log_output(self, component_metrics: List[ComponentMetrics], lines: int = 5) -> str:
+        """Format log output for components"""
+        output = ["", "📋 Recent Logs:"]
+        
+        for metrics in component_metrics:
+            if metrics.status == "not_running":
+                continue
+                
+            recent_logs = self.get_recent_logs(metrics.name, lines)
+            if recent_logs:
+                comp_info = self.config.get_component(metrics.name)
+                display_name = comp_info.name if comp_info else metrics.name.title()
+                output.append(f"\n{display_name} (last {lines} lines):")
+                for log_line in recent_logs:
+                    # Truncate long lines
+                    if len(log_line) > 120:
+                        log_line = log_line[:117] + "..."
+                    output.append(f"    {log_line}")
+                    
+        return "\n".join(output) if len(output) > 2 else ""
+    
     def format_comprehensive_table(self, component_metrics: List[ComponentMetrics], verbose: bool = False) -> str:
         """Format comprehensive status table"""
         table_data = []
@@ -537,7 +819,7 @@ class EnhancedStatusChecker:
         if verbose:
             headers.extend(["Process", "CPU", "Endpoints"])
             
-        return tabulate(table_data, headers=headers, tablefmt="grid")
+        return tabulate(table_data, headers=headers, tablefmt="fancy_grid")
         
     def format_system_summary(self, system_metrics: SystemMetrics) -> str:
         """Format system summary"""
@@ -593,48 +875,73 @@ class EnhancedStatusChecker:
 async def main():
     """Enhanced main entry point"""
     parser = argparse.ArgumentParser(description="Enhanced Tekton status checker")
-    parser.add_argument("--json", action="store_true", help="Output in JSON format")
-    parser.add_argument("--component", help="Check specific component")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    parser.add_argument("--trends", action="store_true", help="Show trend information")
-    parser.add_argument("--no-storage", action="store_true", help="Disable metrics storage")
-    parser.add_argument("--watch", type=int, help="Watch mode - refresh every N seconds")
+    parser.add_argument("--json", "-j", action="store_true", help="Output in JSON format")
+    parser.add_argument("--component", "-c", help="Check specific component")
+    parser.add_argument("--components", "-C", help="Check multiple components (comma-separated)")
+    parser.add_argument("--full", "-f", action="store_true", help="Full output with enhanced table and capabilities")
+    parser.add_argument("--log", "-l", action="store_true", help="Show recent log lines for each component")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output (equivalent to --full --log)")
+    parser.add_argument("--trends", "-t", action="store_true", help="Show trend information")
+    parser.add_argument("--no-storage", "-n", action="store_true", help="Disable metrics storage")
+    parser.add_argument("--watch", "-w", type=int, help="Watch mode - refresh every N seconds")
     
     args = parser.parse_args()
+    
+    # Handle --verbose flag as --full --log
+    if args.verbose:
+        args.full = True
+        args.log = True
     
     async with EnhancedStatusChecker(store_metrics=not args.no_storage) as checker:
         
         async def check_and_display():
+            # Determine which components to check
+            components_to_check = None
             if args.component:
-                # Check specific component
-                component_name = args.component.lower().replace("-", "_")
-                comp_info = checker.config.get_component(component_name)
+                components_to_check = [args.component.lower().replace("-", "_")]
+            elif args.components:
+                components_to_check = [c.strip().lower().replace("-", "_") for c in args.components.split(",")]
                 
-                if not comp_info:
-                    print(f"❌ Unknown component: {args.component}")
-                    available = list(checker.config.get_all_components().keys())
-                    print(f"Available: {', '.join(sorted(available))}")
+            if components_to_check:
+                # Check specific components
+                component_metrics = []
+                for component_name in components_to_check:
+                    comp_info = checker.config.get_component(component_name)
+                    
+                    if not comp_info:
+                        print(f"❌ Unknown component: {component_name}")
+                        available = list(checker.config.get_all_components().keys())
+                        print(f"Available: {', '.join(sorted(available))}")
+                        continue
+                        
+                    metrics = await checker.check_component_comprehensive(component_name, comp_info)
+                    component_metrics.append(metrics)
+                
+                if not component_metrics:
                     return
                     
-                metrics = await checker.check_component_comprehensive(component_name, comp_info)
-                
                 if args.json:
-                    print(json.dumps(metrics.to_dict(), indent=2, default=str))
+                    if len(component_metrics) == 1:
+                        print(json.dumps(component_metrics[0].to_dict(), indent=2, default=str))
+                    else:
+                        output = {"components": [m.to_dict() for m in component_metrics]}
+                        print(json.dumps(output, indent=2, default=str))
                 else:
-                    print(f"🔍 Component Status: {comp_info.name}")
-                    print(f"   Status: {metrics.status}")
-                    print(f"   Health Score: {metrics.health_score:.1f}/100")
-                    print(f"   Response Time: {metrics.response_time:.3f}s" if metrics.response_time else "   Response Time: -")
-                    print(f"   Version: {metrics.version}")
-                    print(f"   Registered: {'Yes' if metrics.registered_with_hermes else 'No'}")
+                    # Display table based on mode
+                    if args.full:
+                        print(f"\n{checker.format_full_table(component_metrics)}")
+                    else:
+                        print(f"\n{checker.format_default_table(component_metrics)}")
                     
-                    if args.verbose and metrics.process_info:
-                        print(f"   Process: PID {metrics.process_info.get('pid', 'unknown')}")
-                        print(f"   Memory: {metrics.memory_mb:.1f}MB" if metrics.memory_mb else "   Memory: -")
-                        print(f"   CPU: {metrics.cpu_percent:.1f}%" if metrics.cpu_percent else "   CPU: -")
-                        
+                    # Add logs if requested
+                    if args.log:
+                        log_output = checker.format_log_output(component_metrics)
+                        if log_output:
+                            print(log_output)
+                            
                     if args.trends:
-                        print(f"\n{checker.get_trends_summary(component_name)}")
+                        for metrics in component_metrics:
+                            print(f"\n{checker.get_trends_summary(metrics.name)}")
                         
             else:
                 # Check all components
@@ -647,8 +954,19 @@ async def main():
                     }
                     print(json.dumps(output, indent=2, default=str))
                 else:
-                    print(f"\n{checker.format_comprehensive_table(component_metrics, verbose=args.verbose)}")
+                    # Display table based on mode
+                    if args.full:
+                        print(f"\n{checker.format_full_table(component_metrics)}")
+                    else:
+                        print(f"\n{checker.format_default_table(component_metrics)}")
+                        
                     print(f"\n{checker.format_system_summary(system_metrics)}")
+                    
+                    # Add logs if requested
+                    if args.log:
+                        log_output = checker.format_log_output(component_metrics)
+                        if log_output:
+                            print(log_output)
                     
                     if args.trends:
                         print(f"\n{checker.get_trends_summary()}")

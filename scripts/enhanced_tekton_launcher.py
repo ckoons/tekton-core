@@ -3,6 +3,7 @@
 Enhanced Tekton Component Launcher - Next Generation
 
 Advanced launcher with health monitoring, auto-recovery, and improved reliability.
+Now with proper logging to $TEKTON_ROOT/.tekton/logs/
 """
 import os
 import sys
@@ -21,9 +22,41 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import platform
 from datetime import datetime, timedelta
+import threading
+import queue
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Find the Tekton root directory by looking for a marker file
+def find_tekton_root():
+    """Find the Tekton root directory by looking for marker files"""
+    # If __file__ is a symlink, resolve it first
+    script_path = os.path.realpath(__file__)
+    current_dir = os.path.dirname(script_path)
+    
+    # Look for Tekton root markers
+    markers = ['setup.py', 'tekton', 'README.md']
+    
+    while current_dir != '/':
+        # Check if all markers exist in this directory
+        if all(os.path.exists(os.path.join(current_dir, marker)) for marker in markers):
+            # Additional check: make sure tekton is a directory
+            if os.path.isdir(os.path.join(current_dir, 'tekton')):
+                return current_dir
+        
+        # Move up one directory
+        parent = os.path.dirname(current_dir)
+        if parent == current_dir:  # Reached root
+            break
+        current_dir = parent
+    
+    # Fallback: check TEKTON_ROOT env variable
+    if 'TEKTON_ROOT' in os.environ:
+        return os.environ['TEKTON_ROOT']
+    
+    raise RuntimeError("Could not find Tekton root directory. Please set TEKTON_ROOT environment variable.")
+
+# Add Tekton root to Python path
+tekton_root = find_tekton_root()
+sys.path.insert(0, tekton_root)
 
 from tekton.utils.component_config import get_component_config
 from tekton.utils.port_config import get_component_port
@@ -51,6 +84,7 @@ class LaunchResult:
     startup_time: float = 0.0
     health_check_time: Optional[float] = None
     error: Optional[str] = None
+    log_file: Optional[str] = None
 
 
 @dataclass
@@ -66,6 +100,41 @@ class HealthCheckResult:
     endpoint: Optional[str] = None
 
 
+class LogReader(threading.Thread):
+    """Background thread to read from a stream and write to log file"""
+    
+    def __init__(self, stream, log_file, component_name, stream_name="output"):
+        super().__init__(daemon=True)
+        self.stream = stream
+        self.log_file = log_file
+        self.component_name = component_name
+        self.stream_name = stream_name
+        self.running = True
+        
+    def run(self):
+        """Read lines from stream and write to log file"""
+        try:
+            while self.running:
+                line = self.stream.readline()
+                if not line:
+                    break
+                    
+                # Write to log file
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                log_line = f"{timestamp} {line.decode('utf-8', errors='replace')}"
+                self.log_file.write(log_line)
+                self.log_file.flush()
+                
+                # Also print to console if verbose
+                if self.stream_name == "stderr" and "ERROR" in line.decode('utf-8', errors='ignore'):
+                    print(f"[{self.component_name}] ERROR: {line.decode('utf-8', errors='replace').strip()}")
+                    
+        except Exception as e:
+            print(f"[{self.component_name}] Log reader error: {e}")
+        finally:
+            self.running = False
+
+
 class EnhancedComponentLauncher:
     """Advanced component launcher with monitoring and recovery"""
     
@@ -76,6 +145,12 @@ class EnhancedComponentLauncher:
         self.launched_components: Dict[str, LaunchResult] = {}
         self.health_monitor_task: Optional[asyncio.Task] = None
         self.session: Optional[aiohttp.ClientSession] = None
+        self.log_readers: List[LogReader] = []
+        
+        # Setup log directory
+        self.tekton_root = tekton_root  # Use the globally found tekton_root
+        self.log_dir = os.path.join(self.tekton_root, ".tekton", "logs")
+        os.makedirs(self.log_dir, exist_ok=True)
         
     async def __aenter__(self):
         """Async context manager entry"""
@@ -92,6 +167,10 @@ class EnhancedComponentLauncher:
         if self.health_monitor_task:
             self.health_monitor_task.cancel()
             
+        # Stop all log readers
+        for reader in self.log_readers:
+            reader.running = False
+            
     def log(self, message: str, level: str = "info", component: str = None):
         """Enhanced logging with component context"""
         symbols = {
@@ -101,12 +180,17 @@ class EnhancedComponentLauncher:
             "warning": "⚠️",
             "launch": "🚀",
             "health": "🏥",
-            "monitor": "👁️"
+            "monitor": "👁️",
+            "log": "📋"
         }
         symbol = symbols.get(level, "•")
         timestamp = datetime.now().strftime("%H:%M:%S")
         comp_prefix = f"[{component}] " if component else ""
         print(f"{symbol} {timestamp} {comp_prefix}{message}")
+        
+    def get_log_file_path(self, component_name: str) -> str:
+        """Get the log file path for a component"""
+        return os.path.join(self.log_dir, f"{component_name}.log")
         
     async def enhanced_health_check(self, component_name: str, port: int) -> HealthCheckResult:
         """Enhanced health check with multiple endpoints and retries"""
@@ -261,7 +345,8 @@ class EnhancedComponentLauncher:
                         port=port,
                         message=f"Already running on port {port}",
                         startup_time=0,
-                        health_check_time=health.response_time
+                        health_check_time=health.response_time,
+                        log_file=self.get_log_file_path(component_name)
                     )
                 else:
                     # Kill unhealthy process
@@ -302,9 +387,14 @@ class EnhancedComponentLauncher:
                     "success",
                     component_name
                 )
+                self.log(
+                    f"Logging to: {result.log_file}",
+                    "log",
+                    component_name
+                )
             else:
                 result.state = ComponentState.UNHEALTHY
-                result.message = f"Launched but failed health check within 30s"
+                result.message = f"Launched but failed health check within {timeout}s"
                 result.error = "Health check timeout"
                 
                 self.log(result.message, "warning", component_name)
@@ -323,7 +413,7 @@ class EnhancedComponentLauncher:
             )
             
     async def launch_component_process(self, component_name: str) -> LaunchResult:
-        """Launch the actual component process (sync version of original logic)"""
+        """Launch the actual component process with logging"""
         try:
             comp_info = self.config.get_component(component_name)
             port = comp_info.port
@@ -363,11 +453,25 @@ class EnhancedComponentLauncher:
                     message=f"Component directory not found: {component_dir}"
                 )
                 
+            # Open log file
+            log_file_path = self.get_log_file_path(component_name)
+            log_file = open(log_file_path, 'a')
+            
+            # Write launch header to log
+            log_file.write(f"\n{'='*60}\n")
+            log_file.write(f"Component: {component_name}\n")
+            log_file.write(f"Started: {datetime.now()}\n")
+            log_file.write(f"Command: {' '.join(cmd)}\n")
+            log_file.write(f"Directory: {component_dir}\n")
+            log_file.write(f"Port: {port}\n")
+            log_file.write(f"{'='*60}\n\n")
+            log_file.flush()
+                
             # Launch the component
             if self.verbose:
                 self.log(f"Executing: {' '.join(cmd)}", "launch", component_name)
                 
-            # Use subprocess.Popen for non-blocking launch
+            # Use subprocess.Popen with PIPE to capture output
             if platform.system() == "Windows":
                 process = subprocess.Popen(
                     cmd,
@@ -387,11 +491,28 @@ class EnhancedComponentLauncher:
                     preexec_fn=os.setsid
                 )
                 
+            # Start log reader threads
+            stdout_reader = LogReader(process.stdout, log_file, component_name, "stdout")
+            stderr_reader = LogReader(process.stderr, log_file, component_name, "stderr")
+            stdout_reader.start()
+            stderr_reader.start()
+            
+            # Keep track of readers for cleanup
+            self.log_readers.extend([stdout_reader, stderr_reader])
+                
             # Check if process started successfully (faster check)
             await asyncio.sleep(1)  # Reduced from 2s to 1s
             if process.poll() is not None:
-                stdout, stderr = process.communicate()
-                error_msg = stderr.decode() if stderr else stdout.decode()
+                # Process exited immediately - wait for readers to capture output
+                stdout_reader.join(timeout=1)
+                stderr_reader.join(timeout=1)
+                
+                # Read last few lines from log file for error message
+                log_file.close()
+                with open(log_file_path, 'r') as f:
+                    lines = f.readlines()
+                    error_lines = lines[-10:] if len(lines) > 10 else lines
+                    error_msg = ''.join(error_lines)
 
                 # Try to extract meaningful error from output
                 if "ModuleNotFoundError" in error_msg:
@@ -403,14 +524,15 @@ class EnhancedComponentLauncher:
                 elif "ImportError" in error_msg:
                     clean_error = "Import error - check dependencies"
                 else:
-                    clean_error = error_msg[:200] if error_msg.strip() else "Process exited without output"
+                    clean_error = error_msg[-200:] if error_msg.strip() else "Process exited without output"
 
                 return LaunchResult(
                     component_name=component_name,
                     success=False,
                     state=ComponentState.FAILED,
                     message=f"Process exited immediately: {clean_error}",
-                    error=error_msg[:500]
+                    error=error_msg[-500:],
+                    log_file=log_file_path
                 )
                 
             return LaunchResult(
@@ -419,7 +541,8 @@ class EnhancedComponentLauncher:
                 state=ComponentState.STARTING,
                 pid=process.pid,
                 port=port,
-                message=f"Process started with PID {process.pid}"
+                message=f"Process started with PID {process.pid}",
+                log_file=log_file_path
             )
             
         except Exception as e:
@@ -553,6 +676,7 @@ class EnhancedComponentLauncher:
         launch_groups = self.get_launch_groups(components)
         
         self.log(f"Launching {len(components)} components in {len(launch_groups)} groups", "info")
+        self.log(f"Logs will be written to: {self.log_dir}", "log")
         
         # Launch each priority group
         for priority, group_components in launch_groups.items():
@@ -627,22 +751,22 @@ async def main():
     """Enhanced main entry point"""
     parser = argparse.ArgumentParser(description="Enhanced Tekton component launcher")
     parser.add_argument(
-        "--components",
+        "--components", "-c",
         help="Components to launch (comma-separated) or 'all'",
         default=None
     )
     parser.add_argument(
-        "--launch-all",
+        "--launch-all", "-a",
         action="store_true",
         help="Launch all available components"
     )
     parser.add_argument(
-        "--monitor",
+        "--monitor", "-m",
         action="store_true",
         help="Enable continuous health monitoring"
     )
     parser.add_argument(
-        "--health-retries",
+        "--health-retries", "-r",
         type=int,
         default=3,
         help="Number of health check retries"
@@ -652,8 +776,25 @@ async def main():
         action="store_true",
         help="Verbose output"
     )
+    parser.add_argument(
+        "--save-logs", "-s",
+        action="store_true",
+        help="Preserve existing log files (default: delete logs on startup)"
+    )
     
     args = parser.parse_args()
+    
+    # Delete existing logs unless --save-logs is specified
+    if not args.save_logs:
+        log_dir = os.path.join(tekton_root, ".tekton", "logs")
+        if os.path.exists(log_dir):
+            for log_file in os.listdir(log_dir):
+                if log_file.endswith('.log'):
+                    try:
+                        os.remove(os.path.join(log_dir, log_file))
+                    except Exception as e:
+                        print(f"Warning: Could not delete log file {log_file}: {e}")
+            print("✅ Cleared previous log files")
     
     async with EnhancedComponentLauncher(
         verbose=args.verbose,
