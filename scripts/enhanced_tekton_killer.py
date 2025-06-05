@@ -22,8 +22,38 @@ from datetime import datetime, timedelta
 import platform
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Find the Tekton root directory by looking for a marker file
+def find_tekton_root():
+    """Find the Tekton root directory by looking for marker files"""
+    # If __file__ is a symlink, resolve it first
+    script_path = os.path.realpath(__file__)
+    current_dir = os.path.dirname(script_path)
+    
+    # Look for Tekton root markers
+    markers = ['setup.py', 'tekton', 'README.md']
+    
+    while current_dir != '/':
+        # Check if all markers exist in this directory
+        if all(os.path.exists(os.path.join(current_dir, marker)) for marker in markers):
+            # Additional check: make sure tekton is a directory
+            if os.path.isdir(os.path.join(current_dir, 'tekton')):
+                return current_dir
+        
+        # Move up one directory
+        parent = os.path.dirname(current_dir)
+        if parent == current_dir:  # Reached root
+            break
+        current_dir = parent
+    
+    # Fallback: check TEKTON_ROOT env variable
+    if 'TEKTON_ROOT' in os.environ:
+        return os.environ['TEKTON_ROOT']
+    
+    raise RuntimeError("Could not find Tekton root directory. Please set TEKTON_ROOT environment variable.")
+
+# Add Tekton root to Python path
+tekton_root = find_tekton_root()
+sys.path.insert(0, tekton_root)
 
 from tekton.utils.component_config import get_component_config
 from tekton.utils.port_config import get_component_port
@@ -627,27 +657,27 @@ async def main():
         epilog="⚠️  Use with caution! This tool can terminate running services."
     )
     parser.add_argument(
-        "--components",
+        "--components", "-c",
         help="Components to kill (comma-separated) or 'all'",
         default=None
     )
     parser.add_argument(
-        "--nuclear",
+        "--nuclear", "-n",
         action="store_true",
         help="☢️  NUCLEAR OPTION: Kill everything on all Tekton ports"
     )
     parser.add_argument(
-        "--parallel",
+        "--parallel", "-p",
         action="store_true",
         help="⚠️  Kill components in parallel (faster but potentially unstable)"
     )
     parser.add_argument(
-        "--dry-run",
+        "--dry-run", "-d",
         action="store_true",
         help="🛡️  Dry run mode - show what would be killed without actually doing it"
     )
     parser.add_argument(
-        "--force",
+        "--force", "-f",
         action="store_true",
         help="Skip safety confirmations"
     )
