@@ -1,0 +1,2047 @@
+{
+  "timestamp": "2025-06-05T16:00:31.855162",
+  "components": [
+    {
+      "name": "Engram",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Engram/engram/api/fastmcp_server.py",
+          "line": 57,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import create_mcp_router",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/api/fastmcp_server.py",
+          "line": 57,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_standard_mcp_endpoints",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/api/fastmcp_server.py",
+          "line": 143,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import ToolRegistry",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/__init__.py",
+          "line": 7,
+          "import": "from engram.core.structured.memory.base import StructuredMemory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/base.py",
+          "line": 13,
+          "import": "from engram.core.structured.memory.base import StructuredMemory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/memory/storage/__init__.py",
+          "line": 9,
+          "import": "from engram.core.memory.storage.file_storage import FileStorage",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/memory/storage/__init__.py",
+          "line": 12,
+          "import": "from engram.core.memory.storage.vector_storage import VectorStorage",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/categorization/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.categorization.auto import auto_categorize_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.memory.base import StructuredMemory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import load_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import initialize_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import update_memory_in_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import update_memory_importance",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.memory.index import remove_memory_from_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/__init__.py",
+          "line": 10,
+          "import": "from engram.core.structured.memory.migration import migrate_from_memory_service",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 21,
+          "import": "from engram.core.structured.memory.index import load_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 21,
+          "import": "from engram.core.structured.memory.index import initialize_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 21,
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 26,
+          "import": "from engram.core.structured.storage.file_storage import MemoryStorage",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 27,
+          "import": "from engram.core.structured.operations.add import add_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 27,
+          "import": "from engram.core.structured.operations.add import add_auto_categorized_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_memories_by_category",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_memory_digest",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_memory_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_memories_by_tag",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_context_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 28,
+          "import": "from engram.core.structured.operations.retrieve import get_semantic_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 37,
+          "import": "from engram.core.structured.operations.update import set_memory_importance",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 38,
+          "import": "from engram.core.structured.operations.delete import delete_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 39,
+          "import": "from engram.core.structured.operations.search import search_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/memory/base.py",
+          "line": 40,
+          "import": "from engram.core.structured.memory.migration import migrate_from_memory_service",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/update.py",
+          "line": 12,
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/update.py",
+          "line": 12,
+          "import": "from engram.core.structured.memory.index import update_memory_importance",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/delete.py",
+          "line": 11,
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/delete.py",
+          "line": 11,
+          "import": "from engram.core.structured.memory.index import remove_memory_from_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/add.py",
+          "line": 14,
+          "import": "from engram.core.structured.memory.index import update_memory_in_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/add.py",
+          "line": 14,
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/add.py",
+          "line": 15,
+          "import": "from engram.core.structured.categorization.auto import auto_categorize_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.operations.add import add_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.operations.add import add_auto_categorized_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_memories_by_category",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_memory_digest",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_memory_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_memories_by_tag",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_context_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.operations.retrieve import get_semantic_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 11,
+          "import": "from engram.core.structured.operations.update import set_memory_importance",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 12,
+          "import": "from engram.core.structured.operations.delete import delete_memory",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/__init__.py",
+          "line": 13,
+          "import": "from engram.core.structured.operations.search import search_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/retrieve.py",
+          "line": 12,
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/retrieve.py",
+          "line": 13,
+          "import": "from engram.core.structured.search.tags import search_by_tags",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/retrieve.py",
+          "line": 14,
+          "import": "from engram.core.structured.search.context import search_context_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/retrieve.py",
+          "line": 15,
+          "import": "from engram.core.structured.search.semantic import search_semantic_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/search.py",
+          "line": 11,
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/operations/search.py",
+          "line": 12,
+          "import": "from engram.core.structured.search.tags import search_by_tags",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/storage/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.storage.file_storage import MemoryStorage",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/semantic.py",
+          "line": 11,
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/__init__.py",
+          "line": 1,
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/__init__.py",
+          "line": 2,
+          "import": "from engram.core.structured.search.tags import search_by_tags",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/__init__.py",
+          "line": 3,
+          "import": "from engram.core.structured.search.context import search_context_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/__init__.py",
+          "line": 4,
+          "import": "from engram.core.structured.search.semantic import search_semantic_memories",
+          "depth": 5
+        },
+        {
+          "file": "Engram/engram/core/structured/search/context.py",
+          "line": 12,
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [
+        {
+          "import": "from engram.core.memory.base import MemoryService",
+          "count": 7,
+          "item": "MemoryService",
+          "module": "engram.core.memory.base",
+          "depth": 4,
+          "conflicts": [
+            "engram.integrations.hermes.memory_adapter"
+          ]
+        },
+        {
+          "import": "from engram.core.structured.memory.index import save_metadata_index",
+          "count": 5,
+          "item": "save_metadata_index",
+          "module": "engram.core.structured.memory.index",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from engram.core.structured.search.content import search_by_content",
+          "count": 5,
+          "item": "search_by_content",
+          "module": "engram.core.structured.search.content",
+          "depth": 5,
+          "conflicts": []
+        }
+      ],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 314,
+          "3": 122,
+          "2": 97,
+          "4": 53,
+          "5": 40
+        },
+        "total_imports": 626,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Prometheus",
+      "circular_dependencies": [],
+      "star_imports": [
+        {
+          "file": "Prometheus/prometheus/core/mcp/__init__.py",
+          "line": 8,
+          "module": "tools",
+          "full_import": "from tools import *"
+        },
+        {
+          "file": "Prometheus/prometheus/core/mcp/__init__.py",
+          "line": 9,
+          "module": "capabilities",
+          "full_import": "from capabilities import *"
+        }
+      ],
+      "deep_imports": [
+        {
+          "file": "Prometheus/prometheus/api/fastmcp_endpoints.py",
+          "line": 14,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 144,
+          "2": 29,
+          "3": 37,
+          "4": 9,
+          "5": 1
+        },
+        "total_imports": 220,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Hermes",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 25,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 26,
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 27,
+          "import": "from hermes.core.logging.storage.file_storage import LogStorage",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 28,
+          "import": "from hermes.core.logging.management.manager import LogManager",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 29,
+          "import": "from hermes.core.logging.interface.logger import Logger",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 30,
+          "import": "from hermes.core.logging.utils.helpers import init_logging",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging.py",
+          "line": 30,
+          "import": "from hermes.core.logging.utils.helpers import get_logger",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 25,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 26,
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 27,
+          "import": "from hermes.core.logging.storage.file_storage import LogStorage",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 28,
+          "import": "from hermes.core.logging.management.manager import LogManager",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 29,
+          "import": "from hermes.core.logging.interface.logger import Logger",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 30,
+          "import": "from hermes.core.logging.utils.helpers import init_logging",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/__init__.py",
+          "line": 30,
+          "import": "from hermes.core.logging.utils.helpers import get_logger",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/key_value.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/vector.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/graph.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/cache.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/relational.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/database/adapters/document.py",
+          "line": 12,
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/interface/logger.py",
+          "line": 13,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/interface/logger.py",
+          "line": 14,
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/interface/logger.py",
+          "line": 15,
+          "import": "from hermes.core.logging.management.manager import LogManager",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/management/manager.py",
+          "line": 11,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/management/manager.py",
+          "line": 12,
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/management/manager.py",
+          "line": 13,
+          "import": "from hermes.core.logging.storage.file_storage import LogStorage",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/utils/helpers.py",
+          "line": 11,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/utils/helpers.py",
+          "line": 12,
+          "import": "from hermes.core.logging.management.manager import LogManager",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/utils/helpers.py",
+          "line": 13,
+          "import": "from hermes.core.logging.interface.logger import Logger",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/storage/file_storage.py",
+          "line": 16,
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/storage/file_storage.py",
+          "line": 17,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/core/logging/base/entry.py",
+          "line": 14,
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 18,
+          "import": "from hermes.adapters.vector.faiss.operations import store_vector",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 18,
+          "import": "from hermes.adapters.vector.faiss.operations import search_vectors",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 18,
+          "import": "from hermes.adapters.vector.faiss.operations import delete_vectors",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 18,
+          "import": "from hermes.adapters.vector.faiss.operations import get_vector",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 18,
+          "import": "from hermes.adapters.vector.faiss.operations import list_vectors",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 25,
+          "import": "from hermes.adapters.vector.faiss.index import create_index",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/adapter.py",
+          "line": 26,
+          "import": "from hermes.adapters.vector.faiss.utils import rebuild_id_mappings",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/__init__.py",
+          "line": 8,
+          "import": "from hermes.adapters.vector.faiss.adapter import FAISSVectorAdapter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/operations.py",
+          "line": 13,
+          "import": "from hermes.adapters.vector.faiss.utils import matches_filter",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/operations.py",
+          "line": 13,
+          "import": "from hermes.adapters.vector.faiss.utils import rebuild_id_mappings",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/operations.py",
+          "line": 14,
+          "import": "from hermes.adapters.vector.faiss.index import add_to_index",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/operations.py",
+          "line": 14,
+          "import": "from hermes.adapters.vector.faiss.index import remove_from_index",
+          "depth": 5
+        },
+        {
+          "file": "Hermes/hermes/adapters/vector/faiss/operations.py",
+          "line": 14,
+          "import": "from hermes.adapters.vector.faiss.index import create_index",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [
+        {
+          "import": "from hermes.core.database.database_types import DatabaseType",
+          "count": 14,
+          "item": "DatabaseType",
+          "module": "hermes.core.database.database_types",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.database_types import DatabaseBackend",
+          "count": 11,
+          "item": "DatabaseBackend",
+          "module": "hermes.core.database.database_types",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import VectorDatabaseAdapter",
+          "count": 8,
+          "item": "VectorDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.api.database.client_base import BaseRequest",
+          "count": 8,
+          "item": "BaseRequest",
+          "module": "hermes.api.database.client_base",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.logging.base.levels import LogLevel",
+          "count": 7,
+          "item": "LogLevel",
+          "module": "hermes.core.logging.base.levels",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.manager import DatabaseManager",
+          "count": 7,
+          "item": "DatabaseManager",
+          "module": "hermes.core.database.manager",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import DatabaseAdapter",
+          "count": 6,
+          "item": "DatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": [
+            "hermes.core.database.adapters.base"
+          ]
+        },
+        {
+          "import": "from hermes.core.database.adapters.base import DatabaseAdapter",
+          "count": 6,
+          "item": "DatabaseAdapter",
+          "module": "hermes.core.database.adapters.base",
+          "depth": 5,
+          "conflicts": [
+            "hermes.core.database.adapters"
+          ]
+        },
+        {
+          "import": "from hermes.core.logging.base.entry import LogEntry",
+          "count": 5,
+          "item": "LogEntry",
+          "module": "hermes.core.logging.base.entry",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import GraphDatabaseAdapter",
+          "count": 5,
+          "item": "GraphDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import KeyValueDatabaseAdapter",
+          "count": 5,
+          "item": "KeyValueDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import DocumentDatabaseAdapter",
+          "count": 5,
+          "item": "DocumentDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import CacheDatabaseAdapter",
+          "count": 5,
+          "item": "CacheDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from hermes.core.database.adapters import RelationalDatabaseAdapter",
+          "count": 5,
+          "item": "RelationalDatabaseAdapter",
+          "module": "hermes.core.database.adapters",
+          "depth": 4,
+          "conflicts": []
+        }
+      ],
+      "import_stats": {
+        "depth_distribution": {
+          "4": 101,
+          "3": 94,
+          "1": 147,
+          "2": 35,
+          "5": 36
+        },
+        "total_imports": 413,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Athena",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Athena/athena/core/query_engine.py",
+          "line": 19,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import ToolRegistry",
+          "depth": 5
+        },
+        {
+          "file": "Athena/athena/core/entity_manager.py",
+          "line": 19,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import ToolRegistry",
+          "depth": 5
+        },
+        {
+          "file": "Athena/athena/api/endpoints/mcp.py",
+          "line": 35,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import create_mcp_router",
+          "depth": 5
+        },
+        {
+          "file": "Athena/athena/api/endpoints/mcp.py",
+          "line": 35,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_standard_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [
+        {
+          "import": "from tekton.core.query.modes import QueryMode",
+          "count": 7,
+          "item": "QueryMode",
+          "module": "tekton.core.query.modes",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from tekton.core.query.modes import QueryParameters",
+          "count": 6,
+          "item": "QueryParameters",
+          "module": "tekton.core.query.modes",
+          "depth": 4,
+          "conflicts": []
+        }
+      ],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 116,
+          "4": 18,
+          "3": 48,
+          "5": 3,
+          "2": 31
+        },
+        "total_imports": 216,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Rhetor",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Rhetor/rhetor/api/fastmcp_endpoints.py",
+          "line": 14,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 89,
+          "3": 46,
+          "2": 17,
+          "4": 10,
+          "5": 1
+        },
+        "total_imports": 163,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Budget",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Budget/budget/api/mcp_endpoints.py",
+          "line": 76,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import create_mcp_router",
+          "depth": 5
+        },
+        {
+          "file": "Budget/budget/api/mcp_endpoints.py",
+          "line": 76,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_standard_mcp_endpoints",
+          "depth": 5
+        },
+        {
+          "file": "Budget/budget/api/app.py",
+          "line": 117,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import ToolRegistry",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 84,
+          "3": 144,
+          "2": 13,
+          "4": 12,
+          "5": 2
+        },
+        "total_imports": 255,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Apollo",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 64,
+          "2": 20,
+          "3": 77,
+          "4": 25
+        },
+        "total_imports": 186,
+        "max_depth": 4
+      }
+    },
+    {
+      "name": "Ergon",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Ergon/scripts/cleanup_memories.py",
+          "line": 21,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/scripts/cleanup_memories.py",
+          "line": 22,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/core/memory/test_memory_service.py",
+          "line": 14,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_tools.py",
+          "line": 8,
+          "import": "from ergon.core.agents.mail.tools import MailTools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_tools.py",
+          "line": 8,
+          "import": "from ergon.core.agents.mail.tools import mail_tool_definitions",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_tools.py",
+          "line": 8,
+          "import": "from ergon.core.agents.mail.tools import register_mail_tools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_service.py",
+          "line": 10,
+          "import": "from ergon.core.agents.mail.service import MailService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_service.py",
+          "line": 10,
+          "import": "from ergon.core.agents.mail.service import get_mail_service",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_service.py",
+          "line": 10,
+          "import": "from ergon.core.agents.mail.service import setup_mail_provider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_generator.py",
+          "line": 5,
+          "import": "from ergon.core.agents.generators.mail_generator import generate_mail_agent",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_mail_generator.py",
+          "line": 6,
+          "import": "from ergon.core.agents.mail.tools import mail_tool_definitions",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_gmail_integration.py",
+          "line": 11,
+          "import": "from ergon.core.agents.mail.providers import GmailProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_html_emails.py",
+          "line": 8,
+          "import": "from ergon.core.agents.mail.service import MailService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/tests/agents/mail/test_html_emails.py",
+          "line": 9,
+          "import": "from ergon.core.agents.mail.providers import GmailProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/database/models.py",
+          "line": 175,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/database/models.py",
+          "line": 175,
+          "import": "from ergon.core.memory.models.schema import MemoryCollection",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/tool_generator.py",
+          "line": 12,
+          "import": "from ergon.core.repository.generators.base import ToolGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/tool_generator.py",
+          "line": 15,
+          "import": "from ergon.core.repository.generators.base import generate_tool",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 18,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 19,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 20,
+          "import": "from ergon.core.memory.services.embedding import embedding_service",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 21,
+          "import": "from ergon.core.memory.services.vector_store import MemoryVectorService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 75,
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/service.py",
+          "line": 416,
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/__init__.py",
+          "line": 17,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/__init__.py",
+          "line": 18,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/__init__.py",
+          "line": 18,
+          "import": "from ergon.core.memory.models.schema import MemoryCollection",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/__init__.py",
+          "line": 19,
+          "import": "from ergon.core.memory.services.client import ClientManager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/__init__.py",
+          "line": 19,
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/rag.py",
+          "line": 13,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/runner.py",
+          "line": 25,
+          "import": "from ergon.core.agents.runner.base.runner import AgentRunner",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/runner.py",
+          "line": 26,
+          "import": "from ergon.core.agents.runner.base.exceptions import AgentException",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_main_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_tools_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_prompts_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_requirements_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_env_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 20,
+          "import": "from ergon.core.agents.generators.code_generator import generate_readme_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_main_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_tools_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_prompts_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_requirements_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_readme_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 28,
+          "import": "from ergon.core.agents.generators.fallbacks import generate_fallback_env_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 524,
+          "import": "from ergon.core.agents.generators.github_generator import get_github_tools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 286,
+          "import": "from ergon.core.agents.generators.github_generator import generate_github_tools_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 286,
+          "import": "from ergon.core.agents.generators.github_generator import generate_github_agent_file",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 447,
+          "import": "from ergon.core.agents.generators.github_generator import get_github_tools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 453,
+          "import": "from ergon.core.agents.generators.mail_generator import generate_mail_agent",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 458,
+          "import": "from ergon.core.agents.generators.browser_generator import BrowserAgentGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generator.py",
+          "line": 473,
+          "import": "from ergon.core.agents.generators.nexus.generator import generate_nexus_agent",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/mcp/tools.py",
+          "line": 1019,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import create_tool_registry",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/mcp/tools.py",
+          "line": 1019,
+          "import": "from tekton.mcp.fastmcp.utils.tooling import register_tools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 19,
+          "import": "from ergon.core.repository.generators.python_generator import PythonGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 20,
+          "import": "from ergon.core.repository.generators.javascript_generator import JavaScriptGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 21,
+          "import": "from ergon.core.repository.generators.shell_generator import ShellGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 22,
+          "import": "from ergon.core.repository.generators.documentation_generator import DocumentationGenerator",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 23,
+          "import": "from ergon.core.repository.analysis.code_analyzer import CodeAnalyzer",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/repository/generators/base.py",
+          "line": 24,
+          "import": "from ergon.core.repository.utils.file_helpers import get_file_extension",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/utils/__init__.py",
+          "line": 7,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/models/__init__.py",
+          "line": 7,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/models/__init__.py",
+          "line": 7,
+          "import": "from ergon.core.memory.models.schema import MemoryCollection",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/services/__init__.py",
+          "line": 7,
+          "import": "from ergon.core.memory.services.embedding import EmbeddingService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/services/__init__.py",
+          "line": 7,
+          "import": "from ergon.core.memory.services.embedding import embedding_service",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/services/__init__.py",
+          "line": 8,
+          "import": "from ergon.core.memory.services.vector_store import MemoryVectorService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/services/__init__.py",
+          "line": 9,
+          "import": "from ergon.core.memory.services.client import ClientManager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/memory/services/__init__.py",
+          "line": 9,
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/service.py",
+          "line": 17,
+          "import": "from ergon.core.agents.mail.providers import get_mail_provider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/service.py",
+          "line": 17,
+          "import": "from ergon.core.agents.mail.providers import MailProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/service.py",
+          "line": 21,
+          "import": "from ergon.core.agents.mail.imap_provider import ImapSmtpProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/tools.py",
+          "line": 14,
+          "import": "from ergon.core.agents.mail.service import get_mail_service",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/tools.py",
+          "line": 14,
+          "import": "from ergon.core.agents.mail.service import setup_mail_provider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers.py",
+          "line": 9,
+          "import": "from ergon.core.agents.mail.providers.base import MailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers.py",
+          "line": 10,
+          "import": "from ergon.core.agents.mail.providers.gmail import GmailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers.py",
+          "line": 11,
+          "import": "from ergon.core.agents.mail.providers.outlook import OutlookProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers.py",
+          "line": 12,
+          "import": "from ergon.core.agents.mail.providers import get_mail_provider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/setup.py",
+          "line": 18,
+          "import": "from ergon.core.agents.mail.providers import get_mail_provider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/setup.py",
+          "line": 220,
+          "import": "from ergon.core.agents.mail.providers import GmailProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/setup.py",
+          "line": 276,
+          "import": "from ergon.core.agents.mail.providers import OutlookProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/imap_provider.py",
+          "line": 20,
+          "import": "from ergon.core.agents.mail.providers import MailProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/handler.py",
+          "line": 6,
+          "import": "from ergon.core.agents.browser.service import BrowserService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/handler.py",
+          "line": 7,
+          "import": "from ergon.core.agents.browser.registry import BrowserToolRegistry",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/registry.py",
+          "line": 6,
+          "import": "from ergon.core.agents.browser.service import BrowserService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/__init__.py",
+          "line": 1,
+          "import": "from ergon.core.agents.browser.service import BrowserService",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/__init__.py",
+          "line": 2,
+          "import": "from ergon.core.agents.browser.tools import BROWSER_TOOLS",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/browser/__init__.py",
+          "line": 2,
+          "import": "from ergon.core.agents.browser.tools import BrowserActions",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generators/mail_generator.py",
+          "line": 11,
+          "import": "from ergon.core.agents.mail.tools import mail_tool_definitions",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generators/browser_generator.py",
+          "line": 6,
+          "import": "from ergon.core.agents.browser.tools import BROWSER_TOOLS",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/__init__.py",
+          "line": 10,
+          "import": "from ergon.core.agents.mail.providers.base import MailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/__init__.py",
+          "line": 11,
+          "import": "from ergon.core.agents.mail.providers.gmail import GmailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/__init__.py",
+          "line": 12,
+          "import": "from ergon.core.agents.mail.providers.outlook import OutlookProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/__init__.py",
+          "line": 17,
+          "import": "from ergon.core.agents.mail.imap_provider import ImapSmtpProvider",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/gmail.py",
+          "line": 20,
+          "import": "from ergon.core.agents.mail.providers.base import MailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/mail/providers/outlook.py",
+          "line": 18,
+          "import": "from ergon.core.agents.mail.providers.base import MailProvider",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/core/agents/runner/tools/registry.py",
+          "line": 62,
+          "import": "from ergon.core.agents.mail.tools import register_mail_tools",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/runner/tools/registry.py",
+          "line": 83,
+          "import": "from ergon.core.agents.browser.handler import BrowserToolHandler",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/runner/tools/registry.py",
+          "line": 84,
+          "import": "from ergon.core.agents.browser.tools import BROWSER_TOOLS",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/core/agents/generators/nexus/__init__.py",
+          "line": 5,
+          "import": "from ergon.core.agents.generators.nexus.generator import generate_nexus_agent",
+          "depth": 6
+        },
+        {
+          "file": "Ergon/ergon/utils/config/credentials.py",
+          "line": 14,
+          "import": "from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/cli/commands/memory.py",
+          "line": 17,
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/cli/commands/memory.py",
+          "line": 19,
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/cli/commands/memory.py",
+          "line": 20,
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "depth": 5
+        },
+        {
+          "file": "Ergon/ergon/cli/commands/system_commands.py",
+          "line": 327,
+          "import": "from ergon.core.agents.mail.setup import setup_mail_provider",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [
+        {
+          "import": "from ergon.utils.config.settings import settings",
+          "count": 57,
+          "item": "settings",
+          "module": "ergon.utils.config.settings",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.engine import get_db_session",
+          "count": 27,
+          "item": "get_db_session",
+          "module": "ergon.core.database.engine",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import Agent",
+          "count": 22,
+          "item": "Agent",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.engine import init_db",
+          "count": 12,
+          "item": "init_db",
+          "module": "ergon.core.database.engine",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.llm.client import LLMClient",
+          "count": 12,
+          "item": "LLMClient",
+          "module": "ergon.core.llm.client",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import AgentTool",
+          "count": 10,
+          "item": "AgentTool",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import AgentExecution",
+          "count": 10,
+          "item": "AgentExecution",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.memory.service import MemoryService",
+          "count": 9,
+          "item": "MemoryService",
+          "module": "ergon.core.memory.service",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import DocumentationPage",
+          "count": 9,
+          "item": "DocumentationPage",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import AgentMessage",
+          "count": 9,
+          "item": "AgentMessage",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.database.models import AgentFile",
+          "count": 8,
+          "item": "AgentFile",
+          "module": "ergon.core.database.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.memory.utils.categories import MemoryCategory",
+          "count": 7,
+          "item": "MemoryCategory",
+          "module": "ergon.core.memory.utils.categories",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.vector_store.faiss_store import FAISSDocumentStore",
+          "count": 7,
+          "item": "FAISSDocumentStore",
+          "module": "ergon.core.vector_store.faiss_store",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.agents.runner import AgentRunner",
+          "count": 7,
+          "item": "AgentRunner",
+          "module": "ergon.core.agents.runner",
+          "depth": 4,
+          "conflicts": [
+            "ergon.core.agents.runner.base.runner"
+          ]
+        },
+        {
+          "import": "from ergon.core.memory.models.schema import Memory",
+          "count": 6,
+          "item": "Memory",
+          "module": "ergon.core.memory.models.schema",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.docs.document_store import document_store",
+          "count": 6,
+          "item": "document_store",
+          "module": "ergon.core.docs.document_store",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.docs.crawler import crawl_pydantic_ai_docs",
+          "count": 5,
+          "item": "crawl_pydantic_ai_docs",
+          "module": "ergon.core.docs.crawler",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.docs.crawler import crawl_langchain_docs",
+          "count": 5,
+          "item": "crawl_langchain_docs",
+          "module": "ergon.core.docs.crawler",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.docs.crawler import crawl_anthropic_docs",
+          "count": 5,
+          "item": "crawl_anthropic_docs",
+          "module": "ergon.core.docs.crawler",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.repository.models import ComponentType",
+          "count": 5,
+          "item": "ComponentType",
+          "module": "ergon.core.repository.models",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.repository.repository import RepositoryService",
+          "count": 5,
+          "item": "RepositoryService",
+          "module": "ergon.core.repository.repository",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.docs.crawler import crawl_all_docs",
+          "count": 5,
+          "item": "crawl_all_docs",
+          "module": "ergon.core.docs.crawler",
+          "depth": 4,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.memory.services.client import client_manager",
+          "count": 5,
+          "item": "client_manager",
+          "module": "ergon.core.memory.services.client",
+          "depth": 5,
+          "conflicts": []
+        },
+        {
+          "import": "from ergon.core.flow.types import FlowType",
+          "count": 5,
+          "item": "FlowType",
+          "module": "ergon.core.flow.types",
+          "depth": 4,
+          "conflicts": []
+        }
+      ],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 286,
+          "3": 54,
+          "4": 263,
+          "5": 66,
+          "2": 100,
+          "6": 12
+        },
+        "total_imports": 781,
+        "max_depth": 6
+      }
+    },
+    {
+      "name": "Harmonia",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 62,
+          "3": 62,
+          "2": 18,
+          "4": 4
+        },
+        "total_imports": 146,
+        "max_depth": 4
+      }
+    },
+    {
+      "name": "Metis",
+      "circular_dependencies": [],
+      "star_imports": [
+        {
+          "file": "Metis/metis/core/mcp/__init__.py",
+          "line": 7,
+          "module": "tools",
+          "full_import": "from tools import *"
+        },
+        {
+          "file": "Metis/metis/core/mcp/__init__.py",
+          "line": 8,
+          "module": "capabilities",
+          "full_import": "from capabilities import *"
+        }
+      ],
+      "deep_imports": [
+        {
+          "file": "Metis/metis/api/fastmcp_endpoints.py",
+          "line": 14,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [
+        {
+          "import": "from metis.core.mcp.tools import analyze_task_complexity",
+          "count": 6,
+          "item": "analyze_task_complexity",
+          "module": "metis.core.mcp.tools",
+          "depth": 4,
+          "conflicts": []
+        }
+      ],
+      "import_stats": {
+        "depth_distribution": {
+          "3": 127,
+          "1": 67,
+          "4": 17,
+          "2": 5,
+          "5": 1
+        },
+        "total_imports": 217,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Sophia",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Sophia/sophia/api/fastmcp_endpoints.py",
+          "line": 17,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 98,
+          "3": 69,
+          "2": 5,
+          "4": 16,
+          "5": 1
+        },
+        "total_imports": 189,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Synthesis",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Synthesis/synthesis/api/fastmcp_endpoints.py",
+          "line": 15,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 47,
+          "3": 55,
+          "2": 6,
+          "4": 10,
+          "5": 1
+        },
+        "total_imports": 119,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Telos",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Telos/telos/api/fastmcp_endpoints.py",
+          "line": 20,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import create_mcp_router",
+          "depth": 5
+        },
+        {
+          "file": "Telos/telos/api/fastmcp_endpoints.py",
+          "line": 20,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_standard_mcp_endpoints",
+          "depth": 5
+        },
+        {
+          "file": "Telos/telos/api/app.py",
+          "line": 195,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 62,
+          "3": 56,
+          "2": 16,
+          "4": 7,
+          "5": 2
+        },
+        "total_imports": 143,
+        "max_depth": 5
+      }
+    },
+    {
+      "name": "Terma",
+      "circular_dependencies": [],
+      "star_imports": [],
+      "deep_imports": [
+        {
+          "file": "Terma/terma/api/fastmcp_endpoints.py",
+          "line": 15,
+          "import": "from tekton.mcp.fastmcp.utils.endpoints import add_mcp_endpoints",
+          "depth": 5
+        }
+      ],
+      "missing_imports": [],
+      "flattening_candidates": [],
+      "import_stats": {
+        "depth_distribution": {
+          "1": 39,
+          "2": 33,
+          "3": 6,
+          "4": 6,
+          "5": 1
+        },
+        "total_imports": 85,
+        "max_depth": 5
+      }
+    }
+  ]
+}

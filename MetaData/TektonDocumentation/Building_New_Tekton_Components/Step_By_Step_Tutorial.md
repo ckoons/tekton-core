@@ -1465,6 +1465,97 @@ Based on the Shared Utilities Sprint standards:
 - [ ] WebSocket connections work
 - [ ] Main module has if __name__ == "__main__": block
 
+### Step 16: Run Import Analysis
+
+After your component is working, add it to the import analyzer and check for issues:
+
+#### Update the Analyzer
+
+Edit `/scripts/tekton_import_analyzer.py` to include your new component:
+
+```python
+# Find the components list in TektonImportAnalyzer.__init__
+self.components = [
+    "Engram", "Prometheus", "Hermes", "Athena", "Rhetor",
+    "Budget", "Apollo", "Ergon", "Harmonia", "Metis",
+    "Sophia", "Synthesis", "Telos", "Terma",
+    "Nexus"  # Add your new component here
+]
+```
+
+#### Run Analysis
+
+```bash
+# Analyze just your new component
+python scripts/tekton_import_analyzer.py Nexus
+
+# Or analyze all components including yours
+python scripts/tekton_import_analyzer.py --all
+```
+
+#### Review Results
+
+Check for:
+- **Star imports** - Convert to explicit imports
+- **Deep import chains** - Consider flattening if depth > 4
+- **Circular dependencies** - Must be resolved
+- **Missing imports** - Fix any broken imports
+
+#### Fix Issues Interactively
+
+```bash
+# Run the fixer to address any issues found
+python scripts/tekton_import_fixer.py
+
+# Example: Fixing a star import
+# === Star Imports in Nexus ===
+# [1/1] nexus/core/__init__.py:8
+#   from .models import *
+# Fix this star import? (y/n/s/a): y
+#   ✓ Fixed: from .models import Connection, Node, Edge
+```
+
+#### Import Best Practices for New Components
+
+1. **Follow Standard Import Order**:
+   ```python
+   # Standard library
+   import os
+   import sys
+   from typing import Dict, List
+   
+   # Third-party
+   from fastapi import FastAPI
+   from pydantic import BaseModel
+   
+   # Tekton shared
+   from shared.utils.logging_setup import setup_component_logging
+   from shared.utils.env_config import get_component_config
+   
+   # Component-specific
+   from .core import NexusEngine
+   from .models import Connection
+   ```
+
+2. **Avoid Deep Nesting**:
+   ```python
+   # Bad
+   from nexus.core.connections.managers.implementations.base import BaseManager
+   
+   # Good - export commonly used classes at higher levels
+   from nexus.core import BaseManager
+   ```
+
+3. **Use Clear Module Boundaries**:
+   ```python
+   # nexus/__init__.py
+   from .core import NexusEngine
+   from .models import Connection, Node
+   from .client import NexusClient
+   
+   __all__ = ["NexusEngine", "Connection", "Node", "NexusClient"]
+   ```
+
 ## Common Issues and Solutions
 
 ### Port Already in Use
