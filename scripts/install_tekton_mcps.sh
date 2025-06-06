@@ -29,9 +29,20 @@ fi
 echo -e "${YELLOW}Removing any existing Tekton MCP installations...${NC}"
 claude mcp remove tekton 2>/dev/null || true
 
+# Get the absolute path to the bridge script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TEKTON_ROOT="$(dirname "$SCRIPT_DIR")"
+BRIDGE_SCRIPT="$TEKTON_ROOT/Hermes/hermes/api/mcp_stdio_bridge.py"
+
+# Check if bridge script exists
+if [ ! -f "$BRIDGE_SCRIPT" ]; then
+    echo -e "${RED}Error: MCP bridge script not found at $BRIDGE_SCRIPT${NC}"
+    exit 1
+fi
+
 # Install Hermes as the central MCP aggregator
 echo -e "${YELLOW}Installing Hermes as the Tekton MCP aggregator...${NC}"
-claude mcp add tekton -s user http://localhost:8001/api/mcp/v2
+claude mcp add tekton -s user python "$BRIDGE_SCRIPT"
 
 if [ $? -eq 0 ]; then
     echo ""
