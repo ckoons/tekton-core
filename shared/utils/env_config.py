@@ -170,6 +170,118 @@ class BudgetConfig(BaseComponentConfig):
         )
 
 
+class ErgonConfig(BaseComponentConfig):
+    """Configuration for Ergon agent system."""
+    
+    port: int = 8002
+    agent_enabled: bool = True
+    max_agents: int = 10
+    
+    @classmethod
+    def from_env(cls) -> 'ErgonConfig':
+        return cls(
+            port=cls._get_env_value('ERGON_PORT', 8002, 'int'),
+            agent_enabled=cls._get_env_value('ERGON_AGENT_ENABLED', True, 'bool'),
+            max_agents=cls._get_env_value('ERGON_MAX_AGENTS', 10, 'int')
+        )
+
+
+class HarmoniaConfig(BaseComponentConfig):
+    """Configuration for Harmonia workflow system."""
+    
+    port: int = 8007
+    workflow_enabled: bool = True
+    max_workflows: int = 100
+    
+    @classmethod
+    def from_env(cls) -> 'HarmoniaConfig':
+        return cls(
+            port=cls._get_env_value('HARMONIA_PORT', 8007, 'int'),
+            workflow_enabled=cls._get_env_value('HARMONIA_WORKFLOW_ENABLED', True, 'bool'),
+            max_workflows=cls._get_env_value('HARMONIA_MAX_WORKFLOWS', 100, 'int')
+        )
+
+
+class MetisConfig(BaseComponentConfig):
+    """Configuration for Metis task management."""
+    
+    port: int = 8011
+    task_enabled: bool = True
+    max_tasks: int = 1000
+    
+    @classmethod
+    def from_env(cls) -> 'MetisConfig':
+        return cls(
+            port=cls._get_env_value('METIS_PORT', 8011, 'int'),
+            task_enabled=cls._get_env_value('METIS_TASK_ENABLED', True, 'bool'),
+            max_tasks=cls._get_env_value('METIS_MAX_TASKS', 1000, 'int')
+        )
+
+
+class PrometheusConfig(BaseComponentConfig):
+    """Configuration for Prometheus planning system."""
+    
+    port: int = 8006
+    planning_enabled: bool = True
+    max_plans: int = 100
+    
+    @classmethod
+    def from_env(cls) -> 'PrometheusConfig':
+        return cls(
+            port=cls._get_env_value('PROMETHEUS_PORT', 8006, 'int'),
+            planning_enabled=cls._get_env_value('PROMETHEUS_PLANNING_ENABLED', True, 'bool'),
+            max_plans=cls._get_env_value('PROMETHEUS_MAX_PLANS', 100, 'int')
+        )
+
+
+class SophiaConfig(BaseComponentConfig):
+    """Configuration for Sophia ML system."""
+    
+    port: int = 8014
+    ml_enabled: bool = True
+    max_models: int = 10
+    
+    @classmethod
+    def from_env(cls) -> 'SophiaConfig':
+        return cls(
+            port=cls._get_env_value('SOPHIA_PORT', 8014, 'int'),
+            ml_enabled=cls._get_env_value('SOPHIA_ML_ENABLED', True, 'bool'),
+            max_models=cls._get_env_value('SOPHIA_MAX_MODELS', 10, 'int')
+        )
+
+
+class SynthesisConfig(BaseComponentConfig):
+    """Configuration for Synthesis execution engine."""
+    
+    port: int = 8009
+    execution_enabled: bool = True
+    max_executions: int = 50
+    
+    @classmethod
+    def from_env(cls) -> 'SynthesisConfig':
+        return cls(
+            port=cls._get_env_value('SYNTHESIS_PORT', 8009, 'int'),
+            execution_enabled=cls._get_env_value('SYNTHESIS_EXECUTION_ENABLED', True, 'bool'),
+            max_executions=cls._get_env_value('SYNTHESIS_MAX_EXECUTIONS', 50, 'int')
+        )
+
+
+class TelosConfig(BaseComponentConfig):
+    """Configuration for Telos requirements system."""
+    
+    port: int = 8008
+    requirements_enabled: bool = True
+    max_requirements: int = 500
+    
+    @classmethod
+    def from_env(cls) -> 'TelosConfig':
+        return cls(
+            port=cls._get_env_value('TELOS_PORT', 8008, 'int'),
+            requirements_enabled=cls._get_env_value('TELOS_REQUIREMENTS_ENABLED', True, 'bool'),
+            max_requirements=cls._get_env_value('TELOS_MAX_REQUIREMENTS', 500, 'int')
+        )
+
+
 class TektonConfig(BaseModel):
     """Global Tekton system configuration."""
     
@@ -235,12 +347,14 @@ class ComponentConfig:
         self.athena = AthenaConfig.from_env()
         self.apollo = ApolloConfig.from_env()
         self.budget = BudgetConfig.from_env()
+        self.ergon = ErgonConfig.from_env()
+        self.harmonia = HarmoniaConfig.from_env()
+        self.metis = MetisConfig.from_env()
+        self.prometheus = PrometheusConfig.from_env()
+        self.sophia = SophiaConfig.from_env()
+        self.synthesis = SynthesisConfig.from_env()
+        self.telos = TelosConfig.from_env()
         self.tekton = TektonConfig.from_env()
-        
-        # Add more components as needed
-        # self.ergon = ErgonConfig.from_env()
-        # self.prometheus = PrometheusConfig.from_env()
-        # etc.
     
     def refresh(self):
         """Refresh configuration from environment."""

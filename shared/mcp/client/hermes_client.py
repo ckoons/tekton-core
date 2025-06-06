@@ -21,30 +21,37 @@ class HermesMCPClient:
     
     def __init__(
         self,
-        hermes_url: str,
-        component_name: str,
+        hermes_url: str = None,
+        component_name: str = None,
+        component_port: int = None,
         component_version: str = "0.1.0",
+        auth_token: Optional[str] = None,
         timeout: int = 30
     ):
         """
         Initialize the Hermes MCP client.
         
         Args:
-            hermes_url: Base URL of Hermes (e.g., http://localhost:8001)
+            hermes_url: Base URL of Hermes (defaults to http://localhost:8001)
             component_name: Name of the component
+            component_port: Port where component is running (for tool execution callbacks)
             component_version: Version of the component
+            auth_token: Optional authentication token
             timeout: Request timeout in seconds
         """
-        self.hermes_url = hermes_url.rstrip("/")
+        import os
+        self.hermes_url = (hermes_url or os.environ.get("HERMES_URL", "http://localhost:8001")).rstrip("/")
         self.mcp_base_url = f"{self.hermes_url}/api/mcp/v2"
         self.component_name = component_name
+        self.component_port = component_port or int(os.environ.get(f"{component_name.upper()}_PORT", "8000"))
         self.component_version = component_version
+        self.auth_token = auth_token
         self.timeout = timeout
         
-        # Local tool registry for handling execution requests
-        self.tool_handlers: Dict[str, Callable] = {}
+        # Track registered tools for cleanup
+        self.registered_tools: List[str] = []
         
-        logger.info(f"Initialized Hermes MCP client for {component_name}")
+        logger.info(f"Initialized Hermes MCP client for {component_name} at {self.hermes_url}")
     
     async def health_check(self) -> Dict[str, Any]:
         """
@@ -79,7 +86,8 @@ class HermesMCPClient:
         name: str,
         description: str,
         input_schema: Dict[str, Any],
-        handler: Callable,
+        output_schema: Optional[Dict[str, Any]] = None,
+        handler: Optional[Callable] = None,
         tags: Optional[List[str]] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
@@ -87,51 +95,64 @@ class HermesMCPClient:
         Register a tool with Hermes.
         
         Args:
-            name: Tool name
+            name: Tool name (will be prefixed with component name if not already)
             description: Tool description
             input_schema: JSON Schema for tool input
-            handler: Async function to handle tool execution
+            output_schema: Output schema (currently not used by Hermes)
+            handler: Tool handler function (ignored - execution handled via endpoints)
             tags: Optional tags for categorization
             metadata: Optional additional metadata
             
         Returns:
             Tool ID if successful, None otherwise
         """
+        # Add component prefix if not already present
+        if not name.startswith(f"{self.component_name}."):
+            full_name = f"{self.component_name}.{name}"
+        else:
+            full_name = name
+            
         tool_spec = {
-            "name": f"{self.component_name}.{name}",
+            "name": full_name,
             "description": description,
             "schema": input_schema,  # Note: Using "schema" as expected by Hermes
+            "endpoint": f"http://localhost:{self.component_port}/api/tools/{name}/execute",
             "tags": tags or [],
             "metadata": {
                 **(metadata or {}),
                 "component": self.component_name,
-                "component_version": self.component_version
+                "component_version": self.component_version,
+                "port": self.component_port
             }
         }
         
         async with aiohttp.ClientSession() as session:
             try:
+                headers = {}
+                if self.auth_token:
+                    headers["Authorization"] = f"Bearer {self.auth_token}"
+                    
                 async with session.post(
                     f"{self.mcp_base_url}/tools",
                     json=tool_spec,
+                    headers=headers,
                     timeout=aiohttp.ClientTimeout(total=self.timeout)
                 ) as resp:
                     if resp.status == 200:
                         result = await resp.json()
                         tool_id = result.get("tool_id")
                         
-                        # Store handler locally
                         if tool_id:
-                            self.tool_handlers[tool_id] = handler
-                            logger.info(f"Registered tool: {name} ({tool_id})")
+                            self.registered_tools.append(tool_id)
+                            logger.info(f"Registered tool: {full_name} ({tool_id})")
                         
                         return tool_id
                     else:
                         error_text = await resp.text()
-                        logger.error(f"Failed to register tool {name}: HTTP {resp.status} - {error_text}")
+                        logger.error(f"Failed to register tool {full_name}: HTTP {resp.status} - {error_text}")
                         return None
             except Exception as e:
-                logger.error(f"Error registering tool {name}: {e}")
+                logger.error(f"Error registering tool {full_name}: {e}")
                 return None
     
     async def unregister_tool(self, tool_id: str) -> bool:
@@ -146,13 +167,18 @@ class HermesMCPClient:
         """
         async with aiohttp.ClientSession() as session:
             try:
+                headers = {}
+                if self.auth_token:
+                    headers["Authorization"] = f"Bearer {self.auth_token}"
+                    
                 async with session.delete(
                     f"{self.mcp_base_url}/tools/{tool_id}",
+                    headers=headers,
                     timeout=aiohttp.ClientTimeout(total=self.timeout)
                 ) as resp:
-                    if resp.status == 200:
-                        # Remove local handler
-                        self.tool_handlers.pop(tool_id, None)
+                    if resp.status in (200, 204):
+                        if tool_id in self.registered_tools:
+                            self.registered_tools.remove(tool_id)
                         logger.info(f"Unregistered tool: {tool_id}")
                         return True
                     else:
@@ -394,3 +420,11 @@ class HermesMCPClient:
             except Exception as e:
                 logger.error(f"Error getting context: {e}")
                 return None
+    
+    async def cleanup(self):
+        """
+        Cleanup by unregistering all tools registered by this client.
+        """
+        for tool_id in self.registered_tools.copy():
+            await self.unregister_tool(tool_id)
+        logger.info(f"Cleaned up {len(self.registered_tools)} registered tools")
