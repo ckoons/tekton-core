@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Test script to verify Phase 3 MCP migration - Hermes tool registration
+Test script to verify MCP Installation - Hermes tool registration
 
 This script tests that all components properly register their FastMCP tools 
 with Hermes through the new bridge implementation.
 
 Usage:
-    python test_mcp_phase3_migration.py                    # Test all components
-    python test_mcp_phase3_migration.py --component hermes # Test only Hermes
-    python test_mcp_phase3_migration.py -c hermes,apollo   # Test Hermes and Apollo
+    python test_mcp_instation.py                    # Test all components
+    python test_mcp_instation.py --component hermes # Test only Hermes
+    python test_mcp_instation.py -c hermes,apollo   # Test Hermes and Apollo
 """
 
 import asyncio
@@ -118,14 +118,14 @@ async def test_tool_execution(tool_id: str, parameters: Dict[str, Any]) -> bool:
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Test Phase 3 MCP migration - Hermes tool registration",
+        description="Test MCP Installation - Hermes tool registration",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python test_mcp_phase3_migration.py                    # Test all components
-  python test_mcp_phase3_migration.py --component hermes # Test only Hermes
-  python test_mcp_phase3_migration.py -c hermes,apollo   # Test Hermes and Apollo
-  python test_mcp_phase3_migration.py -c apollo,athena,budget,engram
+  python test_mcp_instation.py                    # Test all components
+  python test_mcp_instation.py --component hermes # Test only Hermes
+  python test_mcp_instation.py -c hermes,apollo   # Test Hermes and Apollo
+  python test_mcp_instation.py -c apollo,athena,budget,engram
         """
     )
     
@@ -162,35 +162,54 @@ def filter_components(components_dict: Dict, filter_list: Optional[str]) -> Dict
 
 
 async def main():
-    """Run the Phase 3 migration tests."""
+    """Run the MCP Installation tests."""
     args = parse_arguments()
     
     # Filter components if specified
     components_to_test = filter_components(COMPONENTS, args.component)
     
     if args.component:
-        print(f"🔍 Testing Phase 3 MCP Migration - {', '.join(components_to_test.keys())}")
+        print(f"🔍 Testing MCP Installation - {', '.join(components_to_test.keys())}")
     else:
-        print("🔍 Testing Phase 3 MCP Migration - Hermes Tool Registration")
+        print("🔍 Testing MCP Installation - Hermes Tool Registration")
     print("=" * 60)
     
     # Step 1: Check if selected components are healthy
     print("\n1️⃣ Checking component health...")
     all_healthy = True
+    unhealthy_components = []
+    healthy_components = []
+    
+    # Always check Hermes first if not filtered
+    if not args.component or 'hermes' in args.component.lower():
+        hermes_healthy = await check_component_health("Hermes", 8001)
+        status = "✅" if hermes_healthy else "❌"
+        print(f"   {status} Hermes (port 8001): {'Healthy' if hermes_healthy else 'Not healthy'}")
+        if not hermes_healthy:
+            print("\n❌ Hermes is required to be running. Please start it first:")
+            print("   cd Hermes && ./run_hermes.sh")
+            return
+    
     for comp_name, comp_info in components_to_test.items():
+        if comp_name.lower() == "hermes":
+            continue  # Already checked above
         is_healthy = await check_component_health(comp_info["name"], comp_info["port"])
         status = "✅" if is_healthy else "❌"
         print(f"   {status} {comp_info['name']} (port {comp_info['port']}): {'Healthy' if is_healthy else 'Not healthy'}")
         if not is_healthy:
             all_healthy = False
+            unhealthy_components.append(comp_info)
+        else:
+            healthy_components.append(comp_info)
     
     if not all_healthy:
-        print("\n⚠️  Not all components are healthy. Please start them first:")
-        print("   - Start Hermes: cd Hermes && ./run_hermes.sh")
-        print("   - Start Athena: cd Athena && ./run_athena.sh")
-        print("   - Start Budget: cd Budget && ./run_budget.sh")
-        print("   - Start Engram: cd Engram && ./run_engram.sh")
-        return
+        print(f"\n⚠️  {len(unhealthy_components)} component(s) are not healthy:")
+        for comp in unhealthy_components:
+            print(f"   - Start {comp['name']}: cd {comp['name']} && ./run_{comp['name'].lower()}.sh")
+        print(f"\n✅ {len(healthy_components)} component(s) are healthy and will be tested.")
+        print("\n🔄 Continuing with available components...")
+    else:
+        print(f"\n✅ All {len(components_to_test)} components are healthy!")
     
     # Wait a bit for tool registration to complete
     print("\n⏳ Waiting for tool registration to complete...")
@@ -220,12 +239,20 @@ async def main():
         ],
         "engram": [
             "health_check", "component_info",
-            "StoreMemory", "RecallMemory", "SearchMemories", "DeleteMemory",
-            "GetMemoryStats", "StoreStructuredMemory", "GetStructuredMemory",
-            "SearchStructuredMemories", "UpdateStructuredMemory", "DeleteStructuredMemory"
+            "MemoryStore", "MemoryQuery", "GetContext", "StructuredMemoryAdd",
+            "StructuredMemoryGet", "StructuredMemoryUpdate", "StructuredMemoryDelete",
+            "StructuredMemorySearch", "NexusProcess"
         ],
         "ergon": ["health_check", "component_info"],
-        "harmonia": ["health_check", "component_info"],
+        "harmonia": [
+            "health_check", "component_info",
+            "CreateWorkflowDefinition", "UpdateWorkflowDefinition", "DeleteWorkflowDefinition",
+            "GetWorkflowDefinition", "ListWorkflowDefinitions", "ExecuteWorkflow",
+            "CancelWorkflowExecution", "PauseWorkflowExecution", "ResumeWorkflowExecution",
+            "GetWorkflowExecutionStatus", "ListWorkflowExecutions", "CreateTemplate",
+            "InstantiateTemplate", "ListTemplates", "ListComponents",
+            "GetComponentActions", "ExecuteComponentAction"
+        ],
         "metis": [
             "health_check", "component_info",
             "decompose_task", "analyze_task_complexity", "suggest_task_order",
@@ -238,16 +265,15 @@ async def main():
         "telos": ["health_check", "component_info"]
     }
     
-    # Check each component's tools (only test filtered components)
-    components_to_check = list(components_to_test.keys())
-    if not args.component:
-        # If no filter, include hermes
-        if 'hermes' not in components_to_check:
-            components_to_check.append('hermes')
-    elif 'hermes' in [c.lower() for c in args.component.split(',')]:
-        # If hermes explicitly requested, ensure it's included
-        if 'hermes' not in components_to_check:
-            components_to_check.append('hermes')
+    # Check each component's tools (only test healthy components)
+    # Build list of healthy component names
+    healthy_component_names = [comp['name'].lower() for comp in healthy_components]
+    
+    # Always include Hermes if it's running (already checked above)
+    if not args.component or 'hermes' in args.component.lower():
+        healthy_component_names.append('hermes')
+    
+    components_to_check = healthy_component_names
     
     for component in components_to_check:
         if component not in expected_tools:
@@ -333,27 +359,63 @@ async def main():
     success_count = sum(test_results)
     total_count = len(test_results)
     
-    if success_count == total_count:
-        print("✅ All tests passed! Phase 3 migration is successful.")
-        print("\nThe following components are now integrated with Hermes:")
-        print("- Athena: FastMCP tools accessible through Hermes")
-        print("- Budget: FastMCP tools accessible through Hermes")
-        print("- Engram: FastMCP tools accessible through Hermes")
-    else:
-        print(f"⚠️  {success_count}/{total_count} tests passed.")
-        print("\nPlease check the logs of failing components for more details.")
-        
-        # Check if this is likely an import/environment issue
-        if not tools_by_component or len(tools_by_component) <= 1:
-            print("\n🔍 Diagnosis: No component tools found in Hermes registry.")
-            print("   This suggests the MCP bridges are not being initialized.")
-            print("   Likely causes:")
-            print("   - Import errors preventing bridge initialization")
-            print("   - Python path not including component modules")
-            print("   - Environment variables not set correctly")
-            print("   - Bridge code not being executed during startup")
+    print(f"📊 Test Results: {success_count}/{total_count} tests passed")
     
-    print("\n📝 Note: The components maintain their FastMCP implementation")
+    if unhealthy_components:
+        print(f"\n⚠️  {len(unhealthy_components)} component(s) were skipped (not running):")
+        for comp in unhealthy_components:
+            print(f"   - {comp['name']} (port {comp['port']})")
+    
+    if healthy_components:
+        print(f"\n✅ {len(healthy_components)} component(s) were tested:")
+        
+        # Group components by their tool registration status
+        fully_integrated = []
+        partially_integrated = []
+        basic_only = []
+        
+        for comp in healthy_components:
+            comp_name = comp['name'].lower()
+            if comp_name in tools_by_component:
+                tools = tools_by_component[comp_name]
+                expected = expected_tools.get(comp_name, [])
+                
+                # Count FastMCP tools (exclude health_check and component_info)
+                fastmcp_tools = [t for t in tools if t not in ['health_check', 'component_info']]
+                
+                if len(fastmcp_tools) > 0:
+                    if set(expected).issubset(set(tools)):
+                        fully_integrated.append((comp['name'], len(fastmcp_tools)))
+                    else:
+                        partially_integrated.append((comp['name'], len(fastmcp_tools)))
+                else:
+                    basic_only.append(comp['name'])
+            else:
+                basic_only.append(comp['name'])
+        
+        if fully_integrated:
+            print("\n   🌟 Fully Integrated (FastMCP + Hermes):")
+            for name, tool_count in fully_integrated:
+                print(f"      - {name}: {tool_count} FastMCP tools")
+        
+        if partially_integrated:
+            print("\n   ⚠️  Partially Integrated:")
+            for name, tool_count in partially_integrated:
+                print(f"      - {name}: {tool_count} FastMCP tools (some missing)")
+        
+        if basic_only:
+            print("\n   📋 Basic Integration Only:")
+            for name in basic_only:
+                print(f"      - {name}: health_check, component_info only")
+    
+    if success_count < total_count:
+        print("\n🔍 Diagnosis Tips:")
+        print("   - Check component logs for FastMCP registration errors")
+        print("   - Verify get_all_tools() function exists and returns tools")
+        print("   - Ensure MCP bridge is initialized during startup")
+        print("   - Check for import errors in tools.py files")
+    
+    print("\n📝 Note: Components maintain their FastMCP implementation")
     print("   while also registering tools with Hermes for centralized access.")
 
 if __name__ == "__main__":
