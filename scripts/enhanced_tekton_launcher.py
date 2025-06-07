@@ -176,7 +176,8 @@ class EnhancedComponentLauncher:
         
         # Setup log directory
         self.tekton_root = tekton_root  # Use the globally found tekton_root
-        self.log_dir = os.path.join(self.tekton_root, ".tekton", "logs")
+        self.log_dir = os.environ.get('TEKTON_LOG_DIR', 
+                                      os.path.join(self.tekton_root, ".tekton", "logs"))
         os.makedirs(self.log_dir, exist_ok=True)
         
     async def __aenter__(self):
