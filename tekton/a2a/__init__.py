@@ -54,6 +54,19 @@ from .methods import (
     create_standard_dispatcher
 )
 
+# Import streaming components
+from .streaming import (
+    SSEManager,
+    SSEEvent,
+    create_sse_response,
+    EventType,
+    StreamEvent,
+    TaskEvent,
+    AgentEvent,
+    SubscriptionManager,
+    Subscription
+)
+
 __all__ = [
     # JSON-RPC
     'JSONRPCRequest',
@@ -90,7 +103,18 @@ __all__ = [
     'MethodNotFoundError',
     'InvalidParamsError',
     'InternalError',
-    'ParseError'
+    'ParseError',
+    
+    # Streaming
+    'SSEManager',
+    'SSEEvent',
+    'create_sse_response',
+    'EventType',
+    'StreamEvent',
+    'TaskEvent',
+    'AgentEvent',
+    'SubscriptionManager',
+    'Subscription'
 ]
 
 __version__ = '2.0.0'

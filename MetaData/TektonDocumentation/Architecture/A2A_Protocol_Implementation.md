@@ -2,349 +2,239 @@
 
 ## Overview
 
-The Agent-to-Agent (A2A) Protocol provides standardized communication between autonomous agents in the Tekton ecosystem. Our implementation follows the A2A Protocol v0.2.1 specification, using JSON-RPC 2.0 as the message format and providing a robust framework for agent discovery, task management, and inter-agent communication.
+The Agent-to-Agent (A2A) Protocol v0.2.1 provides a standardized communication framework for autonomous agents within the Tekton ecosystem. This implementation uses JSON-RPC 2.0 as the message format and supports both request-response and streaming communication patterns.
 
 ## Architecture
 
 ### Core Components
 
-```
-/tekton/a2a/
-├── __init__.py           # Public API exports
-├── jsonrpc.py           # JSON-RPC 2.0 implementation
-├── errors.py            # Error definitions and handling
-├── agent.py             # Agent Card and Registry
-├── task.py              # Task lifecycle management
-├── discovery.py         # Agent discovery service
-└── methods.py           # Method dispatcher and standard methods
-```
+1. **JSON-RPC Layer** (`/tekton/a2a/jsonrpc.py`)
+   - Implements JSON-RPC 2.0 specification
+   - Handles single requests, batch requests, and notifications
+   - Provides error handling and response formatting
 
-### Integration Architecture
+2. **Agent Registry** (`/tekton/a2a/agent.py`)
+   - Manages agent registration and lifecycle
+   - Tracks agent capabilities and status
+   - Implements Agent Card format compliance
 
-```
-┌─────────────────┐     JSON-RPC 2.0      ┌─────────────────┐
-│   Component A   │◄──────────────────────►│     Hermes      │
-│  (e.g., Ergon)  │                        │  (A2A Hub)      │
-└─────────────────┘                        └─────────────────┘
-                                                    │
-                                                    │
-                                          ┌─────────┴─────────┐
-                                          │                   │
-                                    ┌─────▼─────┐      ┌──────▼────┐
-                                    │Component B│      │Component C│
-                                    └───────────┘      └───────────┘
-```
+3. **Task Manager** (`/tekton/a2a/task.py`)
+   - Handles task creation, assignment, and lifecycle
+   - Supports state transitions with validation
+   - Emits events for streaming (Phase 2)
 
-## Protocol Implementation
+4. **Discovery Service** (`/tekton/a2a/discovery.py`)
+   - Provides agent discovery by capability
+   - Supports method-based agent lookup
+   - Enables dynamic service discovery
 
-### JSON-RPC 2.0 Message Format
+5. **Method Dispatcher** (`/tekton/a2a/methods.py`)
+   - Routes JSON-RPC methods to handlers
+   - Implements standard A2A methods
+   - Extensible for custom methods
 
-All A2A communication uses JSON-RPC 2.0:
+6. **Streaming Support** (`/tekton/a2a/streaming/`) - Phase 2
+   - Server-Sent Events (SSE) for real-time updates
+   - Event-driven architecture with filters
+   - Subscription management for targeted delivery
 
-```json
-// Request
-{
-  "jsonrpc": "2.0",
-  "method": "agent.register",
-  "params": {
-    "agent_card": {
-      "id": "agent-123",
-      "name": "My Agent",
-      "capabilities": ["task_execution"],
-      "supported_methods": ["custom.method"]
-    }
-  },
-  "id": "req-456"
-}
+### Integration with Hermes
 
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "success": true,
-    "agent_id": "agent-123"
-  },
-  "id": "req-456"
-}
-```
+Hermes serves as the central hub for A2A communication:
 
-### Standard Methods
+1. **A2A Service** (`/Hermes/hermes/core/a2a_service.py`)
+   - Bridges Hermes infrastructure with A2A protocol
+   - Manages component lifecycle
+   - Handles event routing
 
-The A2A implementation provides these standard methods:
+2. **A2A Endpoints** (`/Hermes/hermes/api/a2a_endpoints.py`)
+   - Provides JSON-RPC endpoint at `/api/a2a/v1/`
+   - Well-known agent card at `/.well-known/agent.json`
+   - SSE streaming at `/api/a2a/v1/stream/events`
 
-#### Agent Management
-- `agent.register` - Register an agent
-- `agent.unregister` - Unregister an agent
-- `agent.heartbeat` - Send heartbeat signal
-- `agent.update_status` - Update agent status
-- `agent.get` - Get agent information
-- `agent.list` - List all online agents
+## Implementation Phases
 
-#### Discovery
-- `discovery.query` - Query agents with filters
-- `discovery.find_for_method` - Find agent for specific method
-- `discovery.find_for_capability` - Find agents with capability
-- `discovery.capability_map` - Get capability to agent mapping
-- `discovery.method_map` - Get method to agent mapping
+### Phase 1: Core Protocol (Completed)
 
-#### Task Management
+- ✅ JSON-RPC 2.0 message handling
+- ✅ Agent registration and discovery
+- ✅ Task lifecycle management
+- ✅ Method dispatcher with standard methods
+- ✅ Integration with Hermes
+- ✅ Comprehensive test suite (96 tests)
+
+### Phase 2: Streaming Support (In Progress)
+
+- ✅ SSE implementation for unidirectional streaming
+- ✅ Event-driven task updates
+- ✅ Subscription management
+- ✅ Connection filtering
+- 🔄 WebSocket support (pending)
+- 🔄 Channel-based pub/sub (pending)
+
+### Phase 3: Advanced Features (Future)
+
+- Multi-agent conversation support
+- Distributed task coordination
+- Capability negotiation
+- Security and authentication
+
+## Standard A2A Methods
+
+### Agent Methods
+- `agent.register` - Register a new agent
+- `agent.unregister` - Remove an agent
+- `agent.heartbeat` - Update agent heartbeat
+- `agent.update_status` - Change agent status
+- `agent.get` - Get agent details
+- `agent.list` - List all agents
+
+### Task Methods
 - `task.create` - Create a new task
 - `task.assign` - Assign task to agent
 - `task.update_state` - Update task state
 - `task.update_progress` - Update task progress
-- `task.complete` - Complete a task
-- `task.fail` - Fail a task
+- `task.complete` - Mark task complete
+- `task.fail` - Mark task failed
 - `task.cancel` - Cancel a task
-- `task.get` - Get task information
-- `task.list` - List tasks with filters
+- `task.get` - Get task details
+- `task.list` - List tasks
 
-#### Hermes-Specific Extensions
-- `agent.forward` - Forward method call to specific agent
-- `channel.subscribe` - Subscribe to message channel
+### Discovery Methods
+- `discovery.query` - Query agents by criteria
+- `discovery.find_for_method` - Find agents supporting a method
+- `discovery.find_for_capability` - Find agents with capability
+- `discovery.capability_map` - Get capability to agents mapping
+- `discovery.method_map` - Get method to agents mapping
+
+### Hermes-Specific Methods
+- `agent.forward` - Forward request to specific agent
+- `channel.subscribe` - Subscribe to a channel
 - `channel.unsubscribe` - Unsubscribe from channel
-- `channel.publish` - Publish message to channel
-
-## Implementation Details
-
-### Agent Cards
-
-Agents are described using Agent Cards (v0.2.1 spec):
-
-```python
-from tekton.a2a import AgentCard
-
-agent_card = AgentCard.create(
-    name="My Agent",
-    description="An example agent",
-    version="1.0.0",
-    capabilities=["nlp", "code_generation"],
-    supported_methods=["analyze.text", "generate.code"],
-    endpoint="http://localhost:8000/api/a2a/v1/",
-    tags=["ai", "assistant"]
-)
-```
-
-### Task Lifecycle
-
-Tasks follow a formal state machine:
-
-```
-   ┌─────────┐
-   │ PENDING │──────┬────────► CANCELLED
-   └────┬────┘      │
-        │           │
-        ▼           │
-   ┌─────────┐      │
-   │ RUNNING │──────┼────────► FAILED
-   └────┬────┘      │
-        │           │
-        ├───────────┘
-        │
-        ├────────► PAUSED ──┐
-        │                   │
-        │◄──────────────────┘
-        │
-        ▼
-   ┌───────────┐
-   │ COMPLETED │
-   └───────────┘
-```
-
-### Error Handling
-
-A2A uses standard JSON-RPC error codes plus custom extensions:
-
-```python
-# Standard JSON-RPC errors
--32700  # Parse error
--32600  # Invalid Request
--32601  # Method not found
--32602  # Invalid params
--32603  # Internal error
-
-# A2A custom errors (-32000 to -32099)
--32000  # Agent not found
--32001  # Task not found
--32002  # Unauthorized
--32003  # Capability not supported
--32004  # Invalid task state transition
--32005  # Rate limit exceeded
--32006  # Operation timeout
-```
-
-## Integration with Tekton Components
-
-### Hermes as Central Hub
-
-Hermes serves as the central A2A hub, providing:
-1. Agent registration and discovery
-2. Method routing between agents
-3. Task management
-4. Channel-based messaging
-
-### Component Integration Steps
-
-To add A2A support to a Tekton component:
-
-1. **Create an A2A client**:
-```python
-from ergon.core.a2a_client import A2AClient
-
-client = A2AClient(
-    agent_name="My Component",
-    capabilities=["my_capability"],
-    supported_methods=["my.method"]
-)
-
-await client.initialize()  # Registers with Hermes
-```
-
-2. **Implement A2A endpoints** (optional):
-```python
-from fastapi import APIRouter
-from tekton.a2a import JSONRPCRequest
-
-router = APIRouter()
-
-@router.post("/api/a2a/v1/")
-async def handle_a2a(request: JSONRPCRequest):
-    # Handle incoming A2A requests
-    pass
-```
-
-3. **Use A2A for inter-component communication**:
-```python
-# Discover agents
-agents = await client.discover_agents(capabilities=["text_processing"])
-
-# Create and manage tasks
-task = await client.create_task(
-    name="Process Document",
-    input_data={"document": "..."}
-)
-
-# Forward method calls
-result = await client.forward_to_agent(
-    agent_id="other-agent",
-    method="process.text",
-    params={"text": "..."}
-)
-```
+- `channel.publish` - Publish to channel
 
 ## Testing
 
-### Unit Testing
+### Running Tests
 
-Run A2A unit tests:
 ```bash
-python tests/run_unit_tests_only.py
+# Run all A2A tests
+python tests/run_a2a_all_tests.py
+
+# Run only unit tests
+python tests/run_a2a_all_tests.py -u
+
+# Run only integration tests
+python tests/run_a2a_all_tests.py -i
+
+# Run manual streaming test
+python tests/manual/test_a2a_streaming.py
 ```
 
-### Integration Testing
+### Test Coverage
 
-Test A2A integration with a running Hermes instance:
+- **Unit Tests**: Core protocol components, JSON-RPC handling, streaming
+- **Integration Tests**: Hermes integration, end-to-end flows
+- **Manual Tests**: SSE streaming, subscription management
+
+## Usage Examples
+
+### Basic Agent Registration
+
 ```python
-import aiohttp
-import json
-
-async def test_a2a():
-    async with aiohttp.ClientSession() as session:
-        # Test JSON-RPC endpoint
-        request = {
-            "jsonrpc": "2.0",
-            "method": "agent.list",
-            "id": 1
+# JSON-RPC request
+{
+    "jsonrpc": "2.0",
+    "method": "agent.register",
+    "params": {
+        "agent_card": {
+            "name": "MyAgent",
+            "description": "Example agent",
+            "version": "1.0.0",
+            "capabilities": ["task_processing"],
+            "supported_methods": ["custom.method"],
+            "endpoint": "http://localhost:8005/"
         }
-        
-        async with session.post(
-            "http://localhost:8001/api/a2a/v1/",
-            json=request
-        ) as response:
-            result = await response.json()
-            print(f"Online agents: {result['result']}")
+    },
+    "id": 1
+}
 ```
 
-## Preparing for V1.0
+### Creating and Monitoring a Task with SSE
 
-The current implementation (v0.2.1) provides a solid foundation for the upcoming V1.0 release. Key areas for enhancement:
+```python
+# Create task
+{
+    "jsonrpc": "2.0",
+    "method": "task.create",
+    "params": {
+        "name": "Process Data",
+        "description": "Process user data",
+        "priority": "high"
+    },
+    "id": 1
+}
 
-### 1. Streaming Support (Phase 2)
-- Server-Sent Events (SSE) for real-time updates
-- WebSocket support for bidirectional streaming
-- Streaming task progress and logs
+# Connect to SSE stream
+GET /api/a2a/v1/stream/events?task_id=task-123
 
-### 2. Enhanced Security (Phase 3)
-- JWT-based authentication
-- OAuth 2.0 support
-- Method-level authorization
-- Rate limiting per agent
+# Receive real-time updates
+data: {"type": "task.state_changed", "task_id": "task-123", ...}
+data: {"type": "task.progress", "task_id": "task-123", "progress": 0.5, ...}
+data: {"type": "task.completed", "task_id": "task-123", ...}
+```
 
-### 3. Persistence
-- Agent state persistence in Hermes database
-- Task history and audit logs
-- Conversation history
-
-### 4. Advanced Features
-- Agent capability negotiation
-- Multi-agent task coordination
-- Distributed task execution
-- Agent health monitoring and auto-recovery
-
-## Maintenance Guidelines
+## Development Guidelines
 
 ### Adding New Methods
 
-1. Define method in `methods.py`:
-```python
-async def my_new_method(param1: str, param2: int) -> Dict[str, Any]:
-    """Documentation for the method"""
-    # Implementation
-    return {"result": "success"}
-```
+1. Define method handler in appropriate module
+2. Register with method dispatcher
+3. Add tests for the new method
+4. Update documentation
 
-2. Register with dispatcher:
-```python
-dispatcher.register_method("category.my_method", my_new_method)
-```
+### Extending Streaming
 
-3. Update agent capabilities:
-```python
-supported_methods.append("category.my_method")
-```
+1. Create new event types in `events.py`
+2. Add event emission in relevant components
+3. Update filters if needed
+4. Test with SSE client
 
-### Monitoring and Debugging
+### Debugging
 
-Enable debug logging:
-```python
-import logging
-logging.getLogger("tekton.a2a").setLevel(logging.DEBUG)
-```
+- Enable debug logging: `export LOG_LEVEL=DEBUG`
+- Check Hermes logs for A2A service messages
+- Use manual test scripts for interactive testing
+- Monitor SSE connections at `/api/a2a/v1/stream/connections`
 
-Monitor A2A traffic through Hermes logs:
-```bash
-tail -f logs/hermes.log | grep "a2a"
-```
+## Migration from Legacy A2A
 
-### Performance Considerations
+The new implementation is not backwards compatible. Key changes:
 
-1. **Connection Pooling**: A2A clients use aiohttp session pooling
-2. **Batch Requests**: Use JSON-RPC batch requests for multiple operations
-3. **Heartbeat Interval**: Default 60s, adjust based on network latency
-4. **Task Cleanup**: Implement periodic cleanup of completed tasks
+1. **Message Format**: Custom format → JSON-RPC 2.0
+2. **Agent Registration**: Direct registration → Agent Cards
+3. **Task Management**: Simple states → Full lifecycle
+4. **Discovery**: Basic listing → Advanced querying
+5. **Streaming**: Not supported → SSE/WebSocket
 
-## Best Practices
+## Future Enhancements
 
-1. **Always use structured errors** - Return proper JSON-RPC error responses
-2. **Implement heartbeats** - Keep agent registration active
-3. **Handle disconnections gracefully** - Re-register on connection loss
-4. **Use appropriate task states** - Follow the state machine
-5. **Document custom methods** - Include in agent card metadata
-6. **Version your agents** - Use semantic versioning
-7. **Test state transitions** - Ensure valid task lifecycle
+1. **Security**
+   - Agent authentication
+   - Message signing
+   - Capability-based access control
 
-## References
+2. **Performance**
+   - Connection pooling
+   - Event batching
+   - Caching layer
 
-- [A2A Protocol Specification v0.2.1](https://google-a2a.github.io/A2A/specification/)
-- [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
-- [Tekton A2A Implementation](/tekton/a2a/)
-- [Phase 1 Status Report](/MetaData/DevelopmentSprints/A2Av2_Sprint/PHASE1_STATUS.md)
+3. **Reliability**
+   - Message persistence
+   - Delivery guarantees
+   - Retry mechanisms
+
+4. **Monitoring**
+   - Metrics collection
+   - Health checks
+   - Performance tracking
