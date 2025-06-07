@@ -509,7 +509,11 @@ async def main():
         
         hermes_tools_to_test = [
             ("ListComponents", {}),
-            ("GetComponentStatus", {"component_id": "hermes-api"})
+            ("GetComponentStatus", {"component_id": "hermes-api"}),
+            ("QueryVectorDatabase", {"query": "test", "limit": 5}),
+            ("StoreVectorData", {"data": "test data", "metadata": {"test": True}}),
+            ("PublishMessage", {"channel": "test", "message": {"content": "test"}}),
+            ("CreateChannel", {"name": "test-channel"})
         ]
         
         for tool_name, params in hermes_tools_to_test:
@@ -656,6 +660,16 @@ async def main():
         
         print("\n📝 Note: Components maintain their FastMCP implementation")
         print("   while also registering tools with Hermes for centralized access.")
+        
+        # Show Hermes-specific details if comprehensive
+        if args.comprehensive:
+            print("\n🔧 Hermes Tools Tested:")
+            print("   - ListComponents: List all registered components")
+            print("   - GetComponentStatus: Get status of specific component")
+            print("   - QueryVectorDatabase: Search vector database")
+            print("   - StoreVectorData: Store data in vector database")
+            print("   - PublishMessage: Publish message to channel")
+            print("   - CreateChannel: Create new message channel")
 
 if __name__ == "__main__":
     asyncio.run(main())

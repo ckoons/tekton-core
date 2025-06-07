@@ -785,152 +785,307 @@ if __name__ == "__main__":
     )
 ```
 
-### Step 7: Create MCP Endpoints
+### Step 7: Create MCP Integration (Modern FastMCP Approach)
+
+With the completion of the YetAnotherMCP Sprint, Tekton now uses a standardized FastMCP implementation. Here's how to add MCP tools to your component:
+
+#### Create MCP Tools Module
 
 ```python
-# nexus/api/endpoints/mcp.py
+# nexus/core/mcp/tools.py
 """
-MCP v2 Endpoints for Nexus
+MCP Tools for Nexus using FastMCP
+
+This follows the modern Tekton MCP pattern where components:
+1. Use FastMCP decorators for tool definition
+2. Register tools with Hermes automatically
+3. Provide a get_all_tools() function for registration
 """
 
+from fastmcp import FastMCP
+from typing import List, Dict, Any
+
+# Component configuration
+COMPONENT_NAME = "nexus"
+
+# Create FastMCP instance
+mcp = FastMCP(
+    name=f"{COMPONENT_NAME}-mcp-server",
+    dependencies=["httpx"]
+)
+
+# Define tools using decorators
+@mcp.tool(description="Check component health")
+async def health_check() -> dict:
+    """Check if the component is healthy."""
+    return {
+        "status": "healthy",
+        "component": COMPONENT_NAME,
+        "version": "0.1.0"
+    }
+
+@mcp.tool(description="Get component information")
+async def component_info() -> dict:
+    """Get basic component information."""
+    return {
+        "name": COMPONENT_NAME,
+        "version": "0.1.0",
+        "description": "Connection management component",
+        "capabilities": ["connection_monitoring", "dependency_tracking"]
+    }
+
+@mcp.tool(description="List all component connections and their status")
+async def list_connections() -> List[Dict[str, Any]]:
+    """List all registered connections."""
+    # Import here to avoid circular imports
+    from nexus.api.app import app
+    
+    if not hasattr(app.state, "connection_manager"):
+        return {"error": "Connection manager not initialized"}
+    
+    connections = await app.state.connection_manager.get_all_connections()
+    return [
+        {
+            "component": conn.component_name,
+            "status": conn.status,
+            "port": conn.port,
+            "latency_ms": conn.latency_ms,
+            "last_seen": conn.last_seen.isoformat()
+        }
+        for conn in connections
+    ]
+
+@mcp.tool(description="Test connectivity to a specific component")
+async def test_connection(component_id: str) -> Dict[str, Any]:
+    """Test a specific connection.
+    
+    Args:
+        component_id: ID of the component to test
+        
+    Returns:
+        Connection test results
+    """
+    from nexus.api.app import app
+    
+    if not hasattr(app.state, "connection_manager"):
+        return {"error": "Connection manager not initialized"}
+    
+    try:
+        connection = await app.state.connection_manager.test_connection(component_id)
+        return {
+            "component": connection.component_name,
+            "status": connection.status,
+            "latency_ms": connection.latency_ms,
+            "healthy": connection.status == "connected"
+        }
+    except ValueError as e:
+        return {"error": str(e)}
+
+@mcp.tool(description="Get performance metrics for a component connection")
+async def get_connection_metrics(component_id: str) -> Dict[str, Any]:
+    """Get metrics for a specific connection.
+    
+    Args:
+        component_id: ID of the component
+        
+    Returns:
+        Performance metrics for the connection
+    """
+    from nexus.api.app import app
+    
+    if not hasattr(app.state, "connection_manager"):
+        return {"error": "Connection manager not initialized"}
+    
+    metrics = await app.state.connection_manager.get_connection_metrics(component_id)
+    if metrics:
+        return {
+            "component_id": metrics.component_id,
+            "success_rate": metrics.success_rate,
+            "avg_latency_ms": metrics.avg_latency_ms,
+            "min_latency_ms": metrics.min_latency_ms,
+            "max_latency_ms": metrics.max_latency_ms,
+            "total_requests": metrics.total_requests
+        }
+    else:
+        return {"error": f"No metrics available for {component_id}"}
+
+def get_all_tools():
+    """Get all MCP tools for registration with Hermes.
+    
+    This function is REQUIRED for Hermes integration.
+    It should return all tools in the format expected by Hermes.
+    """
+    tools = []
+    
+    # Get all FastMCP decorated tools
+    for tool in mcp.list_tools():
+        tool_dict = tool.dict()
+        # Add component prefix to tool ID
+        tool_dict["id"] = f"{COMPONENT_NAME}.{tool.name}"
+        tools.append(tool_dict)
+    
+    return tools
+
+# Optional: Create tool groups for better organization
+connection_tools = [list_connections, test_connection, get_connection_metrics]
+basic_tools = [health_check, component_info]
+```
+
+#### Create MCP Endpoints
+
+```python
+# nexus/api/mcp_endpoints.py
+"""
+MCP API endpoints for Nexus
+
+These endpoints expose the MCP tools via HTTP for testing
+and direct access. Hermes will use these for tool discovery.
+"""
+
+from fastapi import APIRouter, HTTPException
+from typing import Dict, Any, List
 import logging
-from typing import Dict, List, Any
-from fastapi import APIRouter, HTTPException, Depends
-from tekton.models.base import TektonBaseModel
-from pydantic import Field
 
-from nexus.api.dependencies import get_connection_manager
-from nexus.core.connection_manager import ConnectionManager
+from nexus.core.mcp.tools import get_all_tools, mcp
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
-# MCP v2 Models
-class Tool(TektonBaseModel):
-    """MCP Tool definition"""
-    name: str
-    description: str
-    inputSchema: Dict[str, Any]
+@router.get("/tools")
+async def list_tools() -> List[Dict[str, Any]]:
+    """List all available MCP tools.
+    
+    This endpoint is used by Hermes for tool discovery.
+    """
+    return get_all_tools()
 
-class ToolList(TektonBaseModel):
-    """Response for tool listing"""
-    tools: List[Tool]
+@router.post("/tools/{tool_id}/execute")
+async def execute_tool(tool_id: str, request: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute a specific tool.
+    
+    Args:
+        tool_id: The tool ID (e.g., "nexus.list_connections")
+        request: Request body with parameters
+        
+    Returns:
+        Tool execution result
+    """
+    # Remove component prefix if present
+    if tool_id.startswith("nexus."):
+        tool_name = tool_id[6:]  # Remove "nexus."
+    else:
+        tool_name = tool_id
+    
+    # Get parameters from request
+    parameters = request.get("parameters", {})
+    
+    # Find and execute the tool
+    for tool in mcp.list_tools():
+        if tool.name == tool_name:
+            try:
+                # Execute the tool
+                result = await tool.fn(**parameters)
+                return {"result": result}
+            except Exception as e:
+                logger.error(f"Error executing tool {tool_name}: {e}")
+                return {"error": str(e)}
+    
+    raise HTTPException(status_code=404, detail=f"Tool {tool_id} not found")
 
-class ToolCall(TektonBaseModel):
-    """Request to call a tool"""
-    name: str
-    arguments: Dict[str, Any] = Field(default_factory=dict)
-
-class ToolResponse(TektonBaseModel):
-    """Response from tool execution"""
-    content: List[Dict[str, Any]]
-    isError: bool = False
-
-# Define available tools
-AVAILABLE_TOOLS = [
-    Tool(
-        name="list_connections",
-        description="List all component connections and their status",
-        inputSchema={
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    ),
-    Tool(
-        name="test_connection",
-        description="Test connectivity to a specific component",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "component_id": {
-                    "type": "string",
-                    "description": "ID of the component to test"
-                }
-            },
-            "required": ["component_id"]
-        }
-    ),
-    Tool(
-        name="get_connection_metrics",
-        description="Get performance metrics for a component connection",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "component_id": {
-                    "type": "string",
-                    "description": "ID of the component"
-                }
-            },
-            "required": ["component_id"]
-        }
-    )
-]
-
-@router.post("/v2/tools/list", response_model=ToolList)
-async def list_tools() -> ToolList:
-    """List available MCP tools."""
-    return ToolList(tools=AVAILABLE_TOOLS)
-
-@router.post("/v2/tools/call", response_model=ToolResponse)
-async def call_tool(
-    request: ToolCall,
-    connection_manager: ConnectionManager = Depends(get_connection_manager)
-) -> ToolResponse:
-    """Execute an MCP tool."""
-    try:
-        if request.name == "list_connections":
-            connections = await connection_manager.get_all_connections()
-            content = [
-                {
-                    "type": "text",
-                    "text": f"{conn.component_name}: {conn.status} (port {conn.port})"
-                }
-                for conn in connections
-            ]
-            return ToolResponse(content=content)
-            
-        elif request.name == "test_connection":
-            component_id = request.arguments.get("component_id")
-            if not component_id:
-                raise ValueError("component_id is required")
-                
-            connection = await connection_manager.test_connection(component_id)
-            return ToolResponse(
-                content=[{
-                    "type": "text",
-                    "text": f"{connection.component_name}: {connection.status} (latency: {connection.latency_ms:.2f}ms)"
-                }]
-            )
-            
-        elif request.name == "get_connection_metrics":
-            component_id = request.arguments.get("component_id")
-            if not component_id:
-                raise ValueError("component_id is required")
-                
-            metrics = await connection_manager.get_connection_metrics(component_id)
-            if metrics:
-                return ToolResponse(
-                    content=[{
-                        "type": "text",
-                        "text": f"Metrics for {component_id}: Success rate: {metrics.success_rate:.2%}, Avg latency: {metrics.avg_latency_ms:.2f}ms"
-                    }]
-                )
-            else:
-                return ToolResponse(
-                    content=[{"type": "text", "text": f"No metrics available for {component_id}"}]
-                )
-        else:
-            raise HTTPException(status_code=404, detail=f"Tool {request.name} not found")
-            
-    except Exception as e:
-        logger.error(f"Error executing tool {request.name}: {e}")
-        return ToolResponse(
-            content=[{"type": "text", "text": str(e)}],
-            isError=True
-        )
+# Health check for MCP service
+@router.get("/health")
+async def mcp_health():
+    """Check MCP service health."""
+    tool_count = len(get_all_tools())
+    return {
+        "status": "healthy",
+        "tool_count": tool_count,
+        "mcp_version": "2.0",
+        "fastmcp": True
+    }
 ```
+
+#### Update Main App to Include MCP
+
+Update your `nexus/api/app.py` to include the MCP router:
+
+```python
+# In nexus/api/app.py, after mounting standard routers:
+
+# Import and include MCP router
+try:
+    from nexus.api import mcp_endpoints
+    app.include_router(
+        mcp_endpoints.router, 
+        prefix="/api/mcp/v2", 
+        tags=["mcp"]
+    )
+    logger.info("MCP endpoints registered at /api/mcp/v2")
+except ImportError as e:
+    logger.warning(f"MCP endpoints not available: {e}")
+```
+
+#### MCP Testing
+
+Create a test script to verify MCP integration:
+
+```python
+# examples/test_mcp_integration.py
+#!/usr/bin/env python3
+"""Test MCP integration for Nexus"""
+
+import asyncio
+import httpx
+import json
+
+async def test_nexus_mcp():
+    """Test Nexus MCP tools."""
+    base_url = "http://localhost:8016"
+    
+    async with httpx.AsyncClient() as client:
+        # 1. Check MCP health
+        print("Checking MCP health...")
+        response = await client.get(f"{base_url}/api/mcp/v2/health")
+        print(f"MCP Health: {response.json()}")
+        
+        # 2. List tools
+        print("\nListing MCP tools...")
+        response = await client.get(f"{base_url}/api/mcp/v2/tools")
+        tools = response.json()
+        print(f"Found {len(tools)} tools:")
+        for tool in tools:
+            print(f"  - {tool['name']}: {tool['description']}")
+        
+        # 3. Test tool execution
+        print("\nTesting list_connections tool...")
+        response = await client.post(
+            f"{base_url}/api/mcp/v2/tools/nexus.list_connections/execute",
+            json={"parameters": {}}
+        )
+        result = response.json()
+        print(f"Result: {json.dumps(result, indent=2)}")
+        
+        # 4. Test through Hermes (if running)
+        print("\nChecking Hermes registration...")
+        try:
+            response = await client.get("http://localhost:8001/api/mcp/v2/tools")
+            hermes_tools = response.json()
+            nexus_tools = [t for t in hermes_tools if t.get("name", "").startswith("nexus.")]
+            print(f"Nexus tools in Hermes: {len(nexus_tools)}")
+        except:
+            print("Hermes not available")
+
+if __name__ == "__main__":
+    asyncio.run(test_nexus_mcp())
+```
+
+#### Key Points for Modern MCP Implementation
+
+1. **Use FastMCP decorators** - The `@mcp.tool()` decorator is the standard way to define tools
+2. **Implement get_all_tools()** - This function is REQUIRED for Hermes integration
+3. **Tool naming** - Tools are automatically prefixed with component name by Hermes
+4. **No duplicate registration** - FastMCP handles basic tools like health_check automatically
+5. **Test both direct and through Hermes** - Ensure tools work in both scenarios
 
 Create dependencies:
 
@@ -1459,7 +1614,10 @@ Based on the Shared Utilities Sprint standards:
 - [ ] Launch script uses ANSI colors and lsof checking
 - [ ] Logs to ~/.tekton/logs/
 - [ ] Component appears in tekton-status as healthy
-- [ ] MCP tools are accessible
+- [ ] MCP tools are accessible via /api/mcp/v2/tools
+- [ ] MCP tools registered with Hermes (check via test script)
+- [ ] FastMCP decorators used for all tools
+- [ ] get_all_tools() function implemented
 - [ ] CLI commands work correctly
 - [ ] UI component loads in Hephaestus
 - [ ] WebSocket connections work
