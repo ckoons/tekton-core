@@ -57,7 +57,16 @@ class ComponentRegistry:
         Args:
             data_dir: Optional directory for persistent storage
         """
-        self.data_dir = data_dir or os.path.expanduser("~/.tekton/registry")
+        if data_dir:
+            self.data_dir = data_dir
+        else:
+            # Use $TEKTON_DATA_DIR/registry by default
+            default_data_dir = os.path.join(
+                os.environ.get('TEKTON_DATA_DIR', 
+                              os.path.join(os.environ.get('TEKTON_ROOT', os.path.expanduser('~')), '.tekton', 'data')),
+                'registry'
+            )
+            self.data_dir = default_data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         
         # Internal storage

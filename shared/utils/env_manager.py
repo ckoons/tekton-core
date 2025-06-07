@@ -132,6 +132,11 @@ class TektonEnvManager:
             os.environ['TEKTON_LOG_DIR'] = os.path.join(os.environ['TEKTON_ROOT'], '.tekton', 'logs')
             logger.info(f"Set TEKTON_LOG_DIR to: {os.environ['TEKTON_LOG_DIR']}")
         
+        # Set TEKTON_DATA_DIR if not already set
+        if 'TEKTON_DATA_DIR' not in os.environ:
+            os.environ['TEKTON_DATA_DIR'] = os.path.join(os.environ['TEKTON_ROOT'], '.tekton', 'data')
+            logger.info(f"Set TEKTON_DATA_DIR to: {os.environ['TEKTON_DATA_DIR']}")
+        
         # Load files in priority order (later files override earlier ones)
         env_files = [
             (self.user_env, "user"),
