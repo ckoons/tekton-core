@@ -1,183 +1,146 @@
-# A2A v2 Protocol Update - Sprint Plan
+# A2A v2 Protocol Sprint Plan
 
-## Overview
+## Sprint Overview
 
-This document outlines the high-level plan for the A2A v2 Protocol Update Sprint. It provides an overview of the goals, approach, and expected outcomes.
+**Sprint Name**: A2Av2 Protocol Implementation  
+**Duration**: 6-9 days  
+**Status**: Phase 2 In Progress
 
-Tekton is an intelligent orchestration system that coordinates multiple AI models and resources to efficiently solve complex software engineering problems. This Development Sprint focuses on updating Tekton's Agent-to-Agent (A2A) communication framework to align with the new A2A Protocol v0.2.1 specification, bringing industry-standard protocols and enterprise-ready features to Tekton's multi-agent orchestration capabilities.
+## Objective
 
-## Sprint Goals
+Implement the A2A Protocol v0.2.1 from scratch, providing a clean, specification-compliant implementation without legacy constraints.
 
-The primary goals of this sprint are:
+## Sprint Phases
 
-1. **Protocol Modernization**: Replace custom message format with JSON-RPC 2.0 over HTTP(S) for industry-standard communication
-2. **Real-time Capabilities**: Implement Server-Sent Events (SSE) for streaming updates and real-time agent collaboration
-3. **Task Lifecycle Management**: Introduce formal task states and lifecycle management with proper state transitions
-4. **Enterprise Security**: Add OAuth/JWT authentication, authorization, and webhook-based push notifications
-5. **Improved Discovery**: Update Agent Cards to match the new specification with skills, capabilities, and security schemes
+### Phase 1: Core Protocol Implementation ✅ COMPLETED
 
-## Business Value
+**Duration**: 3 days (Completed)
 
-This sprint delivers value by:
+**Deliverables**:
+- ✅ JSON-RPC 2.0 message handling
+- ✅ Agent Card format and registry
+- ✅ Task lifecycle management
+- ✅ Discovery service
+- ✅ Method dispatcher with standard methods
+- ✅ Hermes integration
+- ✅ Comprehensive test suite (96 tests)
 
-- **Standards Compliance**: Adopting JSON-RPC 2.0 enables easier integration with external systems and tools
-- **Better Interoperability**: The new protocol allows Tekton agents to communicate with any A2A-compliant system
-- **Enhanced Real-time Operations**: SSE streaming enables responsive, real-time agent collaboration
-- **Enterprise Readiness**: Built-in security and authentication features make Tekton suitable for enterprise deployments
-- **Improved Reliability**: Formal task lifecycle management provides better tracking and error handling
+**Key Files Created**:
+- `/tekton/a2a/jsonrpc.py` - JSON-RPC implementation
+- `/tekton/a2a/agent.py` - Agent registry and cards
+- `/tekton/a2a/task.py` - Task management
+- `/tekton/a2a/discovery.py` - Discovery service
+- `/tekton/a2a/methods.py` - Method dispatcher
+- `/Hermes/hermes/core/a2a_service.py` - Hermes integration
+- `/Hermes/hermes/api/a2a_endpoints.py` - API endpoints
 
-## Current State Assessment
+### Phase 2: Streaming and Real-time Communication ✅ COMPLETED
 
-### Existing Implementation
+**Duration**: 2-3 days (Completed)
 
-Tekton currently implements a custom A2A protocol with:
-- Custom message format using Python dataclasses
-- Basic agent registry with simple capability matching
-- Task management without formal state transitions
-- Direct agent-to-agent communication through Hermes message bus
-- No streaming or real-time update capabilities
-- Basic authentication through component registration
+**Deliverables**:
+- ✅ SSE (Server-Sent Events) for unidirectional streaming
+- ✅ Event-driven architecture with callbacks
+- ✅ Subscription management system
+- ✅ Connection filtering and routing
+- ✅ Unit tests for streaming components
+- 🔄 WebSocket support for bidirectional communication
+- 🔄 Channel-based pub/sub system
 
-### Pain Points
+**Progress**:
+- Created `/tekton/a2a/streaming/` module
+- Implemented SSEManager, events, and subscriptions
+- Integrated with TaskManager for real-time updates
+- Added streaming endpoints to Hermes
+- Created manual test scripts
+- **Current Issue**: Need Hermes restart to apply endpoint fixes
 
-- Custom protocol limits interoperability with external systems
-- No support for long-running tasks with progress updates
-- Limited real-time capabilities for agent collaboration
-- Missing enterprise security features (OAuth, JWT)
-- No standardized error handling or status codes
-- Difficult to debug agent interactions without proper state tracking
+### Phase 3: Advanced Features and Polish 📋 PLANNED
 
-## Proposed Approach
+**Duration**: 1-3 days
 
-The update will be implemented in layers, starting with the protocol foundation and building up to full feature parity:
+**Planned Deliverables**:
+- Multi-agent conversation support
+- Advanced task coordination
+- Performance optimizations
+- Security enhancements
+- Complete documentation
+- Migration guide from legacy A2A
 
-### Key Components Affected
+## Testing Strategy
 
-- **tekton-core/tekton/a2a**: Complete overhaul of the A2A module to support JSON-RPC 2.0
-- **Hermes/hermes/core/a2a_service.py**: Update to handle JSON-RPC methods and SSE streaming
-- **Ergon/ergon/api/a2a_endpoints.py**: Modify endpoints to use new protocol format
-- **All Components**: Update agent registration to use new Agent Card format
+### Completed Tests
+- ✅ 69 unit tests for core protocol
+- ✅ 27 unit tests for streaming
+- ✅ 5 integration tests for Hermes
+- ✅ Manual test scripts created
 
-### Technical Approach
+### Test Commands
+```bash
+# Run all A2A tests
+python tests/run_a2a_all_tests.py
 
-1. **Protocol Layer**: Implement JSON-RPC 2.0 request/response handling with proper error codes
-2. **Transport Layer**: Add HTTP(S) server capabilities to components for A2A endpoints
-3. **Streaming Layer**: Implement SSE for real-time updates using FastAPI's streaming response
-4. **Task Management**: Create formal TaskState enum and state transition logic
-5. **Security Layer**: Add authentication middleware supporting multiple schemes (Bearer, API Key)
+# Run unit tests only
+python tests/run_a2a_all_tests.py -u
 
-## Code Quality Requirements
+# Run integration tests only
+python tests/run_a2a_all_tests.py -i
 
-### Debug Instrumentation
+# Run manual streaming test
+python tests/manual/test_a2a_streaming.py
+```
 
-All code produced in this sprint **MUST** follow the [Debug Instrumentation Guidelines](/MetaData/TektonDocumentation/DeveloperGuides/Debugging/DebuggingInstrumentation.md):
+## Documentation
 
-- Frontend JavaScript must use conditional `TektonDebug` calls
-- Backend Python must use the `debug_log` utility and `@log_function` decorators
-- All debug calls must include appropriate component names and log levels
-- Error handling must include contextual debug information
+### Created Documentation
+- ✅ `/MetaData/TektonDocumentation/Architecture/A2A_Protocol_Implementation.md`
+- ✅ `/MetaData/DevelopmentSprints/A2Av2_Sprint/PHASE1_STATUS.md`
+- ✅ `/MetaData/DevelopmentSprints/A2Av2_Sprint/PHASE2_STATUS.md`
 
-This instrumentation will enable efficient debugging and diagnostics without impacting performance when disabled.
+### Pending Documentation
+- Update Building_New_Tekton_Components.md
+- Create migration guide
+- Add streaming examples
 
-### Documentation
+## Key Technical Decisions
 
-Code must be documented according to the following guidelines:
-
-- Class and method documentation with clear purpose statements
-- API contracts and parameter descriptions
-- Requirements for component initialization
-- Error handling strategy
-- JSON-RPC method signatures and examples
-
-### Testing
-
-The implementation must include appropriate tests:
-
-- Unit tests for JSON-RPC protocol handling
-- Integration tests for agent communication
-- Performance tests for streaming capabilities
-- Security tests for authentication/authorization
-
-## Out of Scope
-
-The following items are explicitly out of scope for this sprint:
-
-- UI updates for new A2A features
-- External agent integration (focus on internal Tekton agents first)
-- Advanced A2A features like agent collaboration protocols
-- Performance optimization (focus on correctness first)
-- Backward compatibility (clean implementation of v0.2.1)
+1. **No Backwards Compatibility**: Clean implementation without legacy support
+2. **JSON-RPC 2.0**: Standard protocol for all communication
+3. **Hermes as Hub**: Single entry point for A2A communication
+4. **Event-Driven Streaming**: Callbacks and SSE for real-time updates
+5. **Modular Design**: Clear separation of concerns
 
 ## Dependencies
 
-This sprint has the following dependencies:
+- Hermes must be running for A2A functionality
+- No external dependencies beyond standard Python libraries
+- FastAPI for API endpoints
+- asyncio for asynchronous operations
 
-- FastAPI for HTTP server and SSE streaming support
-- jsonrpc package for protocol handling
-- Current Tekton infrastructure (Hermes, component registration)
-- Existing authentication mechanisms for backward compatibility
+## Risks and Mitigation
 
-## Timeline and Phases
+1. **Risk**: Streaming complexity
+   - **Mitigation**: Phased implementation, extensive testing
 
-This sprint is planned to be completed in 3 phases:
+2. **Risk**: Performance with many agents
+   - **Mitigation**: Connection pooling, event batching (Phase 3)
 
-### Phase 1: Protocol Foundation
-- **Duration**: 2-3 days
-- **Focus**: JSON-RPC 2.0 implementation and basic HTTP transport
-- **Key Deliverables**: 
-  - JSON-RPC request/response handling
-  - HTTP endpoints for A2A methods
-  - Error code implementation
-  - Basic tests
+3. **Risk**: Integration challenges
+   - **Mitigation**: Clear interfaces, comprehensive tests
 
-### Phase 2: Streaming and Tasks
-- **Duration**: 2-3 days
-- **Focus**: SSE streaming and formal task management
-- **Key Deliverables**:
-  - Server-Sent Events implementation
-  - TaskState enum and transitions
-  - Task status updates
-  - Streaming tests
+## Next Steps
 
-### Phase 3: Security and Agent Cards
-- **Duration**: 2-3 days
-- **Focus**: Authentication, Agent Cards, and integration
-- **Key Deliverables**:
-  - Authentication middleware
-  - Updated Agent Card format
-  - Well-known URI endpoints
-  - Integration with existing components
+1. **Immediate** (Phase 2 completion):
+   - Fix and test SSE streaming end-to-end
+   - Implement WebSocket support
+   - Complete channel-based pub/sub
 
-## Risks and Mitigations
+2. **Phase 3**:
+   - Multi-agent conversations
+   - Performance optimizations
+   - Security features
 
-| Risk | Impact | Likelihood | Mitigation |
-|------|--------|------------|------------|
-| Steep learning curve for JSON-RPC 2.0 | Medium | Medium | Provide comprehensive examples and documentation |
-| Performance impact from HTTP overhead | Medium | Low | Use persistent connections and connection pooling |
-| Complex state management for tasks | Medium | Medium | Start with simple states, add complex ones incrementally |
-| Security vulnerabilities in auth | High | Low | Use established libraries and patterns |
-
-## Success Criteria
-
-This sprint will be considered successful if:
-
-- JSON-RPC 2.0 protocol is fully implemented and tested
-- At least one agent can communicate using the new protocol
-- SSE streaming works for real-time updates
-- Task state transitions are properly tracked
-- All code follows the Debug Instrumentation Guidelines
-- Documentation is complete and accurate
-- Tests pass with 80% coverage
-
-## Key Stakeholders
-
-- **Casey**: Human-in-the-loop project manager
-- **Tekton Core Team**: Affected by protocol changes
-- **Component Maintainers**: Need to update their agents
-
-## References
-
-- [A2A Protocol Specification v0.2.1](https://google-a2a.github.io/A2A/specification/)
-- [JSON-RPC 2.0 Specification](https://www.jsonrpc.org/specification)
-- [Server-Sent Events W3C Specification](https://html.spec.whatwg.org/multipage/server-sent-events.html)
-- [Current Tekton A2A Implementation](/Tekton/tekton/a2a/)
+3. **Post-Sprint**:
+   - Deploy to production
+   - Monitor and optimize
+   - Gather feedback for v0.3.0

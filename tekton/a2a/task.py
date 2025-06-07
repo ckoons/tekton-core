@@ -7,8 +7,9 @@ to the A2A Protocol v0.2.1 specification.
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Callable
 from uuid import uuid4
+import asyncio
 
 from tekton.models.base import TektonBaseModel
 from .errors import TaskStateError, TaskNotFoundError
@@ -193,6 +194,12 @@ class TaskManager:
     
     def __init__(self):
         self._tasks: Dict[str, Task] = {}
+        self._event_callbacks: List[Callable[[str, Task, str, Optional[Any]], None]] = []
+        try:
+            self._lock = asyncio.Lock()
+        except RuntimeError:
+            # No event loop in thread
+            self._lock = None
     
     def create_task(
         self,
@@ -203,6 +210,7 @@ class TaskManager:
         """Create and register a new task"""
         task = Task.create(name=name, created_by=created_by, **kwargs)
         self._tasks[task.id] = task
+        self._emit_event_sync("task.created", task, f"Task '{name}' created")
         return task
     
     def get_task(self, task_id: str) -> Task:
@@ -247,7 +255,17 @@ class TaskManager:
     ) -> Task:
         """Update task state with validation"""
         task = self.get_task(task_id)
+        old_state = task.state
         task.transition_to(new_state, message)
+        self._emit_event_sync(
+            "task.state_changed",
+            task,
+            message or f"State changed from {old_state} to {new_state}",
+            {
+                "old_state": old_state.value if hasattr(old_state, 'value') else old_state,
+                "new_state": new_state.value if hasattr(new_state, 'value') else new_state
+            }
+        )
         return task
     
     def update_task_progress(
@@ -259,6 +277,12 @@ class TaskManager:
         """Update task progress"""
         task = self.get_task(task_id)
         task.update_progress(progress, message)
+        self._emit_event_sync(
+            "task.progress",
+            task,
+            message or f"Progress: {progress:.0%}",
+            {"progress": progress}
+        )
         return task
     
     def complete_task(
@@ -273,8 +297,12 @@ class TaskManager:
         if output_data:
             task.set_output(output_data)
         
-        task.transition_to(TaskState.COMPLETED, message or "Task completed successfully")
-        return task
+        # Use update_task_state to emit event
+        return self.update_task_state(
+            task_id,
+            TaskState.COMPLETED,
+            message or "Task completed successfully"
+        )
     
     def fail_task(
         self,
@@ -285,14 +313,22 @@ class TaskManager:
         """Mark task as failed with error information"""
         task = self.get_task(task_id)
         task.set_error(error_data)
-        task.transition_to(TaskState.FAILED, message or "Task failed")
-        return task
+        
+        # Use update_task_state to emit event
+        return self.update_task_state(
+            task_id,
+            TaskState.FAILED,
+            message or "Task failed"
+        )
     
     def cancel_task(self, task_id: str, reason: Optional[str] = None) -> Task:
         """Cancel a task"""
-        task = self.get_task(task_id)
-        task.transition_to(TaskState.CANCELLED, reason or "Task cancelled")
-        return task
+        # Use update_task_state to emit event
+        return self.update_task_state(
+            task_id,
+            TaskState.CANCELLED,
+            reason or "Task cancelled"
+        )
     
     def cleanup_completed(self, before: Optional[datetime] = None) -> List[str]:
         """Remove completed tasks older than specified time"""
@@ -305,3 +341,57 @@ class TaskManager:
                     removed_ids.append(task_id)
         
         return removed_ids
+    
+    def add_event_callback(
+        self,
+        callback: Callable[[str, Task, str, Optional[Any]], None]
+    ) -> None:
+        """
+        Add a callback for task events
+        
+        Callback receives: (event_type, task, message, data)
+        """
+        self._event_callbacks.append(callback)
+    
+    def remove_event_callback(
+        self,
+        callback: Callable[[str, Task, str, Optional[Any]], None]
+    ) -> None:
+        """Remove an event callback"""
+        if callback in self._event_callbacks:
+            self._event_callbacks.remove(callback)
+    
+    async def _emit_event(
+        self,
+        event_type: str,
+        task: Task,
+        message: Optional[str] = None,
+        data: Optional[Any] = None
+    ) -> None:
+        """Emit an event to all registered callbacks"""
+        for callback in self._event_callbacks:
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(event_type, task, message, data)
+                else:
+                    callback(event_type, task, message, data)
+            except Exception as e:
+                # Log error but don't fail
+                import logging
+                logging.error(f"Error in event callback: {e}")
+    
+    def _emit_event_sync(
+        self,
+        event_type: str,
+        task: Task,
+        message: Optional[str] = None,
+        data: Optional[Any] = None
+    ) -> None:
+        """Emit event synchronously (for non-async contexts)"""
+        for callback in self._event_callbacks:
+            try:
+                if not asyncio.iscoroutinefunction(callback):
+                    callback(event_type, task, message, data)
+            except Exception as e:
+                import logging
+                logging.error(f"Error in event callback: {e}")
