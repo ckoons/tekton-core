@@ -106,10 +106,10 @@ class MetricsStorage:
     
     def __init__(self, db_path: str = None):
         if db_path is None:
-            # Use user's home directory for persistent storage
-            home_dir = os.path.expanduser("~/.tekton")
-            os.makedirs(home_dir, exist_ok=True)
-            db_path = os.path.join(home_dir, "metrics.db")
+            # Use tekton_root directory for persistent storage
+            tekton_dir = os.path.join(tekton_root, ".tekton")
+            os.makedirs(tekton_dir, exist_ok=True)
+            db_path = os.path.join(tekton_dir, "metrics.db")
             
         self.db_path = db_path
         self.init_database()
