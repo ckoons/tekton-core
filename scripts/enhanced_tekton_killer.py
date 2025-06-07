@@ -346,10 +346,13 @@ class EnhancedComponentKiller:
             cleanup_performed = False
             
             # Clean up log files if specified
+            log_dir = os.environ.get('TEKTON_LOG_DIR', 
+                                    os.path.join(os.environ.get('TEKTON_ROOT', os.path.expanduser('~')), 
+                                                '.tekton', 'logs'))
             log_patterns = [
                 f"/tmp/{component_name}*.log",
                 f"/var/log/tekton/{component_name}*.log",
-                f"~/.tekton/logs/{component_name}*.log"
+                os.path.join(log_dir, f"{component_name}*.log")
             ]
             
             # Clean up PID files
