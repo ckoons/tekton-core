@@ -3,13 +3,13 @@
 Comprehensive test runner for Tekton A2A Protocol v0.2.1
 
 Usage:
-    ./run_all_tests.py              # Run all tests
-    ./run_all_tests.py --unit       # Run only unit tests
-    ./run_all_tests.py --integration # Run only integration tests
-    ./run_all_tests.py --manual     # Run manual API tests
-    ./run_all_tests.py -u           # Short form for --unit
-    ./run_all_tests.py -i           # Short form for --integration
-    ./run_all_tests.py -m           # Short form for --manual
+    ./run_a2a_all_tests.py              # Run all tests
+    ./run_a2a_all_tests.py --unit       # Run only unit tests
+    ./run_a2a_all_tests.py --integration # Run only integration tests
+    ./run_a2a_all_tests.py --manual     # Run manual API tests
+    ./run_a2a_all_tests.py -u           # Short form for --unit
+    ./run_a2a_all_tests.py -i           # Short form for --integration
+    ./run_a2a_all_tests.py -m           # Short form for --manual
 """
 
 import os
@@ -18,23 +18,27 @@ import subprocess
 import argparse
 from pathlib import Path
 
-# Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+# Get the absolute path to this script and project directories
+script_path = Path(__file__).resolve()
+tests_dir = script_path.parent
+project_root = tests_dir.parent
 
-# Test categories
+# Add project root to path
+sys.path.insert(0, str(project_root))
+
+# Test categories - use absolute paths
 UNIT_TESTS = {
-    "Unit Tests - JSON-RPC": "tests/unit/a2a/test_jsonrpc_messages.py",
-    "Unit Tests - Agent Cards": "tests/unit/a2a/test_agent_cards.py", 
-    "Unit Tests - Task Lifecycle": "tests/unit/a2a/test_task_lifecycle.py",
-    "Unit Tests - Discovery": "tests/unit/a2a/test_discovery.py",
+    "Unit Tests - JSON-RPC": str(tests_dir / "unit/a2a/test_jsonrpc_messages.py"),
+    "Unit Tests - Agent Cards": str(tests_dir / "unit/a2a/test_agent_cards.py"), 
+    "Unit Tests - Task Lifecycle": str(tests_dir / "unit/a2a/test_task_lifecycle.py"),
+    "Unit Tests - Discovery": str(tests_dir / "unit/a2a/test_discovery.py"),
 }
 
 INTEGRATION_TESTS = {
-    "Integration Tests - Hermes A2A": "tests/integration/a2a/test_hermes_a2a.py"
+    "Integration Tests - Hermes A2A": str(tests_dir / "integration/a2a/test_hermes_a2a_simple.py")
 }
 
-MANUAL_TEST_SCRIPT = "tests/test_a2a_manual.sh"
+MANUAL_TEST_SCRIPT = str(tests_dir / "test_a2a_manual.sh")
 
 def run_pytest_suite(suite_name: str, test_path: str) -> bool:
     """Run a pytest test suite and return success status"""
@@ -46,7 +50,7 @@ def run_pytest_suite(suite_name: str, test_path: str) -> bool:
         print(f"❌ Test file not found: {test_path}")
         return False
     
-    # Run pytest
+    # Run pytest with proper configuration
     cmd = [
         sys.executable, "-m", "pytest",
         test_path,
@@ -55,16 +59,19 @@ def run_pytest_suite(suite_name: str, test_path: str) -> bool:
         "--color=yes"
     ]
     
-    # For integration tests, we need to set PYTHONPATH to include Hermes
+    # Set up environment with all necessary paths
     env = os.environ.copy()
-    if "integration" in suite_name.lower():
-        hermes_path = os.path.join(project_root, "Hermes")
-        if 'PYTHONPATH' in env:
-            env['PYTHONPATH'] = f"{hermes_path}:{env['PYTHONPATH']}"
-        else:
-            env['PYTHONPATH'] = hermes_path
+    hermes_path = str(project_root / "Hermes")
+    current_pythonpath = env.get('PYTHONPATH', '')
     
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    # Always include both project root and Hermes path
+    new_pythonpath = f"{project_root}:{hermes_path}:{tests_dir}"
+    if current_pythonpath:
+        env['PYTHONPATH'] = f"{new_pythonpath}:{current_pythonpath}"
+    else:
+        env['PYTHONPATH'] = new_pythonpath
+    
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=str(project_root))
     
     if result.returncode == 0:
         print("✅ PASSED")
@@ -78,10 +85,22 @@ def run_pytest_suite(suite_name: str, test_path: str) -> bool:
             if 'failed' in line and 'passed' in line:
                 print(f"   {line.strip()}")
                 break
+            if 'ERROR' in line:
+                print(f"   {line.strip()}")
         
         # Print errors if verbose
-        if result.stderr and "ModuleNotFoundError" in result.stderr:
-            print("   Note: Integration tests require Hermes to be importable")
+        if result.stderr:
+            print("\n   Error output:")
+            for line in result.stderr.split('\n')[:15]:
+                if line.strip():
+                    print(f"   {line}")
+        
+        if result.returncode != 0 and not result.stderr:
+            # Print some stdout for debugging
+            print("\n   Test output (last 20 lines):")
+            for line in result.stdout.split('\n')[-20:]:
+                if line.strip():
+                    print(f"   {line}")
         
         return False
 
@@ -151,6 +170,9 @@ def main():
     print("=" * 80)
     print("Tekton A2A Protocol v0.2.1 Test Runner")
     print("=" * 80)
+    print(f"Running from: {os.getcwd()}")
+    print(f"Project root: {project_root}")
+    print(f"Tests directory: {tests_dir}")
     
     all_passed = True
     results = {}
