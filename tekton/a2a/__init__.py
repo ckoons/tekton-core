@@ -1,62 +1,96 @@
 """
-Agent-to-Agent (A2A) Communication Framework
+Tekton A2A (Agent-to-Agent) Protocol v2 Implementation
 
-This package provides the core components for agent-to-agent communication,
-enabling autonomous agent collaboration within the Tekton ecosystem.
+This module implements the A2A Protocol v0.2.1 specification for inter-agent
+communication within the Tekton ecosystem, using JSON-RPC 2.0 as the message format.
+
+Key Components:
+- JSON-RPC 2.0 message handling
+- Agent registration and discovery
+- Task lifecycle management
+- Agent Card format compliance
 """
 
-from tekton.a2a.message import (
-    A2AMessage, 
-    A2AMessageType, 
-    A2AMessageStatus,
-    validate_message
+from .jsonrpc import (
+    JSONRPCRequest,
+    JSONRPCResponse,
+    JSONRPCError,
+    JSONRPCBatch,
+    parse_jsonrpc_message,
+    create_error_response,
+    create_success_response
 )
-from tekton.a2a.agent_registry import (
-    AgentRegistry,
+
+from .agent import (
     AgentCard,
-    register_agent,
-    unregister_agent,
-    find_agents_by_capability
+    AgentRegistry,
+    AgentStatus
 )
-from tekton.a2a.task_manager import (
+
+from .task import (
+    Task,
+    TaskState,
     TaskManager,
-    TaskSpec,
-    TaskStatus,
-    create_task,
-    assign_task,
-    complete_task,
-    get_task_status
+    TaskUpdate
 )
-from tekton.a2a.conversation import (
-    ConversationManager,
-    ConversationMetadata,
-    start_conversation,
-    add_to_conversation,
-    get_conversation_history
-)
-from tekton.a2a.discovery import (
+
+from .discovery import (
     DiscoveryService,
-    find_agent_by_id,
-    find_agents_by_type,
-    discover_agents
+    AgentQuery
+)
+
+from .errors import (
+    A2AError,
+    InvalidRequestError,
+    MethodNotFoundError,
+    InvalidParamsError,
+    InternalError,
+    ParseError
+)
+
+from .methods import (
+    MethodDispatcher,
+    StandardA2AMethods,
+    create_standard_dispatcher
 )
 
 __all__ = [
-    # Message module
-    "A2AMessage", "A2AMessageType", "A2AMessageStatus", "validate_message",
+    # JSON-RPC
+    'JSONRPCRequest',
+    'JSONRPCResponse',
+    'JSONRPCError',
+    'JSONRPCBatch',
+    'parse_jsonrpc_message',
+    'create_error_response',
+    'create_success_response',
     
-    # Agent registry module
-    "AgentRegistry", "AgentCard", "register_agent", "unregister_agent", 
-    "find_agents_by_capability",
+    # Agent
+    'AgentCard',
+    'AgentRegistry',
+    'AgentStatus',
     
-    # Task manager module
-    "TaskManager", "TaskSpec", "TaskStatus", "create_task", "assign_task",
-    "complete_task", "get_task_status",
+    # Task
+    'Task',
+    'TaskState',
+    'TaskManager',
+    'TaskUpdate',
     
-    # Conversation manager module
-    "ConversationManager", "ConversationMetadata", "start_conversation",
-    "add_to_conversation", "get_conversation_history",
+    # Discovery
+    'DiscoveryService',
+    'AgentQuery',
     
-    # Discovery service module
-    "DiscoveryService", "find_agent_by_id", "find_agents_by_type", "discover_agents"
+    # Methods
+    'MethodDispatcher',
+    'StandardA2AMethods',
+    'create_standard_dispatcher',
+    
+    # Errors
+    'A2AError',
+    'InvalidRequestError',
+    'MethodNotFoundError',
+    'InvalidParamsError',
+    'InternalError',
+    'ParseError'
 ]
+
+__version__ = '2.0.0'
