@@ -64,7 +64,9 @@ from .streaming import (
     TaskEvent,
     AgentEvent,
     SubscriptionManager,
-    Subscription
+    Subscription,
+    websocket_manager,
+    handle_websocket
 )
 
 __all__ = [
@@ -114,7 +116,9 @@ __all__ = [
     'TaskEvent',
     'AgentEvent',
     'SubscriptionManager',
-    'Subscription'
+    'Subscription',
+    'websocket_manager',
+    'handle_websocket'
 ]
 
 __version__ = '2.0.0'
