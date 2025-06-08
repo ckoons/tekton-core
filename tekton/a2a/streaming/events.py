@@ -34,6 +34,17 @@ class EventType(str, Enum):
     CHANNEL_CREATED = "channel.created"
     CHANNEL_DELETED = "channel.deleted"
     
+    # Conversation events
+    CONVERSATION_CREATED = "conversation.created"
+    CONVERSATION_PARTICIPANT_JOINED = "conversation.participant_joined"
+    CONVERSATION_PARTICIPANT_LEFT = "conversation.participant_left"
+    CONVERSATION_MESSAGE = "conversation.message"
+    CONVERSATION_TURN_REQUESTED = "conversation.turn_requested"
+    CONVERSATION_TURN_GRANTED = "conversation.turn_granted"
+    CONVERSATION_TURN_ADVANCED = "conversation.turn_advanced"
+    CONVERSATION_TURN_TIMEOUT = "conversation.turn_timeout"
+    CONVERSATION_ENDED = "conversation.ended"
+    
     # System events
     SYSTEM_ANNOUNCEMENT = "system.announcement"
     CONNECTION_ESTABLISHED = "connection.established"
@@ -174,5 +185,34 @@ class ChannelEvent(StreamEvent):
             channel=channel,
             sender_id=sender_id,
             data=message,
+            metadata=metadata or {}
+        )
+
+
+class ConversationEvent(StreamEvent):
+    """Conversation-specific event"""
+    
+    conversation_id: str
+    participant_id: Optional[str] = None
+    
+    @classmethod
+    def create_event(
+        cls,
+        event_type: EventType,
+        conversation_id: str,
+        source: str = "system",
+        participant_id: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> 'ConversationEvent':
+        """Create a conversation event"""
+        return cls(
+            id=f"event-{uuid4()}",
+            type=event_type,
+            timestamp=datetime.now(timezone.utc),
+            source=source,
+            conversation_id=conversation_id,
+            participant_id=participant_id,
+            data=data or {},
             metadata=metadata or {}
         )

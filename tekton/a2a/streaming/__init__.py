@@ -6,7 +6,7 @@ real-time streaming in the A2A protocol.
 """
 
 from .sse import SSEManager, SSEEvent, SSEConnection, create_sse_response
-from .events import EventType, StreamEvent, TaskEvent, AgentEvent, ChannelEvent
+from .events import EventType, StreamEvent, TaskEvent, AgentEvent, ChannelEvent, ConversationEvent
 from .subscription import SubscriptionManager, Subscription
 from .websocket import (
     WebSocketManager, 
@@ -30,6 +30,7 @@ __all__ = [
     'TaskEvent',
     'AgentEvent',
     'ChannelEvent',
+    'ConversationEvent',
     
     # Subscriptions
     'SubscriptionManager',

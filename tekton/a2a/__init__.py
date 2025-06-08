@@ -69,6 +69,17 @@ from .streaming import (
     handle_websocket
 )
 
+# Import conversation components
+from .conversation import (
+    Conversation,
+    ConversationRole,
+    ConversationState,
+    TurnTakingMode,
+    ConversationParticipant,
+    ConversationMessage
+)
+from .conversation_manager import ConversationManager
+
 __all__ = [
     # JSON-RPC
     'JSONRPCRequest',
@@ -118,7 +129,16 @@ __all__ = [
     'SubscriptionManager',
     'Subscription',
     'websocket_manager',
-    'handle_websocket'
+    'handle_websocket',
+    
+    # Conversations
+    'Conversation',
+    'ConversationRole',
+    'ConversationState',
+    'TurnTakingMode',
+    'ConversationParticipant',
+    'ConversationMessage',
+    'ConversationManager'
 ]
 
 __version__ = '2.0.0'
