@@ -53,11 +53,16 @@ class ChannelBridge:
     async def initialize(self):
         """Set up bridge subscriptions to Hermes channels"""
         # Subscribe to all Hermes channels to bridge messages
-        await self.message_bus.subscribe("*", self._bridge_hermes_message)
-        await self.message_bus.subscribe("**", self._bridge_hermes_message)
+        self.message_bus.subscribe("*", self._bridge_hermes_message)
+        self.message_bus.subscribe("**", self._bridge_hermes_message)
         
-    async def _bridge_hermes_message(self, topic: str, message: Dict[str, Any], headers: Dict[str, Any]):
+    async def _bridge_hermes_message(self, envelope: Dict[str, Any]):
         """Bridge Hermes message bus messages to A2A channel events"""
+        # Extract topic, message, and headers from envelope
+        headers = envelope.get("headers", {})
+        topic = headers.get("topic", "")
+        message = envelope.get("payload", {})
+        
         # Only bridge messages from actual channels (not system topics)
         if not self._should_bridge_topic(topic):
             return
