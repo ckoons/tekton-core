@@ -80,6 +80,16 @@ from .conversation import (
 )
 from .conversation_manager import ConversationManager
 
+# Import task coordination components
+from .task_coordination import (
+    TaskCoordinator,
+    CoordinationPattern,
+    DependencyType,
+    TaskWorkflow,
+    TaskDependency,
+    ConditionalRule
+)
+
 __all__ = [
     # JSON-RPC
     'JSONRPCRequest',
@@ -138,7 +148,15 @@ __all__ = [
     'TurnTakingMode',
     'ConversationParticipant',
     'ConversationMessage',
-    'ConversationManager'
+    'ConversationManager',
+    
+    # Task Coordination
+    'TaskCoordinator',
+    'CoordinationPattern',
+    'DependencyType',
+    'TaskWorkflow',
+    'TaskDependency',
+    'ConditionalRule'
 ]
 
 __version__ = '2.0.0'
