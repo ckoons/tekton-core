@@ -103,3 +103,9 @@ class TimeoutError(A2AError):
     """Operation timed out (-32006)"""
     def __init__(self, data: Optional[Any] = None):
         super().__init__(-32006, "Operation timed out", data)
+
+
+class ConversationNotFoundError(A2AError):
+    """The specified conversation does not exist (-32007)"""
+    def __init__(self, conversation_id: str, data: Optional[Any] = None):
+        super().__init__(-32007, f"Conversation '{conversation_id}' not found", data)
