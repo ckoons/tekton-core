@@ -40,6 +40,7 @@ UNIT_TESTS = {
     "Unit Tests - Channels": str(tests_dir / "unit/a2a/test_channels.py"),
     "Unit Tests - Conversations": str(tests_dir / "unit/a2a/test_conversation.py"),
     "Unit Tests - Task Coordination": str(tests_dir / "unit/a2a/test_task_coordination.py"),
+    "Unit Tests - Security": str(tests_dir / "unit/a2a/test_security.py"),
 }
 
 INTEGRATION_TESTS = {

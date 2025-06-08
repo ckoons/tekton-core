@@ -90,6 +90,24 @@ from .task_coordination import (
     ConditionalRule
 )
 
+# Import security components
+from .security import (
+    TokenManager,
+    AccessControl,
+    SecurityContext,
+    Permission,
+    Role,
+    MessageSigner,
+    require_permission,
+    require_any_permission
+)
+
+from .middleware import (
+    SecurityMiddleware,
+    apply_security_middleware,
+    secure_method
+)
+
 __all__ = [
     # JSON-RPC
     'JSONRPCRequest',
@@ -156,7 +174,20 @@ __all__ = [
     'DependencyType',
     'TaskWorkflow',
     'TaskDependency',
-    'ConditionalRule'
+    'ConditionalRule',
+    
+    # Security
+    'TokenManager',
+    'AccessControl',
+    'SecurityContext',
+    'Permission',
+    'Role',
+    'MessageSigner',
+    'require_permission',
+    'require_any_permission',
+    'SecurityMiddleware',
+    'apply_security_middleware',
+    'secure_method'
 ]
 
 __version__ = '2.0.0'

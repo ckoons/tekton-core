@@ -13,6 +13,7 @@ All Tekton components must follow these API standards to ensure consistency, dis
 3. **[Migration_Guide.md](./Migration_Guide.md)** - Guide for updating existing components
 4. **[API_Testing_Guide.md](./API_Testing_Guide.md)** - Testing standards for APIs
 5. **[OpenAPI_Standards.md](./OpenAPI_Standards.md)** - Documentation requirements
+6. **[A2A_Protocol_API_Reference.md](./A2A_Protocol_API_Reference.md)** - A2A Protocol v0.2.1 API reference
 
 ## Quick Reference
 
