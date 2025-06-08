@@ -2,7 +2,7 @@
 Event types and models for A2A streaming
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, Any, Optional, Union
 from uuid import uuid4
@@ -60,7 +60,7 @@ class StreamEvent(TektonBaseModel):
         return cls(
             id=f"event-{uuid4()}",
             type=event_type,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=source,
             data=data,
             metadata=metadata or {}
@@ -87,7 +87,7 @@ class TaskEvent(StreamEvent):
         return cls(
             id=f"event-{uuid4()}",
             type=EventType.TASK_STATE_CHANGED,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=source,
             task_id=task_id,
             data={
@@ -110,7 +110,7 @@ class TaskEvent(StreamEvent):
         return cls(
             id=f"event-{uuid4()}",
             type=EventType.TASK_PROGRESS,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=source,
             task_id=task_id,
             data={
@@ -139,7 +139,7 @@ class AgentEvent(StreamEvent):
         return cls(
             id=f"event-{uuid4()}",
             type=EventType.AGENT_STATUS_CHANGED,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=source,
             agent_id=agent_id,
             data={
@@ -167,7 +167,7 @@ class ChannelEvent(StreamEvent):
         return cls(
             id=f"event-{uuid4()}",
             type=EventType.CHANNEL_MESSAGE,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=sender_id,
             channel=channel,
             sender_id=sender_id,
