@@ -5,7 +5,7 @@ Implements task lifecycle management with formal state transitions according
 to the A2A Protocol v0.2.1 specification.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Union, Callable
 from uuid import uuid4
@@ -108,7 +108,7 @@ class Task(TektonBaseModel):
             description=description,
             input_data=input_data,
             priority=priority,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             **kwargs
         )
     
@@ -123,9 +123,9 @@ class Task(TektonBaseModel):
         
         # Update timestamps
         if new_state == TaskState.RUNNING and self.started_at is None:
-            self.started_at = datetime.utcnow()
+            self.started_at = datetime.now(timezone.utc)
         elif new_state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
-            self.completed_at = datetime.utcnow()
+            self.completed_at = datetime.now(timezone.utc)
         
         # Update progress
         if new_state == TaskState.COMPLETED:
@@ -133,7 +133,7 @@ class Task(TektonBaseModel):
         
         # Record update
         update = TaskUpdate(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             state=new_state,
             progress=self.progress,
             message=message
@@ -151,7 +151,7 @@ class Task(TektonBaseModel):
         self.progress = progress
         
         update = TaskUpdate(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             progress=progress,
             message=message
         )
@@ -160,7 +160,7 @@ class Task(TektonBaseModel):
     def add_update(self, message: str, data: Optional[Dict[str, Any]] = None) -> None:
         """Add a general update to the task"""
         update = TaskUpdate(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             message=message,
             data=data
         )

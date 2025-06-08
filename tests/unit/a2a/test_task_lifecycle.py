@@ -3,7 +3,7 @@ Unit tests for Task Lifecycle Management in A2A Protocol v0.2.1
 """
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 
 from tekton.a2a.task import (
@@ -194,14 +194,14 @@ class TestTask:
         
         # Start task
         task.transition_to(TaskState.RUNNING)
-        task.started_at = datetime.utcnow() - timedelta(seconds=30)
+        task.started_at = datetime.now(timezone.utc) - timedelta(seconds=30)
         
         # Still no duration until completed
         assert task.duration() is None
         
         # Complete task
         task.transition_to(TaskState.COMPLETED)
-        task.completed_at = datetime.utcnow()
+        task.completed_at = datetime.now(timezone.utc)
         
         # Now has duration
         duration = task.duration()
@@ -435,12 +435,12 @@ class TestTaskManager:
         manager.cancel_task(task4.id)
         
         # Set completion times
-        old_time = datetime.utcnow() - timedelta(hours=2)
+        old_time = datetime.now(timezone.utc) - timedelta(hours=2)
         task2.completed_at = old_time
         task3.completed_at = old_time
         
         # Cleanup old completed tasks
-        cutoff = datetime.utcnow() - timedelta(hours=1)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
         removed_ids = manager.cleanup_completed(before=cutoff)
         
         assert len(removed_ids) == 2
