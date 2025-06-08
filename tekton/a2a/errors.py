@@ -73,8 +73,8 @@ class TaskNotFoundError(A2AError):
 
 class UnauthorizedError(A2AError):
     """The request lacks valid authentication credentials (-32002)"""
-    def __init__(self, data: Optional[Any] = None):
-        super().__init__(-32002, "Unauthorized", data)
+    def __init__(self, message: Optional[str] = None, data: Optional[Any] = None):
+        super().__init__(-32002, message or "Unauthorized", data)
 
 
 class CapabilityNotSupportedError(A2AError):
