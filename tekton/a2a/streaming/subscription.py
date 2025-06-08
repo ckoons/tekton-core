@@ -6,6 +6,7 @@ Handles subscriptions to channels, tasks, and agents for real-time updates.
 
 import asyncio
 import logging
+import re
 from datetime import datetime
 from typing import Dict, Set, List, Optional, Any, Callable
 from uuid import uuid4
@@ -115,7 +116,15 @@ class Subscription(TektonBaseModel):
                 return False
                 
         elif self.subscription_type == SubscriptionType.CHANNEL:
-            if not hasattr(event, "channel") or event.channel != self.target:
+            if not hasattr(event, "channel"):
+                return False
+            # Check for pattern matching in filters
+            if "channel_pattern" in self.filters:
+                from .channels import ChannelBridge
+                # Use static pattern matching method
+                if not self._matches_channel_pattern(event.channel, self.filters["channel_pattern"]):
+                    return False
+            elif event.channel != self.target:
                 return False
         
         # Check custom filters
@@ -128,6 +137,20 @@ class Subscription(TektonBaseModel):
             return False
         
         return True
+    
+    def _matches_channel_pattern(self, channel: str, pattern: str) -> bool:
+        """Check if channel matches pattern with wildcards"""
+        # Convert pattern to regex
+        # First escape dots
+        regex_pattern = pattern.replace(".", r"\.")
+        # Replace ** with a placeholder to avoid conflict with *
+        regex_pattern = regex_pattern.replace("**", "__DOUBLE_STAR__")
+        # Replace single * with pattern for one segment
+        regex_pattern = regex_pattern.replace("*", "[^.]+")
+        # Replace placeholder with pattern for multiple segments
+        regex_pattern = regex_pattern.replace("__DOUBLE_STAR__", ".*")
+        regex_pattern = f"^{regex_pattern}$"
+        return bool(re.match(regex_pattern, channel))
 
 
 class SubscriptionManager:

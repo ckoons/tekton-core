@@ -31,6 +31,8 @@ class EventType(str, Enum):
     CHANNEL_MESSAGE = "channel.message"
     CHANNEL_SUBSCRIBED = "channel.subscribed"
     CHANNEL_UNSUBSCRIBED = "channel.unsubscribed"
+    CHANNEL_CREATED = "channel.created"
+    CHANNEL_DELETED = "channel.deleted"
     
     # System events
     SYSTEM_ANNOUNCEMENT = "system.announcement"

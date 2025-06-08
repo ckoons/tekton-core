@@ -37,6 +37,7 @@ UNIT_TESTS = {
     "Unit Tests - Discovery": str(tests_dir / "unit/a2a/test_discovery.py"),
     "Unit Tests - SSE Streaming": str(tests_dir / "unit/a2a/test_streaming.py"),
     "Unit Tests - WebSocket": str(tests_dir / "unit/a2a/test_websocket.py"),
+    "Unit Tests - Channels": str(tests_dir / "unit/a2a/test_channels.py"),
 }
 
 INTEGRATION_TESTS = {
