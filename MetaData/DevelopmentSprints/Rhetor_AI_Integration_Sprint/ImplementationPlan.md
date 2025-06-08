@@ -1,34 +1,86 @@
-# Rhetor AI Integration Sprint - Implementation Plan
+# Rhetor AI Integration Sprint - Implementation Plan (UPDATED)
 
 ## Overview
 
-This document provides the detailed implementation plan for the Rhetor AI Integration Sprint. It breaks down the work into specific tasks, identifies dependencies, and provides implementation guidance.
+This document provides the detailed implementation plan for the Rhetor AI Integration Sprint. This plan has been **UPDATED** based on codebase analysis and reflects the **Dynamic AI Specialist Ecosystem** approach.
 
-## Phase 1: Component AI Management (Days 1-3)
+## Architecture: Dynamic AI Specialist Ecosystem
 
-### 1.1 Create Component AI Manager
+### **Core Concept Refinement**
+After analyzing Rhetor and Hephaestus codebases, the approach has been refined to:
+- **Independent AI processes** that coordinate through Hermes message bus
+- **Rhetor orchestrates** all AI communication (hears all, filters/translates as needed)
+- **Dynamic specialist allocation** (AI(16)-Analysis-Metrics, AI(18)-TerminalBasedCoding)
+- **Extend existing model router** rather than building new infrastructure
 
-**File**: `rhetor/core/component_ai_manager.py`
-
-```python
-# Key classes to implement:
-- ComponentAIManager: Manages all component AI instances
-- ComponentAI: Represents a single component's AI
-- ModelConfiguration: Stores model preferences per component
+### **Communication Pattern**
+```
+AI_A → Hermes → AI_B
+     ↗         ↘
+  Rhetor (monitors all, translates as needed)
 ```
 
-**Tasks**:
-- [ ] Create base ComponentAIManager class
-- [ ] Implement component-to-model mapping
-- [ ] Add lazy initialization logic
-- [ ] Integrate with existing LLMClient
-- [ ] Add debug instrumentation
-- [ ] Write unit tests
+## UPDATED Implementation Phases
+
+### **Phase 1: Foundation** (2-3 days)
+**Goal**: Rhetor AI self-management + Engram + Hermes communication
+
+**Key Deliverables**:
+- [x] AI Specialist Manager (`rhetor/core/ai_specialist_manager.py`)
+- [x] AI Specialist Configurations (`rhetor/config/ai_specialists.json`)
+- [ ] Extended Model Router for specialist allocation
+- [ ] Hermes AI-to-AI messaging integration
+- [ ] Hephaestus Rhetor component AI chat interface
+
+### **Phase 2: First Coordination Pair** (2-3 days)
+**Goal**: Rhetor ↔ Apollo coordination via Hermes
+
+**Key Deliverables**:
+- [ ] Apollo AI specialist process
+- [ ] AI-to-AI communication through Hermes message bus
+- [ ] Team chat showing AI coordination
+- [ ] Test coordination patterns
+
+### **Phase 3: Strategic AI Trio** (2-3 days)  
+**Goal**: Multi-AI coordination (Rhetor + Apollo + Telos + Prometheus)
+
+**Key Deliverables**:
+- [ ] Telos and Prometheus AI specialists
+- [ ] 4-AI ecosystem coordination
+- [ ] Complex coordination scenarios
+- [ ] Specialist allocation testing
+
+### **Phase 4: Message Bus Validation** (2-3 days)
+**Goal**: Hermes AI + dynamic specialist creation
+
+**Key Deliverables**:
+- [ ] Hermes AI specialist
+- [ ] Dynamic specialist creation testing  
+- [ ] Complex message routing
+- [ ] Evaluate for full ecosystem
+
+## Updated Implementation Details
+
+### 1.1 AI Specialist Manager (COMPLETED)
+
+**File**: `rhetor/core/ai_specialist_manager.py`
+
+**Features Implemented**:
+- Dynamic AI specialist process management
+- Hermes-mediated AI-to-AI communication
+- Rhetor orchestration and message filtering
+- Specialist configuration management
+- Conversation tracking and context management
+
+**Key Classes**:
+- `AISpecialistManager`: Main coordinator class
+- `AISpecialistConfig`: Specialist configuration
+- `AIMessage`: Message structure for AI communication
 
 **Dependencies**: 
-- `rhetor/core/llm_client.py`
-- `rhetor/core/model_router.py`
-- `rhetor/core/context_manager.py`
+- `rhetor/core/llm_client.py` ✓
+- `rhetor/core/model_router.py` ✓
+- `shared/utils/logging_setup.py` ✓
 
 ### 1.2 Define Component Model Configurations
 

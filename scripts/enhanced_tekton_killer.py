@@ -685,6 +685,11 @@ async def main():
         help="Skip safety confirmations"
     )
     parser.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Automatically answer yes to all prompts"
+    )
+    parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Verbose output"
@@ -696,7 +701,7 @@ async def main():
         
         # Nuclear option
         if args.nuclear:
-            if not args.force and not args.dry_run:
+            if not args.force and not args.yes and not args.dry_run:
                 print("☢️  NUCLEAR OPTION SELECTED")
                 print("This will terminate ALL Tekton components and cleanup resources.")
                 confirm = input("Are you absolutely sure? Type 'NUCLEAR' to confirm: ")
@@ -735,7 +740,7 @@ async def main():
                 print(f"  ⭕ {comp_info.name} (port {comp_info.port}) - not running")
                 
         # Safety confirmation
-        if not args.force and not args.dry_run:
+        if not args.force and not args.yes and not args.dry_run:
             confirm = input(f"\nProceed with termination? [y/N]: ")
             if confirm.lower() not in ['y', 'yes']:
                 print("Termination aborted.")
