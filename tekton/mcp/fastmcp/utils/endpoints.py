@@ -99,35 +99,61 @@ def add_standard_mcp_endpoints(
     @router.get("/capabilities")
     async def get_capabilities():
         """Get component MCP capabilities."""
-        if get_capabilities_func and component_manager_dependency:
-            manager = await component_manager_dependency()
-            capabilities = get_capabilities_func(manager)
-            return {
-                "capabilities": [cap.dict() for cap in capabilities],
-                "count": len(capabilities)
-            }
+        if get_capabilities_func:
+            if component_manager_dependency:
+                manager = await component_manager_dependency()
+                capabilities = get_capabilities_func(manager)
+            else:
+                # Call without component manager
+                capabilities = get_capabilities_func(None)
+            
+            # Ensure capabilities is a list of dicts
+            if capabilities and isinstance(capabilities, list):
+                return {
+                    "capabilities": capabilities,
+                    "count": len(capabilities)
+                }
+            else:
+                return {
+                    "capabilities": [],
+                    "count": 0,
+                    "message": "No capabilities returned"
+                }
         else:
             return {
                 "capabilities": [],
                 "count": 0,
-                "message": "No capabilities available - component manager not configured"
+                "message": "No capabilities function configured"
             }
     
     @router.get("/tools")
     async def get_tools():
         """Get component MCP tools."""
-        if get_tools_func and component_manager_dependency:
-            manager = await component_manager_dependency()
-            tools = get_tools_func(manager)
-            return {
-                "tools": [tool.dict() for tool in tools],
-                "count": len(tools)
-            }
+        if get_tools_func:
+            if component_manager_dependency:
+                manager = await component_manager_dependency()
+                tools = get_tools_func(manager)
+            else:
+                # Call without component manager
+                tools = get_tools_func(None)
+            
+            # Ensure tools is a list of dicts
+            if tools and isinstance(tools, list):
+                return {
+                    "tools": tools,
+                    "count": len(tools)
+                }
+            else:
+                return {
+                    "tools": [],
+                    "count": 0,
+                    "message": "No tools returned"
+                }
         else:
             return {
                 "tools": [],
                 "count": 0,
-                "message": "No tools available - component manager not configured"
+                "message": "No tools function configured"
             }
     
     @router.post("/process")
@@ -136,9 +162,13 @@ def add_standard_mcp_endpoints(
     ):
         """Process an MCP request."""
         try:
-            if process_request_func and component_manager_dependency:
-                manager = await component_manager_dependency()
-                response = await process_request_func(manager, request)
+            if process_request_func:
+                if component_manager_dependency:
+                    manager = await component_manager_dependency()
+                    response = await process_request_func(manager, request)
+                else:
+                    # Call without component manager, passing request data directly
+                    response = await process_request_func(request.dict(), None)
                 return response
             else:
                 return {
