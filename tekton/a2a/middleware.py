@@ -294,8 +294,9 @@ def apply_security_middleware(
                 kwargs["security_context"] = security_context
                 kwargs["access_control"] = middleware.access_control
             
-            # Call original dispatch
-            return await original_dispatch(processed_request, **kwargs)
+            # Call original dispatch (remove headers from kwargs as original doesn't accept it)
+            clean_kwargs = {k: v for k, v in kwargs.items() if k != 'headers'}
+            return await original_dispatch(processed_request, **clean_kwargs)
             
         except UnauthorizedError as e:
             return create_error_response(

@@ -16,8 +16,13 @@ echo ""
 echo -e "${YELLOW}Checking if Hermes is running on port 8001...${NC}"
 if curl -s http://localhost:8001/health > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Hermes is running${NC}"
+    echo -e "${YELLOW}Note: If you see authorization errors, edit .env.tekton and set:${NC}"
+    echo -e "${YELLOW}TEKTON_A2A_ENABLE_SECURITY=false${NC}"
+    echo -e "${YELLOW}Then restart Hermes with: ./Hermes/run_hermes.sh${NC}"
 else
-    echo -e "${RED}✗ Hermes is not running. Please start it with: ./Hermes/run_hermes.sh${NC}"
+    echo -e "${RED}✗ Hermes is not running. Please start it with:${NC}"
+    echo -e "${RED}./Hermes/run_hermes.sh${NC}"
+    echo -e "${RED}(Make sure TEKTON_A2A_ENABLE_SECURITY=false in .env.tekton for testing)${NC}"
     exit 1
 fi
 echo ""
