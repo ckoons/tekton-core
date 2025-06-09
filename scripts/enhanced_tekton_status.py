@@ -879,7 +879,7 @@ async def main():
     parser.add_argument("--component", "-c", help="Check specific component")
     parser.add_argument("--components", "-C", help="Check multiple components (comma-separated)")
     parser.add_argument("--full", "-f", action="store_true", help="Full output with enhanced table and capabilities")
-    parser.add_argument("--log", "-l", action="store_true", help="Show recent log lines for each component")
+    parser.add_argument("--log", "-l", nargs='?', const=5, type=int, metavar='N', help="Show recent log lines for each component (default: 5 lines)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output (equivalent to --full --log)")
     parser.add_argument("--trends", "-t", action="store_true", help="Show trend information")
     parser.add_argument("--no-storage", "-n", action="store_true", help="Disable metrics storage")
@@ -890,7 +890,8 @@ async def main():
     # Handle --verbose flag as --full --log
     if args.verbose:
         args.full = True
-        args.log = True
+        if args.log is None:
+            args.log = 5
     
     async with EnhancedStatusChecker(store_metrics=not args.no_storage) as checker:
         
@@ -935,7 +936,8 @@ async def main():
                     
                     # Add logs if requested
                     if args.log:
-                        log_output = checker.format_log_output(component_metrics)
+                        log_lines = args.log if isinstance(args.log, int) else 5
+                        log_output = checker.format_log_output(component_metrics, lines=log_lines)
                         if log_output:
                             print(log_output)
                             
@@ -964,7 +966,8 @@ async def main():
                     
                     # Add logs if requested
                     if args.log:
-                        log_output = checker.format_log_output(component_metrics)
+                        log_lines = args.log if isinstance(args.log, int) else 5
+                        log_output = checker.format_log_output(component_metrics, lines=log_lines)
                         if log_output:
                             print(log_output)
                     
