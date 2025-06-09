@@ -15,6 +15,10 @@ This directory contains the architectural documentation for the Tekton system. T
 
 - [UI Component Communication](./UIComponentCommunication.md): Communication mechanisms between UI components
 
+### AI and Intelligence Architecture
+
+- [AI Orchestration Architecture](./AI_Orchestration_Architecture.md): AI specialist management and MCP tools orchestration (Phase 3/4)
+
 ### State Management
 
 - [State Management Architecture](./StateManagementArchitecture.md): Application-wide state management approach
