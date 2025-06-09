@@ -107,8 +107,8 @@ class HermesMCPClient:
             Tool ID if successful, None otherwise
         """
         # Add component prefix if not already present
-        if not name.startswith(f"{self.component_name}."):
-            full_name = f"{self.component_name}.{name}"
+        if not name.startswith(f"{self.component_name}_"):
+            full_name = f"{self.component_name}_{name}"
         else:
             full_name = name
             
