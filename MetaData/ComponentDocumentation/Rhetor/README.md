@@ -17,6 +17,11 @@ Rhetor is Tekton's LLM orchestration and prompt management component, designed t
 - **Evaluation Framework**: Automated evaluation of LLM responses
 - **Fallback Mechanisms**: Graceful degradation when primary models are unavailable
 - **Single Port Architecture**: Unified API access through standardized endpoints
+- **AI Specialist Management** (Phase 3): Dedicated AI instances for specific domains
+- **MCP Tools Integration** (Phase 3): 30 tools for model, prompt, context, and AI orchestration
+- **Live Component Integration** (Phase 3): MCP tools interact with running components
+- **Real-Time Streaming** (Phase 4A): SSE-based streaming for long-running operations
+- **Dynamic Specialist Creation** (Phase 4B): Runtime creation of AI specialists from templates
 
 ## Architecture
 
@@ -199,6 +204,97 @@ print(f"Estimated cost: ${estimate['cost']}")
 print(f"Estimated tokens: {estimate['tokens']}")
 ```
 
+## AI Orchestration Features (Phase 3/4)
+
+### AI Specialist Management
+
+Rhetor now manages dedicated AI specialists for different domains:
+
+```python
+# List available specialists
+specialists = await client.list_ai_specialists()
+
+# Send message to a specific specialist
+response = await client.send_to_specialist(
+    specialist_id="code-reviewer",
+    message="Review this Python function for security issues",
+    code=function_code
+)
+
+# Orchestrate team chat between specialists
+conversation = await client.orchestrate_team_chat(
+    topic="Design a new microservice architecture",
+    specialists=["architecture-advisor", "security-auditor", "performance-optimizer"],
+    max_rounds=5
+)
+```
+
+### Dynamic Specialist Creation
+
+Create and customize AI specialists at runtime:
+
+```python
+# Create from template
+specialist = await client.create_dynamic_specialist(
+    template_id="code-reviewer",
+    name="Python Security Expert",
+    customization={
+        "temperature": 0.2,
+        "focus": "security vulnerabilities",
+        "language": "python"
+    }
+)
+
+# Clone and modify existing specialist
+clone = await client.clone_specialist(
+    source_id="code-reviewer",
+    name="JavaScript Reviewer",
+    modifications={"language": "javascript"}
+)
+```
+
+### MCP Tools
+
+Rhetor provides 30 MCP tools accessible via Hermes:
+
+#### Model Management
+- `rhetor.GetAvailableModels`
+- `rhetor.SetDefaultModel`
+- `rhetor.TestModelConnection`
+- `rhetor.GetModelPerformance`
+
+#### Prompt Engineering
+- `rhetor.CreatePromptTemplate`
+- `rhetor.OptimizePrompt`
+- `rhetor.AnalyzePromptPerformance`
+
+#### AI Orchestration
+- `rhetor.ListAISpecialists`
+- `rhetor.SendMessageToSpecialist`
+- `rhetor.OrchestrateTeamChat`
+- `rhetor.GetSpecialistMetrics`
+
+#### Streaming Tools
+- `rhetor.SendMessageToSpecialistStream`
+- `rhetor.OrchestrateTeamChatStream`
+
+### Real-Time Streaming
+
+Use SSE for long-running operations:
+
+```python
+# Stream specialist responses
+async for event in client.stream_specialist_response(
+    specialist_id="data-analyst",
+    message="Analyze this dataset",
+    data=large_dataset
+):
+    if event.type == "progress":
+        print(f"Progress: {event.data['progress']}%")
+    elif event.type == "partial":
+        print(event.data['content'], end="")
+```
+
 ## Integration with Other Components
 
 Rhetor seamlessly integrates with other Tekton components:
@@ -208,6 +304,7 @@ Rhetor seamlessly integrates with other Tekton components:
 - **Athena**: For knowledge graph access and fact-checking
 - **Ergon**: For agent capabilities and specialized tasks
 - **LLM Adapter**: For local model access and specialized interfaces
+- **All Components**: Via MCP tools for AI-powered operations
 
 ## API Reference
 
