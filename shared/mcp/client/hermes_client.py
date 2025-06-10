@@ -7,10 +7,18 @@ and handle tool execution requests.
 
 import logging
 import asyncio
+import os
+import sys
 from typing import Dict, Any, Optional, List, Callable
 import aiohttp
 import json
 
+# Add Tekton root to path for shared imports
+tekton_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+if tekton_root not in sys.path:
+    sys.path.append(tekton_root)
+
+from shared.utils.env_config import get_component_config
 from tekton.models import TektonBaseModel
 
 logger = logging.getLogger(__name__)
@@ -39,11 +47,21 @@ class HermesMCPClient:
             auth_token: Optional authentication token
             timeout: Request timeout in seconds
         """
-        import os
         self.hermes_url = (hermes_url or os.environ.get("HERMES_URL", "http://localhost:8001")).rstrip("/")
         self.mcp_base_url = f"{self.hermes_url}/api/mcp/v2"
         self.component_name = component_name
-        self.component_port = component_port or int(os.environ.get(f"{component_name.upper()}_PORT", "8000"))
+        
+        # Get component port from config or environment
+        if component_port is None and component_name:
+            config = get_component_config()
+            component_lower = component_name.lower()
+            try:
+                component_config = getattr(config, component_lower)
+                component_port = component_config.port
+            except (AttributeError, TypeError):
+                component_port = int(os.environ.get(f"{component_name.upper()}_PORT"))
+        
+        self.component_port = component_port
         self.component_version = component_version
         self.auth_token = auth_token
         self.timeout = timeout
