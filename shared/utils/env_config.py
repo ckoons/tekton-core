@@ -26,6 +26,37 @@ class BaseComponentConfig(BaseModel):
         return cls()
     
     @classmethod
+    def _get_required_env(cls, key: str, value_type: str = 'int') -> Any:
+        """
+        Get required environment variable value.
+        
+        Args:
+            key: Environment variable name
+            value_type: Type to convert to ('str', 'int', 'float', 'bool')
+            
+        Returns:
+            Typed value
+            
+        Raises:
+            ValueError: If environment variable not found
+        """
+        value = os.environ.get(key)
+        if value is None:
+            raise ValueError(f"{key} not found in environment variables")
+        
+        try:
+            if value_type == 'int':
+                return int(value)
+            elif value_type == 'float':
+                return float(value)
+            elif value_type == 'bool':
+                return value.lower() in ('true', 'yes', '1', 'y', 't', 'on')
+            else:
+                return value
+        except (ValueError, AttributeError) as e:
+            raise ValueError(f"Invalid {value_type} value for {key}: {value}") from e
+    
+    @classmethod
     def _get_env_value(cls, key: str, default: Any = None, value_type: str = 'str') -> Any:
         """
         Get typed value from environment with fallback to default.
@@ -59,7 +90,8 @@ class BaseComponentConfig(BaseModel):
 class HermesConfig(BaseComponentConfig):
     """Configuration for Hermes service registry."""
     
-    port: int = 8001
+    port: int
+    db_mcp_port: int
     discovery_enabled: bool = True
     registration_timeout: int = 30
     health_check_interval: int = 60
@@ -68,7 +100,8 @@ class HermesConfig(BaseComponentConfig):
     def from_env(cls) -> 'HermesConfig':
         """Create HermesConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('HERMES_PORT', 8001, 'int'),
+            port=cls._get_required_env('HERMES_PORT', 'int'),
+            db_mcp_port=cls._get_required_env('DB_MCP_PORT', 'int'),
             discovery_enabled=cls._get_env_value('TEKTON_HERMES_DISCOVERY', True, 'bool'),
             registration_timeout=cls._get_env_value('HERMES_REGISTRATION_TIMEOUT', 30, 'int'),
             health_check_interval=cls._get_env_value('HERMES_HEALTH_CHECK_INTERVAL', 60, 'int')
@@ -78,7 +111,7 @@ class HermesConfig(BaseComponentConfig):
 class EngramConfig(BaseComponentConfig):
     """Configuration for Engram memory system."""
     
-    port: int = 8000
+    port: int
     memory_limit: int = 1000
     cache_enabled: bool = True
     vector_dimensions: int = 768
@@ -87,7 +120,7 @@ class EngramConfig(BaseComponentConfig):
     def from_env(cls) -> 'EngramConfig':
         """Create EngramConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('ENGRAM_PORT', 8000, 'int'),
+            port=cls._get_required_env('ENGRAM_PORT', 'int'),
             memory_limit=cls._get_env_value('ENGRAM_MEMORY_LIMIT', 1000, 'int'),
             cache_enabled=cls._get_env_value('ENGRAM_CACHE_ENABLED', True, 'bool'),
             vector_dimensions=cls._get_env_value('ENGRAM_VECTOR_DIMENSIONS', 768, 'int')
@@ -97,7 +130,7 @@ class EngramConfig(BaseComponentConfig):
 class RhetorConfig(BaseComponentConfig):
     """Configuration for Rhetor LLM service."""
     
-    port: int = 8003
+    port: int
     default_model: str = 'claude-3-sonnet'
     default_provider: str = 'anthropic'
     request_timeout: int = 120
@@ -107,7 +140,7 @@ class RhetorConfig(BaseComponentConfig):
     def from_env(cls) -> 'RhetorConfig':
         """Create RhetorConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('RHETOR_PORT', 8003, 'int'),
+            port=cls._get_required_env('RHETOR_PORT', 'int'),
             default_model=cls._get_env_value('TEKTON_DEFAULT_MODEL', 'claude-3-sonnet', 'str'),
             default_provider=cls._get_env_value('TEKTON_DEFAULT_PROVIDER', 'anthropic', 'str'),
             request_timeout=cls._get_env_value('RHETOR_TIMEOUT', 120, 'int'),
@@ -118,7 +151,7 @@ class RhetorConfig(BaseComponentConfig):
 class AthenaConfig(BaseComponentConfig):
     """Configuration for Athena knowledge graph."""
     
-    port: int = 8005
+    port: int
     graph_enabled: bool = True
     max_nodes: int = 10000
     
@@ -126,7 +159,7 @@ class AthenaConfig(BaseComponentConfig):
     def from_env(cls) -> 'AthenaConfig':
         """Create AthenaConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('ATHENA_PORT', 8005, 'int'),
+            port=cls._get_required_env('ATHENA_PORT', 'int'),
             graph_enabled=cls._get_env_value('ATHENA_GRAPH_ENABLED', True, 'bool'),
             max_nodes=cls._get_env_value('ATHENA_MAX_NODES', 10000, 'int')
         )
@@ -135,7 +168,7 @@ class AthenaConfig(BaseComponentConfig):
 class ApolloConfig(BaseComponentConfig):
     """Configuration for Apollo prediction system."""
     
-    port: int = 8012
+    port: int
     predictions_enabled: bool = True
     confidence_threshold: float = 0.75
     update_interval: int = 300
@@ -144,7 +177,7 @@ class ApolloConfig(BaseComponentConfig):
     def from_env(cls) -> 'ApolloConfig':
         """Create ApolloConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('APOLLO_PORT', 8012, 'int'),
+            port=cls._get_required_env('APOLLO_PORT', 'int'),
             predictions_enabled=cls._get_env_value('TEKTON_APOLLO_PREDICTIONS', True, 'bool'),
             confidence_threshold=cls._get_env_value('APOLLO_CONFIDENCE_THRESHOLD', 0.75, 'float'),
             update_interval=cls._get_env_value('APOLLO_UPDATE_INTERVAL', 300, 'int')
@@ -154,7 +187,7 @@ class ApolloConfig(BaseComponentConfig):
 class BudgetConfig(BaseComponentConfig):
     """Configuration for Budget cost management."""
     
-    port: int = 8013
+    port: int
     tracking_enabled: bool = True
     warning_threshold: float = 100.0
     limit: float = 500.0
@@ -163,7 +196,7 @@ class BudgetConfig(BaseComponentConfig):
     def from_env(cls) -> 'BudgetConfig':
         """Create BudgetConfig from environment variables."""
         return cls(
-            port=cls._get_env_value('BUDGET_PORT', 8013, 'int'),
+            port=cls._get_required_env('BUDGET_PORT', 'int'),
             tracking_enabled=cls._get_env_value('TEKTON_BUDGET_TRACKING', True, 'bool'),
             warning_threshold=cls._get_env_value('BUDGET_WARNING_THRESHOLD', 100.0, 'float'),
             limit=cls._get_env_value('BUDGET_LIMIT', 500.0, 'float')
@@ -173,14 +206,14 @@ class BudgetConfig(BaseComponentConfig):
 class ErgonConfig(BaseComponentConfig):
     """Configuration for Ergon agent system."""
     
-    port: int = 8002
+    port: int
     agent_enabled: bool = True
     max_agents: int = 10
     
     @classmethod
     def from_env(cls) -> 'ErgonConfig':
         return cls(
-            port=cls._get_env_value('ERGON_PORT', 8002, 'int'),
+            port=cls._get_required_env('ERGON_PORT', 'int'),
             agent_enabled=cls._get_env_value('ERGON_AGENT_ENABLED', True, 'bool'),
             max_agents=cls._get_env_value('ERGON_MAX_AGENTS', 10, 'int')
         )
@@ -189,14 +222,14 @@ class ErgonConfig(BaseComponentConfig):
 class HarmoniaConfig(BaseComponentConfig):
     """Configuration for Harmonia workflow system."""
     
-    port: int = 8007
+    port: int
     workflow_enabled: bool = True
     max_workflows: int = 100
     
     @classmethod
     def from_env(cls) -> 'HarmoniaConfig':
         return cls(
-            port=cls._get_env_value('HARMONIA_PORT', 8007, 'int'),
+            port=cls._get_required_env('HARMONIA_PORT', 'int'),
             workflow_enabled=cls._get_env_value('HARMONIA_WORKFLOW_ENABLED', True, 'bool'),
             max_workflows=cls._get_env_value('HARMONIA_MAX_WORKFLOWS', 100, 'int')
         )
@@ -205,14 +238,14 @@ class HarmoniaConfig(BaseComponentConfig):
 class MetisConfig(BaseComponentConfig):
     """Configuration for Metis task management."""
     
-    port: int = 8011
+    port: int
     task_enabled: bool = True
     max_tasks: int = 1000
     
     @classmethod
     def from_env(cls) -> 'MetisConfig':
         return cls(
-            port=cls._get_env_value('METIS_PORT', 8011, 'int'),
+            port=cls._get_required_env('METIS_PORT', 'int'),
             task_enabled=cls._get_env_value('METIS_TASK_ENABLED', True, 'bool'),
             max_tasks=cls._get_env_value('METIS_MAX_TASKS', 1000, 'int')
         )
@@ -221,14 +254,14 @@ class MetisConfig(BaseComponentConfig):
 class PrometheusConfig(BaseComponentConfig):
     """Configuration for Prometheus planning system."""
     
-    port: int = 8006
+    port: int
     planning_enabled: bool = True
     max_plans: int = 100
     
     @classmethod
     def from_env(cls) -> 'PrometheusConfig':
         return cls(
-            port=cls._get_env_value('PROMETHEUS_PORT', 8006, 'int'),
+            port=cls._get_required_env('PROMETHEUS_PORT', 'int'),
             planning_enabled=cls._get_env_value('PROMETHEUS_PLANNING_ENABLED', True, 'bool'),
             max_plans=cls._get_env_value('PROMETHEUS_MAX_PLANS', 100, 'int')
         )
@@ -237,14 +270,14 @@ class PrometheusConfig(BaseComponentConfig):
 class SophiaConfig(BaseComponentConfig):
     """Configuration for Sophia ML system."""
     
-    port: int = 8014
+    port: int
     ml_enabled: bool = True
     max_models: int = 10
     
     @classmethod
     def from_env(cls) -> 'SophiaConfig':
         return cls(
-            port=cls._get_env_value('SOPHIA_PORT', 8014, 'int'),
+            port=cls._get_required_env('SOPHIA_PORT', 'int'),
             ml_enabled=cls._get_env_value('SOPHIA_ML_ENABLED', True, 'bool'),
             max_models=cls._get_env_value('SOPHIA_MAX_MODELS', 10, 'int')
         )
@@ -253,14 +286,14 @@ class SophiaConfig(BaseComponentConfig):
 class SynthesisConfig(BaseComponentConfig):
     """Configuration for Synthesis execution engine."""
     
-    port: int = 8009
+    port: int
     execution_enabled: bool = True
     max_executions: int = 50
     
     @classmethod
     def from_env(cls) -> 'SynthesisConfig':
         return cls(
-            port=cls._get_env_value('SYNTHESIS_PORT', 8009, 'int'),
+            port=cls._get_required_env('SYNTHESIS_PORT', 'int'),
             execution_enabled=cls._get_env_value('SYNTHESIS_EXECUTION_ENABLED', True, 'bool'),
             max_executions=cls._get_env_value('SYNTHESIS_MAX_EXECUTIONS', 50, 'int')
         )
@@ -269,16 +302,48 @@ class SynthesisConfig(BaseComponentConfig):
 class TelosConfig(BaseComponentConfig):
     """Configuration for Telos requirements system."""
     
-    port: int = 8008
+    port: int
     requirements_enabled: bool = True
     max_requirements: int = 500
     
     @classmethod
     def from_env(cls) -> 'TelosConfig':
         return cls(
-            port=cls._get_env_value('TELOS_PORT', 8008, 'int'),
+            port=cls._get_required_env('TELOS_PORT', 'int'),
             requirements_enabled=cls._get_env_value('TELOS_REQUIREMENTS_ENABLED', True, 'bool'),
             max_requirements=cls._get_env_value('TELOS_MAX_REQUIREMENTS', 500, 'int')
+        )
+
+
+class TermaConfig(BaseComponentConfig):
+    """Configuration for Terma terminal system."""
+    
+    port: int
+    ws_port: int
+    terminal_enabled: bool = True
+    max_sessions: int = 10
+    
+    @classmethod
+    def from_env(cls) -> 'TermaConfig':
+        return cls(
+            port=cls._get_required_env('TERMA_PORT', 'int'),
+            ws_port=cls._get_required_env('TERMA_WS_PORT', 'int'),
+            terminal_enabled=cls._get_env_value('TERMA_TERMINAL_ENABLED', True, 'bool'),
+            max_sessions=cls._get_env_value('TERMA_MAX_SESSIONS', 10, 'int')
+        )
+
+
+class TektonCoreConfig(BaseComponentConfig):
+    """Configuration for Tekton Core API."""
+    
+    port: int
+    api_enabled: bool = True
+    
+    @classmethod
+    def from_env(cls) -> 'TektonCoreConfig':
+        return cls(
+            port=cls._get_required_env('TEKTON_CORE_PORT', 'int'),
+            api_enabled=cls._get_env_value('TEKTON_CORE_API_ENABLED', True, 'bool')
         )
 
 
@@ -354,6 +419,8 @@ class ComponentConfig:
         self.sophia = SophiaConfig.from_env()
         self.synthesis = SynthesisConfig.from_env()
         self.telos = TelosConfig.from_env()
+        self.terma = TermaConfig.from_env()
+        self.tekton_core = TektonCoreConfig.from_env()
         self.tekton = TektonConfig.from_env()
     
     def refresh(self):
@@ -381,6 +448,16 @@ class ComponentConfig:
             'athena': self.athena,
             'apollo': self.apollo,
             'budget': self.budget,
+            'ergon': self.ergon,
+            'harmonia': self.harmonia,
+            'metis': self.metis,
+            'prometheus': self.prometheus,
+            'sophia': self.sophia,
+            'synthesis': self.synthesis,
+            'telos': self.telos,
+            'terma': self.terma,
+            'tekton-core': self.tekton_core,
+            'tekton_core': self.tekton_core,
         }
         
         config = component_map.get(component_lower)
@@ -398,6 +475,14 @@ class ComponentConfig:
             'athena': self.athena.model_dump(),
             'apollo': self.apollo.model_dump(),
             'budget': self.budget.model_dump(),
+            'ergon': self.ergon.model_dump(),
+            'harmonia': self.harmonia.model_dump(),
+            'metis': self.metis.model_dump(),
+            'prometheus': self.prometheus.model_dump(),
+            'sophia': self.sophia.model_dump(),
+            'synthesis': self.synthesis.model_dump(),
+            'telos': self.telos.model_dump(),
+            'terma': self.terma.model_dump(),
             'tekton': self.tekton.model_dump(),
         }
 
