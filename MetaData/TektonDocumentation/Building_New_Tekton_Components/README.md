@@ -51,11 +51,12 @@ A Tekton component is a self-contained service that:
 1. **[Component_Architecture_Guide.md](./Component_Architecture_Guide.md)** - Overall architecture and patterns
 2. **[Backend_Implementation_Guide.md](./Backend_Implementation_Guide.md)** - Backend API and business logic (includes MCP)
 3. **[UI_Implementation_Guide.md](./UI_Implementation_Guide.md)** - Hephaestus UI integration
-4. **[Step_By_Step_Tutorial.md](./Step_By_Step_Tutorial.md)** - Complete walkthrough
-5. **[Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md)** - Common patterns and utilities
-6. **[Testing_Guide.md](./Testing_Guide.md)** - Test-driven development approach
-7. **[Documentation_Requirements.md](./Documentation_Requirements.md)** - Required documentation
-8. **[MCP Implementation Guide](../MCP_IMPLEMENTATION_GUIDE.md)** - Detailed MCP implementation patterns
+4. **[AI_Interface_Implementation_Guide.md](./AI_Interface_Implementation_Guide.md)** - Implementing AI interfaces and chat integration
+5. **[Step_By_Step_Tutorial.md](./Step_By_Step_Tutorial.md)** - Complete walkthrough
+6. **[Shared_Patterns_Reference.md](./Shared_Patterns_Reference.md)** - Common patterns and utilities
+7. **[Testing_Guide.md](./Testing_Guide.md)** - Test-driven development approach
+8. **[Documentation_Requirements.md](./Documentation_Requirements.md)** - Required documentation
+9. **[MCP Implementation Guide](../MCP_IMPLEMENTATION_GUIDE.md)** - Detailed MCP implementation patterns
 
 ## Component Directory Structure
 
