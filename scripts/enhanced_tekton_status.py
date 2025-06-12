@@ -204,15 +204,17 @@ class MetricsStorage:
 class EnhancedStatusChecker:
     """Advanced status checker with comprehensive monitoring"""
     
-    def __init__(self, store_metrics: bool = True):
+    def __init__(self, store_metrics: bool = True, timeout: float = 2.0, quick_mode: bool = False):
         self.config = get_component_config()
         self.storage = MetricsStorage() if store_metrics else None
         self.session = None
+        self.timeout = timeout
+        self.quick_mode = quick_mode
         
     async def __aenter__(self):
         """Async context manager entry"""
         self.session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=10),
+            timeout=aiohttp.ClientTimeout(total=self.timeout),
             connector=aiohttp.TCPConnector(limit=20)
         )
         return self
@@ -252,6 +254,7 @@ class EnhancedStatusChecker:
         
         if not process_info:
             metrics.status = "not_running"
+            metrics.response_time = time.time() - start_time
             return metrics
             
         # Extract process metrics
@@ -268,33 +271,37 @@ class EnhancedStatusChecker:
             metrics.status = "healthy"
             metrics.version = health_result.get("version", "unknown")
             
-            # Check additional endpoints
-            endpoints_to_check = ["/health", "/api", "/status"]
-            if comp_name == "hermes":
-                endpoints_to_check.extend(["/api/components", "/api/database"])
-            elif comp_name == "sophia":
-                endpoints_to_check.extend(["/mcp", "/api/metrics"])
-                
-            for endpoint in endpoints_to_check:
-                endpoint_healthy = await self.check_endpoint(comp_info.port, endpoint)
-                metrics.endpoint_health[endpoint] = endpoint_healthy
+            # Skip additional checks in quick mode
+            if not self.quick_mode:
+                # Check additional endpoints
+                endpoints_to_check = ["/health", "/api", "/status"]
+                if comp_name == "hermes":
+                    endpoints_to_check.extend(["/api/components", "/api/database"])
+                elif comp_name == "sophia":
+                    endpoints_to_check.extend(["/mcp", "/api/metrics"])
+                    
+                for endpoint in endpoints_to_check:
+                    endpoint_healthy = await self.check_endpoint(comp_info.port, endpoint)
+                    metrics.endpoint_health[endpoint] = endpoint_healthy
                 
         else:
             metrics.status = health_result.get("status", "unhealthy")
             metrics.last_error = health_result.get("error")
             
-        # Check Hermes registration
-        if comp_name != "hermes":  # Hermes can't register with itself
-            metrics.registered_with_hermes = await self.check_hermes_registration(comp_name)
-            
-        # Check ready status
-        ready_result = await self.check_ready_endpoint(comp_info.port)
-        metrics.ready = ready_result.get("ready", False)
-        if ready_result.get("version"):
-            metrics.version = ready_result["version"]
-            
-        # Get capabilities
-        metrics.capabilities = await self.get_component_capabilities(comp_name, comp_info.port)
+        # Skip some checks in quick mode or if component is down
+        if not self.quick_mode and metrics.status != "not_running":
+            # Check Hermes registration
+            if comp_name != "hermes":  # Hermes can't register with itself
+                metrics.registered_with_hermes = await self.check_hermes_registration(comp_name)
+                
+            # Check ready status
+            ready_result = await self.check_ready_endpoint(comp_info.port)
+            metrics.ready = ready_result.get("ready", False)
+            if ready_result.get("version"):
+                metrics.version = ready_result["version"]
+                
+            # Get capabilities
+            metrics.capabilities = await self.get_component_capabilities(comp_name, comp_info.port)
             
         # Calculate health score
         metrics.health_score = self.calculate_health_score(metrics)
@@ -532,7 +539,9 @@ class EnhancedStatusChecker:
         components = self.config.get_all_components()
 
         if show_progress:
-            print(f"🔍 Checking {len(components)} components...")
+            mode_str = " (quick mode)" if self.quick_mode else ""
+            timeout_str = f" with {self.timeout}s timeout" if self.timeout != 2.0 else ""
+            print(f"🔍 Checking {len(components)} components{mode_str}{timeout_str}...")
 
         # Check all components in parallel with progress updates
         tasks = [
@@ -884,6 +893,8 @@ async def main():
     parser.add_argument("--trends", "-t", action="store_true", help="Show trend information")
     parser.add_argument("--no-storage", "-n", action="store_true", help="Disable metrics storage")
     parser.add_argument("--watch", "-w", type=int, help="Watch mode - refresh every N seconds")
+    parser.add_argument("--timeout", type=float, default=2.0, help="HTTP request timeout in seconds (default: 2.0)")
+    parser.add_argument("--quick", "-q", action="store_true", help="Quick mode - skip detailed checks for faster results")
     
     args = parser.parse_args()
     
@@ -893,7 +904,7 @@ async def main():
         if args.log is None:
             args.log = 5
     
-    async with EnhancedStatusChecker(store_metrics=not args.no_storage) as checker:
+    async with EnhancedStatusChecker(store_metrics=not args.no_storage, timeout=args.timeout, quick_mode=args.quick) as checker:
         
         async def check_and_display():
             # Determine which components to check

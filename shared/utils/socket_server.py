@@ -15,11 +15,17 @@ from uvicorn.config import Config
 from uvicorn.server import Server
 
 
-async def run_with_socket_reuse_async(app_str: str, host: str = "0.0.0.0", port: int = 8000, **kwargs):
+async def run_with_socket_reuse_async(app, host: str = "0.0.0.0", port: int = 8000, **kwargs):
     """
     Run uvicorn with socket reuse enabled (async version).
     
     This properly configures socket reuse for immediate port rebinding on macOS.
+    
+    Args:
+        app: Either a string (e.g., "module:app") or an app instance
+        host: Host to bind to
+        port: Port to bind to
+        **kwargs: Additional arguments for uvicorn Config
     """
     # Create socket with proper reuse options
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -42,7 +48,7 @@ async def run_with_socket_reuse_async(app_str: str, host: str = "0.0.0.0", port:
     kwargs.pop('port', None)
     
     config = Config(
-        app_str,
+        app,
         fd=sock.fileno(),
         **kwargs
     )
@@ -62,11 +68,17 @@ async def run_with_socket_reuse_async(app_str: str, host: str = "0.0.0.0", port:
         sock.close()
 
 
-def run_with_socket_reuse(app_str: str, host: str = "0.0.0.0", port: int = 8000, **kwargs):
+def run_with_socket_reuse(app, host: str = "0.0.0.0", port: int = 8000, **kwargs):
     """
     Run uvicorn with socket reuse enabled.
     
     This fixes the "Address already in use" error during rapid restarts.
+    
+    Args:
+        app: Either a string (e.g., "module:app") or an app instance
+        host: Host to bind to
+        port: Port to bind to
+        **kwargs: Additional arguments for uvicorn Config
     """
     # Create socket with proper reuse options
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,7 +101,7 @@ def run_with_socket_reuse(app_str: str, host: str = "0.0.0.0", port: int = 8000,
     kwargs.pop('port', None)
     
     config = Config(
-        app_str,
+        app,
         fd=sock.fileno(),
         **kwargs
     )
@@ -132,7 +144,7 @@ class ReuseAddressServer(Server):
 
 def run_component_server(
     component_name: str,
-    app_module: str,
+    app_module,
     default_port: int,
     reload: bool = False
 ):
@@ -141,7 +153,7 @@ def run_component_server(
     
     Args:
         component_name: Name of the component (e.g., "budget", "telos")
-        app_module: Module path to the app (e.g., "budget.api.app")
+        app_module: Module path to the app (e.g., "budget.api.app") or app instance
         default_port: Default port if not in environment
         reload: Whether to enable auto-reload
     """
@@ -152,8 +164,10 @@ def run_component_server(
     print(f"Starting {component_name.capitalize()} on port {port}...")
     
     # Run with socket reuse
+    # If app_module is a string, append :app, otherwise use it directly
+    app = f"{app_module}:app" if isinstance(app_module, str) else app_module
     run_with_socket_reuse(
-        f"{app_module}:app",
+        app,
         host="0.0.0.0",
         port=port,
         reload=reload,
