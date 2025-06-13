@@ -94,3 +94,15 @@ curl http://localhost:8088/health
 ```
 
 Remember: **Simple HTML > React Component**
+
+## For Claude Sessions
+
+See these Claude-specific guides:
+- `UIDevToolsClaudeInstructions.md` - Detailed instructions for Claude
+- `UI_DEVTOOLS_CHEATSHEET.md` - Quick commands cheat sheet
+- `ui_devtools_client.py` - Python wrapper for easy usage
+
+Start every UI session with:
+```python
+from ui_devtools_client import UIDevTools, check_and_start_mcp
+```

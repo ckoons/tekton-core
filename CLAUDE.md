@@ -8,41 +8,98 @@ If you have any recommendations, ideas or suggestions, please speak up - your th
 
 When working with Tekton UI, you MUST use the Hephaestus UI DevTools MCP (port 8088) instead of requesting screenshots or adding frameworks.
 
-**IMPORTANT**: The UI DevTools MCP must be started manually:
+### ⚠️ CRITICAL: How to Use UI DevTools
+
+**DO NOT use any other playwright, puppeteer, or browser automation tools!**
+
+**ONLY use the HTTP API at port 8088:**
+
 ```bash
-# Check if running
+# 1. First check if MCP is running
 curl http://localhost:8088/health
 
-# Start if needed
+# 2. If not running, start it
 cd $TEKTON_ROOT/Hephaestus && ./run_mcp.sh
+
+# 3. Use HTTP API for ALL UI operations
+curl -X POST http://localhost:8088/api/mcp/v2/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tool_name": "ui_capture",
+    "arguments": {
+      "component": "rhetor"
+    }
+  }'
 ```
 
-### Critical Rules:
-1. **NEVER request screenshots** - Use `ui_capture` to get structured UI data
-2. **ALWAYS test in sandbox** - Use `ui_sandbox` with `preview=True` before applying changes
-3. **Simple HTML only** - No React, Vue, Angular, or build tools for simple UI changes
-4. **Check before changing** - Use `ui_analyze` to understand current state
+### The ONLY Four Tools (via HTTP API):
 
-### Available UI DevTools:
-- `ui_capture` - See UI structure without screenshots
-- `ui_sandbox` - Test changes safely (detects and rejects frameworks)
-- `ui_interact` - Click, type, and interact with UI
-- `ui_analyze` - Check for frameworks and complexity
+1. **ui_capture** - Get UI structure (NO screenshots)
+   ```json
+   {"tool_name": "ui_capture", "arguments": {"component": "rhetor"}}
+   ```
 
-### Example - Adding a Footer Widget:
+2. **ui_sandbox** - Test changes safely (detects frameworks)
+   ```json
+   {
+     "tool_name": "ui_sandbox",
+     "arguments": {
+       "component": "rhetor",
+       "changes": [{"type": "html", "selector": "#footer", "content": "<div>Test</div>", "action": "append"}],
+       "preview": true
+     }
+   }
+   ```
+
+3. **ui_interact** - Click/type UI elements
+   ```json
+   {"tool_name": "ui_interact", "arguments": {"component": "rhetor", "action": "click", "selector": "button"}}
+   ```
+
+4. **ui_analyze** - Check for frameworks
+   ```json
+   {"tool_name": "ui_analyze", "arguments": {"component": "rhetor", "deep_scan": false}}
+   ```
+
+### Python Example (USE THIS PATTERN):
+
 ```python
-# ✅ RIGHT WAY (3 lines)
-await ui_sandbox(
-    component="rhetor",
-    changes=[{"type": "html", "selector": "#footer", 
-              "content": "<span>Timestamp: 2024</span>", "action": "append"}],
-    preview=False
-)
+import httpx
+import asyncio
 
-# ❌ WRONG WAY (triggers --nuclear-destruction)
-# npm install react webpack babel...
+async def work_with_ui():
+    # ALWAYS use HTTP endpoint
+    MCP_URL = "http://localhost:8088/api/mcp/v2/execute"
+    
+    async with httpx.AsyncClient() as client:
+        # Capture UI
+        response = await client.post(MCP_URL, json={
+            "tool_name": "ui_capture",
+            "arguments": {"component": "rhetor"}
+        })
+        
+        # Test changes
+        response = await client.post(MCP_URL, json={
+            "tool_name": "ui_sandbox",
+            "arguments": {
+                "component": "rhetor",
+                "changes": [{"type": "html", "selector": "#footer", "content": "<span>2024</span>", "action": "append"}],
+                "preview": True
+            }
+        })
 ```
 
-See `/MetaData/TektonDocumentation/Guides/UIDevToolsGuide.md` for full documentation.
+### ❌ DO NOT USE:
+- playwright:browser_navigate
+- Any puppeteer tools
+- Screenshot commands
+- Direct browser automation
+- npm install ANYTHING
+
+### ✅ ONLY USE:
+- HTTP POST to http://localhost:8088/api/mcp/v2/execute
+- The four tools: ui_capture, ui_sandbox, ui_interact, ui_analyze
+
+See `/MetaData/TektonDocumentation/Guides/UIDevToolsExplicitGuide.md` for detailed examples.
 
 Remember: Casey uses `tekton-revert --nuclear-destruction` when you over-engineer simple UI changes!  
