@@ -315,6 +315,24 @@ class TelosConfig(BaseComponentConfig):
         )
 
 
+class HephaestusConfig(BaseComponentConfig):
+    """Configuration for Hephaestus UI system."""
+    
+    port: int
+    mcp_port: int
+    mcp_enabled: bool = True
+    max_connections: int = 100
+    
+    @classmethod
+    def from_env(cls) -> 'HephaestusConfig':
+        return cls(
+            port=cls._get_required_env('HEPHAESTUS_PORT', 'int'),
+            mcp_port=cls._get_required_env('HEPHAESTUS_MCP_PORT', 'int'),
+            mcp_enabled=cls._get_env_value('HEPHAESTUS_MCP_ENABLED', True, 'bool'),
+            max_connections=cls._get_env_value('HEPHAESTUS_MAX_CONNECTIONS', 100, 'int')
+        )
+
+
 class TermaConfig(BaseComponentConfig):
     """Configuration for Terma terminal system."""
     
@@ -414,6 +432,7 @@ class ComponentConfig:
         self.budget = BudgetConfig.from_env()
         self.ergon = ErgonConfig.from_env()
         self.harmonia = HarmoniaConfig.from_env()
+        self.hephaestus = HephaestusConfig.from_env()
         self.metis = MetisConfig.from_env()
         self.prometheus = PrometheusConfig.from_env()
         self.sophia = SophiaConfig.from_env()
@@ -450,6 +469,7 @@ class ComponentConfig:
             'budget': self.budget,
             'ergon': self.ergon,
             'harmonia': self.harmonia,
+            'hephaestus': self.hephaestus,
             'metis': self.metis,
             'prometheus': self.prometheus,
             'sophia': self.sophia,
@@ -477,6 +497,7 @@ class ComponentConfig:
             'budget': self.budget.model_dump(),
             'ergon': self.ergon.model_dump(),
             'harmonia': self.harmonia.model_dump(),
+            'hephaestus': self.hephaestus.model_dump(),
             'metis': self.metis.model_dump(),
             'prometheus': self.prometheus.model_dump(),
             'sophia': self.sophia.model_dump(),
