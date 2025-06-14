@@ -683,15 +683,26 @@ class EnhancedComponentKiller:
         
         return "\n".join(lines)
     
-    async def final_cleanup_phase(self):
-        """Nuclear cleanup - ensure everything is dead and ports are free"""
+    async def final_cleanup_phase(self, target_components: Optional[List[str]] = None):
+        """Nuclear cleanup - ensure everything is dead and ports are free
+        
+        Args:
+            target_components: List of specific components to cleanup. If None, cleanup all.
+        """
         self.log("Waiting 3 seconds for socket cleanup (SO_LINGER + buffer)...", "cleanup")
         await asyncio.sleep(3)  # 2 second linger + 1 second buffer
         
         cleanup_performed = False
         all_components = self.config.get_all_components()
         
-        for comp_name, comp_info in all_components.items():
+        # Filter components if specific targets provided
+        if target_components:
+            components_to_check = {name: info for name, info in all_components.items() 
+                                 if name in target_components}
+        else:
+            components_to_check = all_components
+        
+        for comp_name, comp_info in components_to_check.items():
             port = comp_info.port
             
             # Check if port is still in use
@@ -842,8 +853,14 @@ async def main():
         print(killer.format_termination_report(results))
         
         # Final cleanup phase
-        print("\n🔥 Starting final cleanup phase...")
-        await killer.final_cleanup_phase()
+        if args.nuclear or not args.components or args.components.lower() == 'all':
+            # Full cleanup for nuclear or all components
+            print("\n🔥 Starting final cleanup phase for all components...")
+            await killer.final_cleanup_phase()
+        elif args.force:
+            # Targeted cleanup only for specific components when using --force
+            print(f"\n🔥 Starting cleanup phase for {', '.join(components)}...")
+            await killer.final_cleanup_phase(target_components=components)
         
         # Exit with appropriate code
         failed_count = sum(1 for r in results.values() if r.result == KillResult.FAILED)

@@ -36,16 +36,6 @@ This approach leads to:
 ## Affected Components
 
 All Tekton components will be updated:
-- Apollo
-- Athena
-- Aura
-- Budget
-- Chronos
-- CognitoFlux
-- Hermes
-- Noesis
-- Rhetor
-- Telos
 
 ## Success Criteria
 

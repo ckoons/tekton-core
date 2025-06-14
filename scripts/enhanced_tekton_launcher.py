@@ -707,13 +707,25 @@ class EnhancedComponentLauncher:
             # Return empty list to indicate failure
             return []
     
-    async def pre_launch_check(self):
-        """Check for lingering processes before launch"""
+    async def pre_launch_check(self, target_components: Optional[List[str]] = None):
+        """Check for lingering processes before launch
+        
+        Args:
+            target_components: List of specific components to check. If None, check all.
+        """
         conflicts = []
         
-        # Check all configured ports
+        # Check configured ports - only for target components if specified
         all_components = self.config.get_all_components()
-        for comp_name, comp_info in all_components.items():
+        
+        # Filter components if specific targets provided
+        if target_components:
+            components_to_check = {name: info for name, info in all_components.items() 
+                                 if name in target_components}
+        else:
+            components_to_check = all_components
+            
+        for comp_name, comp_info in components_to_check.items():
             port = comp_info.port
             if self.is_port_in_use(port):
                 conflicts.append((comp_name, port))
@@ -747,8 +759,8 @@ class EnhancedComponentLauncher:
             self.log("No components to launch", "warning")
             return
         
-        # Pre-launch check for lingering processes
-        await self.pre_launch_check()
+        # Pre-launch check for lingering processes - only for components we're launching
+        await self.pre_launch_check(target_components=components)
             
         # Group by priority
         launch_groups = self.get_launch_groups(components)

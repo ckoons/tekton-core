@@ -53,11 +53,17 @@ class LatentReasoningMixin:
             return True
             
         except ImportError as e:
-            logger.error(f"Error importing SharedLatentSpace: {e}")
-            logger.error("Make sure Engram with Hermes integration is available in your environment")
+            logger.warning(f"SharedLatentSpace not available: {e}")
+            logger.info("Latent reasoning will work in standalone mode without cross-component sharing")
+            # Set a flag to indicate standalone mode
+            self.latent_space = None
+            self._latent_standalone_mode = True
             return False
         except Exception as e:
-            logger.error(f"Error initializing latent space: {e}")
+            logger.warning(f"Could not initialize latent space: {e}")
+            logger.info("Continuing in standalone mode without latent space features")
+            self.latent_space = None
+            self._latent_standalone_mode = True
             return False
     
     async def _handle_external_insight(self, insight: Dict[str, Any]):
@@ -77,7 +83,20 @@ class LatentReasoningMixin:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Process input with iterative latent space reasoning."""
-        if not hasattr(self, 'latent_space'):
+        # Check if we're in standalone mode
+        if hasattr(self, '_latent_standalone_mode') and self._latent_standalone_mode:
+            # Run in simple mode without latent space features
+            result = await process_func(input_content)
+            return {
+                "content": result,
+                "thought_id": "standalone",
+                "iterations": 1,
+                "converged": True,
+                "similarity": 1.0,
+                "standalone_mode": True
+            }
+            
+        if not hasattr(self, 'latent_space') or self.latent_space is None:
             raise RuntimeError(f"Latent space not initialized for {self.__class__.__name__}. "
                              f"Call initialize_latent_space() first.")
                              
