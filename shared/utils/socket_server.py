@@ -32,11 +32,10 @@ async def run_with_socket_reuse_async(app, host: str = "0.0.0.0", port: int = 80
     
     # Enable reuse options BEFORE binding
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    if hasattr(socket, 'SO_REUSEPORT'):
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    # REMOVED SO_REUSEPORT - we don't want multiple processes on same port
     
-    # Set SO_LINGER to 0 for immediate close (onoff=1, linger=0)
-    linger_struct = struct.pack('ii', 1, 0)  # onoff=1, linger time=0
+    # Set SO_LINGER to 2 seconds for graceful close
+    linger_struct = struct.pack('ii', 1, 2)  # onoff=1, linger time=2 seconds
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger_struct)
     
     # Bind and listen
@@ -85,11 +84,10 @@ def run_with_socket_reuse(app, host: str = "0.0.0.0", port: int = 8000, **kwargs
     
     # Enable reuse options BEFORE binding
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    if hasattr(socket, 'SO_REUSEPORT'):
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    # REMOVED SO_REUSEPORT - we don't want multiple processes on same port
     
-    # Set SO_LINGER to 0 for immediate close (onoff=1, linger=0)
-    linger_struct = struct.pack('ii', 1, 0)  # onoff=1, linger time=0
+    # Set SO_LINGER to 2 seconds for graceful close
+    linger_struct = struct.pack('ii', 1, 2)  # onoff=1, linger time=2 seconds
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger_struct)
     
     # Bind and listen

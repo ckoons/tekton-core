@@ -65,7 +65,7 @@ class GracefulShutdown:
         """
         self.cleanup_tasks.append(cleanup_func)
     
-    async def shutdown_sequence(self, timeout: int = 30) -> ShutdownMetrics:
+    async def shutdown_sequence(self, timeout: int = 10) -> ShutdownMetrics:
         """
         Execute graceful shutdown sequence.
         
@@ -125,70 +125,12 @@ class GracefulShutdown:
             metrics.cleanup_errors.append(error_msg)
 
 
-def component_lifespan(
-    component_name: str,
-    startup_func: Callable,
-    cleanup_funcs: Optional[List[Callable]] = None,
-    port: Optional[int] = None
-):
-    """
-    Create a lifespan context manager for FastAPI apps with graceful shutdown.
-    
-    This replaces the deprecated @app.on_event decorators.
-    
-    Args:
-        component_name: Name of the component
-        startup_func: Async function to run at startup
-        cleanup_funcs: List of async cleanup functions
-        port: Optional port number for startup metrics
-        
-    Returns:
-        Async context manager function for FastAPI lifespan
-        
-    Example:
-        app = FastAPI(lifespan=component_lifespan(
-            "mycomponent",
-            startup_func=initialize,
-            cleanup_funcs=[close_db, cleanup_cache]
-        ))
-    """
-    @asynccontextmanager
-    async def lifespan(app):
-        # Startup
-        try:
-            metrics = await component_startup(
-                component_name,
-                startup_func,
-                port=port
-            )
-            logger.info(f"Startup metrics: {metrics}")
-        except Exception as e:
-            logger.error(f"Failed to start {component_name}: {e}")
-            raise
-        
-        # Create shutdown handler
-        shutdown = GracefulShutdown(component_name)
-        if cleanup_funcs:
-            for func in cleanup_funcs:
-                shutdown.register_cleanup(func)
-        
-        yield
-        
-        # Shutdown
-        shutdown_metrics = await shutdown.shutdown_sequence()
-        
-        if shutdown_metrics.cleanup_errors:
-            logger.warning(
-                f"[{component_name}] Shutdown completed with {len(shutdown_metrics.cleanup_errors)} errors"
-            )
-    
-    return lifespan
 
 
 def create_shutdown_handler(
     component_name: str,
     cleanup_funcs: List[Callable],
-    timeout: int = 30
+    timeout: int = 10
 ) -> Callable:
     """
     Create a standardized shutdown handler function.

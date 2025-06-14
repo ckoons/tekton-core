@@ -186,19 +186,19 @@ is_registered_with_hermes = False  # Track registration status
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for MyComponent"""
+    """Lifespan context manager for MyComponent - REQUIRED pattern for all components"""
     # IMPORTANT: Must declare as global to access module-level variables
     global hermes_registration, heartbeat_task, start_time, is_registered_with_hermes
     
-    # Track startup time for ready endpoint
-    import time
-    start_time = time.time()
-    
-    # Startup
-    logger.info("Starting MyComponent API")
-    
+    # Define startup function
     async def mycomponent_startup():
         """Component-specific startup logic"""
+        global hermes_registration, heartbeat_task, start_time, is_registered_with_hermes
+        
+        # Track startup time for ready endpoint
+        import time
+        start_time = time.time()
+        
         try:
             # Get configuration - NEVER hardcode ports
             config = get_component_config()
@@ -209,7 +209,6 @@ async def lifespan(app: FastAPI):
             app.state.start_time = datetime.utcnow()
             
             # Register with Hermes
-            global hermes_registration, heartbeat_task
             hermes_registration = HermesRegistration()
             
             logger.info(f"Attempting to register MyComponent with Hermes on port {port}")
@@ -224,7 +223,7 @@ async def lifespan(app: FastAPI):
                 }
             )
             
-            if is_registered:
+            if is_registered_with_hermes:
                 logger.info("Successfully registered with Hermes")
                 heartbeat_task = asyncio.create_task(
                     heartbeat_loop(hermes_registration, COMPONENT_NAME, interval=30)
@@ -261,8 +260,8 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         
-        if hermes_registration and hermes_registration.is_registered:
-            await hermes_registration.deregister(COMPONENT_NAME)
+        if hermes_registration and is_registered_with_hermes:
+            await hermes_registration.deregister(COMPONENT_NAME.lower())
             logger.info("Deregistered from Hermes")
     
     shutdown.register_cleanup(cleanup_hermes)
@@ -301,7 +300,7 @@ app = FastAPI(
         component_version=COMPONENT_VERSION,
         component_description=COMPONENT_DESCRIPTION
     ),
-    lifespan=lifespan  # REQUIRED
+    lifespan=lifespan  # REQUIRED - Direct async context manager pattern
 )
 
 # Add CORS middleware

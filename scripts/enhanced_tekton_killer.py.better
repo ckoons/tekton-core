@@ -107,10 +107,9 @@ class ProcessInfo:
 class EnhancedComponentKiller:
     """Advanced component termination system with safety features"""
     
-    def __init__(self, verbose: bool = False, dry_run: bool = False, skip_graceful: bool = False):
+    def __init__(self, verbose: bool = False, dry_run: bool = False):
         self.verbose = verbose
         self.dry_run = dry_run
-        self.skip_graceful = skip_graceful
         try:
             self.config = get_component_config()
         except Exception as e:
@@ -469,28 +468,25 @@ class EnhancedComponentKiller:
                 termination_time=time.time() - start_time
             )
             
-        # Strategy 1: Try graceful HTTP shutdown (unless skip_graceful is set)
-        if not self.skip_graceful:
-            self.log("Attempting graceful HTTP shutdown...", "info", component_name)
-            if await self.send_graceful_shutdown_signal(component_name, port):
-                # Wait a moment for graceful shutdown
-                await asyncio.sleep(3)
-                
-                # Check if process is still running
-                if not self.get_detailed_process_info(port):
-                    cleanup_performed = await self.cleanup_component_resources(component_name)
-                    return TerminationResult(
-                        component_name=component_name,
-                        port=port,
-                        result=KillResult.SUCCESS,
-                        method_used=KillMethod.GRACEFUL_HTTP,
-                        pid=process_info.pid,
-                        message="Gracefully shutdown via HTTP",
-                        cleanup_performed=cleanup_performed,
-                        termination_time=time.time() - start_time
-                    )
-        else:
-            self.log("Skipping HTTP graceful shutdown (--skip-graceful flag set)", "info", component_name)
+        # Strategy 1: Try graceful HTTP shutdown
+        self.log("Attempting graceful HTTP shutdown...", "info", component_name)
+        if await self.send_graceful_shutdown_signal(component_name, port):
+            # Wait a moment for graceful shutdown
+            await asyncio.sleep(3)
+            
+            # Check if process is still running
+            if not self.get_detailed_process_info(port):
+                cleanup_performed = await self.cleanup_component_resources(component_name)
+                return TerminationResult(
+                    component_name=component_name,
+                    port=port,
+                    result=KillResult.SUCCESS,
+                    method_used=KillMethod.GRACEFUL_HTTP,
+                    pid=process_info.pid,
+                    message="Gracefully shutdown via HTTP",
+                    cleanup_performed=cleanup_performed,
+                    termination_time=time.time() - start_time
+                )
                 
         # Strategy 2: Try graceful signal termination
         self.log("Attempting graceful signal termination...", "info", component_name)
@@ -766,11 +762,6 @@ async def main():
         help="Skip safety confirmations"
     )
     parser.add_argument(
-        "--skip-graceful", "-sg",
-        action="store_true",
-        help="⚡ Skip HTTP graceful shutdown and go straight to SIGTERM"
-    )
-    parser.add_argument(
         "--yes", "-y",
         action="store_true",
         help="Automatically answer yes to all prompts"
@@ -783,7 +774,7 @@ async def main():
     
     args = parser.parse_args()
     
-    async with EnhancedComponentKiller(verbose=args.verbose, dry_run=args.dry_run, skip_graceful=args.skip_graceful) as killer:
+    async with EnhancedComponentKiller(verbose=args.verbose, dry_run=args.dry_run) as killer:
         
         # Nuclear option
         if args.nuclear:

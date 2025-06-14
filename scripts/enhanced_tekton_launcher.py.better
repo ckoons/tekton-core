@@ -784,27 +784,13 @@ class EnhancedComponentLauncher:
             self.start_health_monitoring()
             
     def get_launch_groups(self, components: List[str]) -> Dict[int, List[str]]:
-        """Group components by startup priority with dependency hierarchy:
-        Hermes → Engram → Rhetor → Everything else
-        """
+        """Group components by startup priority (original logic)"""
         groups = defaultdict(list)
-        
-        # Define explicit priority hierarchy
-        priority_map = {
-            "hermes": 1,    # First - message bus
-            "engram": 2,    # Second - memory system
-            "rhetor": 3,    # Third - AI whisperer
-        }
         
         for comp_name in components:
             comp_info = self.config.get_component(comp_name)
             if comp_info:
-                # Use explicit priority if defined, otherwise use priority 4 (everything else)
-                if comp_name in priority_map:
-                    priority = priority_map[comp_name]
-                else:
-                    priority = 4  # Everything else launches after core components
-                    
+                priority = comp_info.startup_priority
                 groups[priority].append(comp_name)
                 
         return dict(sorted(groups.items()))
