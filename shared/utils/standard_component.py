@@ -87,7 +87,7 @@ class StandardComponentBase:
             
         except Exception as e:
             self.logger.error(f"Failed to initialize {self.component_name}: {e}")
-            raise StartupError(f"Component initialization failed: {e}")
+            raise StartupError(f"Component initialization failed: {e}", self.component_name)
     
     async def _pre_init(self):
         """Pre-initialization hook - override if needed."""
