@@ -885,8 +885,7 @@ async def main():
     """Enhanced main entry point"""
     parser = argparse.ArgumentParser(description="Enhanced Tekton status checker")
     parser.add_argument("--json", "-j", action="store_true", help="Output in JSON format")
-    parser.add_argument("--component", "-c", help="Check specific component")
-    parser.add_argument("--components", "-C", help="Check multiple components (comma-separated)")
+    parser.add_argument("--component", "-c", help="Check specific component(s) - single component or comma-separated list")
     parser.add_argument("--full", "-f", action="store_true", help="Full output with enhanced table and capabilities")
     parser.add_argument("--log", "-l", nargs='?', const=5, type=int, metavar='N', help="Show recent log lines for each component (default: 5 lines)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output (equivalent to --full --log)")
@@ -910,9 +909,11 @@ async def main():
             # Determine which components to check
             components_to_check = None
             if args.component:
-                components_to_check = [args.component.lower().replace("-", "_")]
-            elif args.components:
-                components_to_check = [c.strip().lower().replace("-", "_") for c in args.components.split(",")]
+                # Handle comma-separated components
+                if ',' in args.component:
+                    components_to_check = [c.strip().lower().replace("-", "_") for c in args.component.split(",")]
+                else:
+                    components_to_check = [args.component.lower().replace("-", "_")]
                 
             if components_to_check:
                 # Check specific components
