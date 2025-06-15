@@ -46,6 +46,10 @@ class GlobalConfig:
             self._registration_info: Dict[str, Any] = {}
             self._start_time = time.time()
             
+            # Service URL cache - populated once from Hermes
+            self._service_urls: Dict[str, str] = {}
+            self._service_urls_loaded = False
+            
             # Component-specific state (will be set by components)
             self.hermes_registration = None
             self.heartbeat_task = None
@@ -136,12 +140,34 @@ class GlobalConfig:
             del self._services[service_name]
     
     # Service URL resolution
+    def _load_service_urls(self):
+        """Load all service URLs from Hermes once."""
+        if self._service_urls_loaded:
+            return
+            
+        try:
+            import requests
+            response = requests.get("http://localhost:8001/components", timeout=2.0)
+            if response.ok:
+                data = response.json()
+                for component in data.get('components', []):
+                    name = component.get('name')
+                    endpoint = component.get('endpoint')
+                    if name and endpoint:
+                        self._service_urls[name] = endpoint
+                logger.info(f"Loaded {len(self._service_urls)} service URLs from Hermes")
+        except Exception as e:
+            logger.debug(f"Could not load service URLs from Hermes: {e}")
+        
+        self._service_urls_loaded = True
+    
     def get_service_url(self, component_name: str) -> str:
         """
-        Get URL for a component service.
+        Get URL for a component service using Hermes service discovery.
         
-        TODO: Future sprint - replace with Hermes service discovery
-        Currently returns hardcoded localhost URL
+        Queries Hermes once on first call to get all service URLs,
+        then uses cached values. Falls back to localhost if Hermes
+        is unavailable or component not found.
         
         Args:
             component_name: Name of the component
@@ -149,6 +175,15 @@ class GlobalConfig:
         Returns:
             Service URL (e.g., "http://localhost:8003")
         """
+        # Load service URLs from Hermes on first call
+        if not self._service_urls_loaded:
+            self._load_service_urls()
+        
+        # Check cache first
+        if component_name in self._service_urls:
+            return self._service_urls[component_name]
+        
+        # Fallback to localhost configuration
         config = self.get_component_config(component_name)
         return f"http://localhost:{config.port}"
     
@@ -184,6 +219,8 @@ class GlobalConfig:
         """Clear all runtime state (useful for testing)."""
         self._services.clear()
         self._registration_info.clear()
+        self._service_urls.clear()
+        self._service_urls_loaded = False
         self.hermes_registration = None
         self.heartbeat_task = None
         self.is_registered_with_hermes = False
