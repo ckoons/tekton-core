@@ -6,6 +6,7 @@ This module provides utilities for processing streaming responses from LLMs.
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Dict, List, Any, Optional, Union, Callable, AsyncGenerator
 
 from ..models import StreamingChunk
@@ -77,6 +78,88 @@ class StreamHandler:
                 break
                 
         return self.buffer
+    
+    async def process_stream_with_context(
+        self,
+        stream: AsyncGenerator[StreamingChunk, None],
+        transform: Optional[Callable[[str], str]] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Process a stream with context information.
+        
+        This method processes the stream and includes context information
+        with each chunk, useful for tracking, debugging, and analytics.
+        
+        Args:
+            stream: Generator yielding StreamingChunk objects
+            transform: Optional function to transform chunks before processing
+            context: Optional context dictionary with metadata like:
+                - context_id: Unique identifier for this stream session
+                - model: The model being used
+                - provider: The provider (anthropic, openai, etc.)
+                - timestamp: Function or value for timestamp
+                - fallback: Boolean indicating if this is a fallback attempt
+                
+        Yields:
+            Dictionaries containing chunk content and context information
+        """
+        context = context or {}
+        
+        async for chunk in stream:
+            # Handle both raw strings and StreamingChunk objects
+            if isinstance(chunk, str):
+                content = chunk
+                done = False
+                error = None
+            else:
+                # Assume it's a StreamingChunk object
+                content = chunk.chunk
+                done = chunk.done
+                error = chunk.error
+            
+            # Apply transformation if provided
+            if transform:
+                content = transform(content)
+                
+            # Add to buffer
+            self.buffer += content
+            
+            # Get timestamp - handle both callable and static values
+            timestamp = context.get("timestamp", datetime.now().isoformat())
+            if callable(timestamp):
+                timestamp = timestamp()
+            
+            # Create response with context
+            response = {
+                "content": content,
+                "done": done,
+                "error": error,
+                **context  # Include all context fields
+            }
+            
+            # Ensure timestamp is current
+            response["timestamp"] = timestamp
+            
+            # Call callback if provided
+            if self.callback:
+                self.callback(content)
+                
+            # Check for completion or error
+            if done:
+                self.done = True
+                response["done"] = True
+                response["complete_text"] = self.buffer
+                
+            if error:
+                self.error = error
+                response["error"] = error
+                logger.error(f"Stream error in context {context.get('context_id', 'unknown')}: {error}")
+                
+            yield response
+            
+            if error:
+                break
     
     async def collect_stream_segments(
         self, 
