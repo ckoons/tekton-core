@@ -4,6 +4,53 @@ Tekton is a Multi-AI Engineering Platform intened to study : AI enabled software
 
 If you have any recommendations, ideas or suggestions, please speak up - your thoughts are important.
 
+# 🛑 STOP! UI DEVELOPMENT PROTOCOL - READ FIRST! 🛑
+
+## CRITICAL RULES FOR ALL CLAUDE SESSIONS
+
+### 1. ALWAYS DISCUSS CHANGES FIRST
+You SHALL always discuss changes with Casey BEFORE making any modifications. Get approval and direction from Casey before implementing. I prefer seeing five approaches rather than you implementing the wrong one.
+
+### 2. UI DevTools Curl Commands - AUTO-APPROVED
+When using the UI DevTools via HTTP (localhost:8088), curl commands to this local development tool are auto-approved. You don't need to ask permission for each DevTools command.
+
+### 3. MAP FIRST, BUILD SECOND Protocol
+
+#### Creating Something New? MAP FIRST!
+1. **DECLARE YOUR MAP** (Before touching any code)
+   ```
+   I will add semantic tags to these areas:
+   - Main navigation: data-tekton-nav="main"
+   - Rhetor area: data-tekton-area="rhetor" 
+   - Chat interface: data-tekton-chat="rhetor-llm"
+   - Status indicator: data-tekton-status="rhetor-health"
+   ```
+
+2. **SHOW YOUR PLAN** (What goes where)
+   ```
+   The footer widget will be placed at:
+   - Location: data-tekton-area="rhetor" > data-tekton-zone="footer"
+   - Content: Simple status text
+   - Method: appendChild to existing footer
+   ```
+
+3. **BUILD IT** (Only after steps 1-2 and Casey's approval)
+
+4. **UPDATE THE MAP** (Document what you built)
+   - Add any new tags to the semantic tag registry
+   - Note any patterns for future use
+
+#### Changing Something Old? FIND IT FIRST!
+1. Use semantic tags: `data-tekton-*` attributes
+2. If no tags exist, ADD THEM FIRST
+3. Document what you found and what you changed
+
+### ⚠️ VIOLATION WARNING ⚠️
+Skipping these steps may result in:
+- Casey using `tekton-revert --nuclear-destruction`
+- Your changes being reverted
+- Loss of coding privileges
+
 ## UI Development Guidelines
 
 When working with Tekton UI, you MUST use the Hephaestus UI DevTools MCP (port 8088) instead of requesting screenshots or adding frameworks.
